@@ -367,8 +367,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         }
 
         // Setup Bones & Natural Arm Resting Pose
-        let headBone: THREE.Bone | null = null;
-
         if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
           mmdMesh.skeleton.bones.forEach((bone, index) => {
             const name = bone.name;
@@ -381,7 +379,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             } else if (name === '首') {
               neckBoneRef.current = bone;
             } else if (name === '頭' || name === 'head') {
-              headBone = bone;
               headBoneRef.current = bone;
             }
 
@@ -446,24 +443,31 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               const isBlushMat = 
                 rawMatName.includes('顏+') || rawMatName.includes('颜+') ||
                 rawMatName.includes('顏赤') || rawMatName.includes('颜赤') ||
-                matName.includes('blush') || matName.includes('pipi') ||
-                matName.includes('頬') || matName.includes('ほほ') ||
-                matName.includes('hoho') || matName.includes('赤み') ||
-                matName.includes('照れ') ||
-                mapUrl.includes('颜赤') || mapUrl.includes('yan_chi') ||
-                mapUrl.includes('blush') || mapUrl.includes('hoho');
+                mapUrl.includes('颜赤') || mapUrl.includes('yan_chi');
 
               if (isBlushMat) {
-                mat.transparent = true;
-                mat.depthWrite = false;
-                (mat as any).opacity = 0;
-                mat.visible = false;
-                mat.userData = { outlineParameters: { visible: false } };
-                if (!cheekMaterialsRef.current.includes(mat as THREE.MeshBasicMaterial)) {
-                  cheekMaterialsRef.current.push(mat as THREE.MeshBasicMaterial);
+                const blushTex = new THREE.TextureLoader().load('/models/firefly/颜赤.png');
+                blushTex.colorSpace = THREE.SRGBColorSpace;
+                const blushMat = new THREE.MeshBasicMaterial({
+                  map: blushTex,
+                  color: new THREE.Color('#ff7e95'), // Soft warm pastel rose-pink tint!
+                  transparent: true,
+                  opacity: 0,
+                  depthWrite: false,
+                  depthTest: true,
+                  side: THREE.DoubleSide,
+                });
+                blushMat.polygonOffset = true;
+                blushMat.polygonOffsetFactor = -4;
+                blushMat.polygonOffsetUnits = -4;
+                (blushMat as any).renderOrder = 10;
+                blushMat.visible = false;
+                blushMat.userData = { outlineParameters: { visible: false } };
+                if (!cheekMaterialsRef.current.includes(blushMat)) {
+                  cheekMaterialsRef.current.push(blushMat);
                 }
-                mat.needsUpdate = true;
-                return mat;
+                blushMat.needsUpdate = true;
+                return blushMat;
               }
 
               const isTransparent = mat.transparent || mat.opacity < 0.98;
@@ -574,15 +578,20 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return lashMat;
               }
 
-              // Mouth, Teeth, Tongue -> Soft Warm Toon Shading Matching Face Skin Saturation!
-              if (matName.includes('mouth') || matName.includes('口') || matName.includes('teeth') || matName.includes('tongue') || matName.includes('舌') || matName.includes('齒')) {
+              // Mouth, Teeth, Tongue & Inner Cavity -> Soft Warm Toon Shading (NO Outlines & depthWrite: true to block background/hair outline bleed!)
+              if (
+                rawMatName.includes('歯') || rawMatName.includes('齒') ||
+                rawMatName.includes('口') || matName.includes('mouth') ||
+                matName.includes('teeth') || matName.includes('tooth') ||
+                matName.includes('tongue') || matName.includes('舌')
+              ) {
                 const mouthMat = new THREE.MeshToonMaterial({
                   map: map,
                   gradientMap: faceToonRampTex, // Shares face skin light and shadow toon ramp!
                   color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
-                  transparent: true,
-                  alphaTest: 0.05,
-                  depthWrite: false,
+                  transparent: isTransparent,
+                  alphaTest: isTransparent ? 0.05 : 0.0,
+                  depthWrite: true,
                   depthTest: true,
                   side: THREE.DoubleSide,
                 });
@@ -661,6 +670,16 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const foreheadMatIdx = mmdMesh.material.findIndex((m) =>
             (m.name || '').toLowerCase().includes('forehead')
           );
+
+          if (foreheadMatIdx !== -1) {
+            const mat = mmdMesh.material[foreheadMatIdx] as THREE.MeshBasicMaterial;
+            if (mat) {
+              mat.map = createAnimeForeheadShadowTexture();
+              mat.transparent = true;
+              mat.opacity = 0;
+              foreheadShadowMaterialRef.current = mat;
+            }
+          }
 
           if (foreheadMatIdx !== -1 && headBoneIdx !== -1 && mmdMesh.geometry.groups) {
             const group = mmdMesh.geometry.groups.find((g) => g.materialIndex === foreheadMatIdx);
@@ -1078,7 +1097,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         const morphSmileMouth = getMorphIdx('口角上げ');
         const morphSmallMouth = getMorphIdx('ん') ?? getMorphIdx('へ');
-        const morphFrownMouth = getMorphIdx('口角下げ') ?? getMorphIdx('▲') ?? getMorphIdx('△');
+        const morphFrownMouth = getMorphIdx('口角下げ');
+        const morphTriangleMouth = getMorphIdx('倒ω') ?? getMorphIdx('▲') ?? getMorphIdx('△');
+        const morphPuckerMouth = getMorphIdx('口横缩げ') ?? getMorphIdx('口横缩げ2');
 
         const morphRelaxedEye  = getMorphIdx('じと目') ?? getMorphIdx('笑い');
         const morphRelaxedEyebrow = getMorphIdx('にこり') ?? getMorphIdx('下');
@@ -1095,6 +1116,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         let targetSmileMouth = 0;
         let targetSmallMouth = 0;
         let targetFrownMouth = 0;
+        let targetTriangleMouth = 0;
+        let targetPuckerMouth = 0;
 
         let targetVowelA = 0;
         let targetVowelI = 0;
@@ -1136,9 +1159,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetFrownMouth = 0.45; // Distressed trembling mouth
           targetSmallMouth = 0.35;
         } else if (emo === 'pouting') {
-          targetFrownMouth = 0.85;
-          targetAngryEyebrow = 0.55;
-          targetSmallMouth = 0.35;
+          targetSmallMouth = 0; // Sealed lips
+          targetFrownMouth = 0.12; // Very gentle soft downturn
+          targetTriangleMouth = 0.28; // Soft gentle anime pouting curve ('倒ω' / '▲')!
+          targetPuckerMouth = 0.22; // Soft natural pouting mouth width
+          targetSadEyebrow = 0.40; // Downturned cute sulking eyebrows ('困る')
+          targetAngryEyebrow = 0.15; // Soft brow tension
+          targetRelaxedEye = 0.25; // Soft sulking narrowed gaze ('じと目')
         } else if (emo === 'relaxed') {
           targetSmileMouth = 0.25; // Gentle sweet smile
           targetRelaxedEyebrow = 0; // Gentle natural arched eyebrows (no downturned sad morph!)
@@ -1182,7 +1209,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             targetVowelA = Math.min(0.35, openPower * 0.40);
             targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
             targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
-          } else if (emo === 'angry' || emo === 'jealous' || emo === 'pouting') {
+          } else if (emo === 'pouting') {
+            // Pouting speech: relax static mouth narrowing & triangle mouth so speech lip-sync animates smoothly
+            targetSmileMouth = 0;
+            targetFrownMouth = 0.12;
+            targetSmallMouth = 0;
+            targetTriangleMouth = 0.10;
+            targetPuckerMouth = 0.10;
+            targetVowelA = Math.min(0.38, openPower * 0.45);
+            targetVowelI = Math.abs(Math.sin(t * 9.5)) * 0.18 * organicFactor;
+            targetVowelO = Math.abs(Math.sin(t * 6.5)) * 0.20 * organicFactor;
+          } else if (emo === 'angry' || emo === 'jealous') {
             // Determined/Angry/Jealous speech: NO smile, keep firm mouth tension
             targetSmileMouth = 0;
             targetFrownMouth = 0.28;
@@ -1204,7 +1241,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         }
 
         // Smoothly fade soft rose-peach cheekbone blush (0 when relaxed/neutral!)
-        const targetCheekOpacity = emo === 'blush-hardly' ? 0.35 : (emo === 'blush' ? 0.20 : 0);
+        const targetCheekOpacity = emo === 'blush-hardly' ? 0.38 : (emo === 'blush' ? 0.24 : (emo === 'pouting' ? 0.22 : (emo === 'teasing' ? 0.12 : (emo === 'happy' ? 0.06 : 0))));
         cheekMaterialsRef.current.forEach((mat) => {
           mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
           mat.visible = mat.opacity > 0.01;
@@ -1227,21 +1264,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         };
 
         const morphBlush1 = getMorphIdx('照れ');
-        const morphBlush2 = getMorphIdx('赤み');
-        const morphBlush3 = getMorphIdx('照れ２');
-        const morphBlush4 = getMorphIdx('blush');
 
+        // Keep MMD vertex morph 照れ at 0 so red decal vertices stay hidden inside head mesh.
+        // Material #2 (顏+) opacity targetCheekOpacity handles blush rendering 100% cleanly!
         let targetBlushMorph = 0;
-        if (emo === 'blush') {
-          targetBlushMorph = 0.35;
-        } else if (emo === 'blush-hardly') {
-          targetBlushMorph = 0.70;
-        }
-
         setMorphTarget(morphBlush1, targetBlushMorph);
-        setMorphTarget(morphBlush2, targetBlushMorph);
-        setMorphTarget(morphBlush3, targetBlushMorph);
-        setMorphTarget(morphBlush4, targetBlushMorph);
 
         setMorphTarget(morphVowelA, targetVowelA);
         setMorphTarget(morphVowelI, targetVowelI);
@@ -1252,6 +1279,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         setMorphTarget(morphSmileMouth, targetSmileMouth);
         setMorphTarget(morphSmallMouth, targetSmallMouth);
         setMorphTarget(morphFrownMouth, targetFrownMouth);
+        setMorphTarget(morphTriangleMouth, targetTriangleMouth);
+        setMorphTarget(morphPuckerMouth, targetPuckerMouth);
 
         setMorphTarget(morphRelaxedEye, targetRelaxedEye);
         setMorphTarget(morphRelaxedEyebrow, targetRelaxedEyebrow);
