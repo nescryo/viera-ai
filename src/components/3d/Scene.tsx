@@ -252,13 +252,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
 
-    // Anime Inverted-Hull Toon Outline Effect (Ultra-delicate 0.8mm anime line)
+    // Anime Inverted-Hull Toon Outline Effect (Crisp 1.4mm anime lineart framing hair & silhouette)
     const effect = new OutlineEffect(renderer, {
-      defaultThickness: 0.0008, // Ultra-delicate 0.8mm line (matching 2D anime illustration)
-      defaultColor: [0.32, 0.29, 0.30], // Soft warm greyish-brown tint (natural matching line)
-      defaultAlpha: 0.65,
+      defaultThickness: 0.0014, // Crisp 1.4mm anime lineart (defines hair strands & bangs contour)
+      defaultColor: [0.20, 0.18, 0.22], // Medium-dark anime lineart color matching in-game reference
+      defaultAlpha: 0.85,
       defaultKeepAlive: true
     });
 
@@ -270,13 +271,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
 
-    // 2. High-Fidelity Neutral/Warm Pipeline Lighting (Warm Key + Soft Subdued Rim)
-    // Warm Champagne Ambient Light (Neutral-warm base for natural skin & hair temperature)
-    const ambientLight = new THREE.AmbientLight(0xfff5ed, 0.75);
+    // 2. High-Fidelity Masterclass Lighting Pipeline
+    // Subdued Warm Ambient Light (0.38 - prevents washed out / flat white faces!)
+    const ambientLight = new THREE.AmbientLight(0xfbf8f5, 0.38);
     scene.add(ambientLight);
 
-    // Warm Key Light (Main neutral-warm sunlight from top-right)
-    const keyLight = new THREE.DirectionalLight(0xfff8f0, 0.95);
+    // Main Neutral/Warm Sunlight Key Light (RGB ≈ warm/neutral white)
+    const keyLight = new THREE.DirectionalLight(0xfffbf5, 0.88);
     keyLight.position.set(2.0, 4.0, 3.0);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
@@ -284,13 +285,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     keyLight.shadow.bias = -0.0003;
     scene.add(keyLight);
 
-    // Soft Warm Fill Light (Front-left fill, neutral-warm tint - NO CYAN CAST!)
-    const fillLight = new THREE.DirectionalLight(0xfff4eb, 0.40);
+    // Neutral Soft Fill Light (RGB ≈ neutral white - NO CYAN CAST!)
+    const fillLight = new THREE.DirectionalLight(0xf5f5f5, 0.28);
     fillLight.position.set(-2.0, 2.0, 2.5);
     scene.add(fillLight);
 
-    // Subdued Soft Cool Rim Light (Very gentle cyan accent from behind - SUBDUED 0.35!)
-    const rimLight = new THREE.DirectionalLight(0xbfdbfe, 0.35);
+    // Subtle Cool Rim Light (Very gentle cyan accent from behind - SUBDUED 0.22!)
+    const rimLight = new THREE.DirectionalLight(0xe0f2fe, 0.22);
     rimLight.position.set(-0.5, 3.0, -3.0);
     scene.add(rimLight);
 
@@ -524,12 +525,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return shadowMat;
               }
 
-              // Eyes, Pupils, Iris (Mat #8: 目) -> Saturated Cyan, Blue, Pink & Magenta Contrast!
+              // Eyes, Pupils, Iris (Mat #8: 目) -> Saturated Deep Cyan, Blue, Magenta & Pink Contrast!
               if (matName.includes('eye') || matName.includes('目') || matName.includes('hitomi') || matName.includes('pupil')) {
-                const isIris = rawMatName === '目' || matName.includes('iris') || matName.includes('pupil');
                 const eyeMat = new THREE.MeshBasicMaterial({
                   map: map,
-                  color: isIris ? new THREE.Color(1.12, 1.12, 1.22) : new THREE.Color(0xffffff),
+                  color: new THREE.Color(1.0, 1.0, 1.0), // True-to-life sRGB texture colors (deep cyan, magenta, dark pupil contrast!)
                   transparent: false,
                   depthWrite: true,
                   depthTest: true,
@@ -540,26 +540,53 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return eyeMat;
               }
 
-              // Eyelashes, Eyebrows, Mouth, Teeth, Tongue -> Delicate Anti-Aliased Overlay
-              if (
-                matName.includes('eyelash') || matName.includes('まつ') ||
-                matName.includes('eyeline') || matName.includes('睫毛') ||
-                matName.includes('eyebrow') || matName.includes('まゆ') ||
-                matName.includes('mouth') || matName.includes('口') ||
-                matName.includes('teeth') || matName.includes('tongue')
-              ) {
-                const featMat = new THREE.MeshBasicMaterial({
+              // Eyebrows (Mat #3 眉 / eyebrow / まゆ) -> Soft Warm Rose-Ash Gray (#8a7c82 matching hair lineart hierarchy!)
+              if (rawMatName.includes('眉') || matName.includes('eyebrow') || matName.includes('まゆ')) {
+                const browMat = new THREE.MeshBasicMaterial({
+                  map: map,
+                  color: new THREE.Color(0x8a7c82), // Soft rose-ash gray tint
+                  transparent: true,
+                  opacity: 0.82, // Softened opacity for seamless integration with hair bangs lineart
+                  alphaTest: 0.08,
+                  depthWrite: false,
+                  depthTest: true,
+                  side: THREE.DoubleSide,
+                });
+                browMat.userData = { outlineParameters: { visible: false } };
+                browMat.needsUpdate = true;
+                return browMat;
+              }
+
+              // Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / ま流) -> Soft Dark Rose-Charcoal (#52464c)
+              if (rawMatName.includes('睫') || matName.includes('eyelash') || matName.includes('eyeline') || matName.includes('まつ')) {
+                const lashMat = new THREE.MeshBasicMaterial({
+                  map: map,
+                  color: new THREE.Color(0x52464c), // Soft dark rose-charcoal (delicate, balanced contrast)
+                  transparent: true,
+                  alphaTest: 0.05,
+                  depthWrite: false,
+                  depthTest: true,
+                  side: THREE.DoubleSide,
+                });
+                lashMat.userData = { outlineParameters: { visible: false } };
+                lashMat.needsUpdate = true;
+                return lashMat;
+              }
+
+              // Mouth, Teeth, Tongue -> Clean Vibrant Rendering
+              if (matName.includes('mouth') || matName.includes('口') || matName.includes('teeth') || matName.includes('tongue') || matName.includes('舌') || matName.includes('齒')) {
+                const mouthMat = new THREE.MeshBasicMaterial({
                   map: map,
                   color: new THREE.Color(0xffffff),
                   transparent: true,
                   alphaTest: 0.05,
-                  depthWrite: false, // Render over face skin cleanly
+                  depthWrite: false,
                   depthTest: true,
                   side: THREE.DoubleSide,
                 });
-                featMat.userData = { outlineParameters: { visible: false } };
-                featMat.needsUpdate = true;
-                return featMat;
+                mouthMat.userData = { outlineParameters: { visible: false } };
+                mouthMat.needsUpdate = true;
+                return mouthMat;
               }
 
               // Body, Hair, Clothes, Jacket, Ribbon, Skirt -> Vibrant MeshToonMaterial WITH outline!
@@ -1081,9 +1108,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           targetAngryEyebrow = 0.55;
           targetSmallMouth = 0.35;
         } else if (emo === 'relaxed') {
-          targetSmileMouth = 0.35;
-          targetRelaxedEyebrow = 0.45;
-          targetRelaxedEye = 0.15;
+          targetSmileMouth = 0.25; // Gentle sweet smile
+          targetRelaxedEyebrow = 0; // Gentle natural arched eyebrows (no downturned sad morph!)
+          targetRelaxedEye = 0; // Wide open expressive round eyes (no squished eyelids!)
         } else if (emo === 'surprised') {
           targetSurprisedEye = 0.85;
           targetSurprisedEyebrow = 0.75;
