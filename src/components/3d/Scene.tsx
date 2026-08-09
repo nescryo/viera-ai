@@ -155,9 +155,9 @@ function createFaceToonRampTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#f5dcd8'); // Soft warm porcelain shadow step
-    grad.addColorStop(0.35, '#faf0ed'); // Soft warm transition
-    grad.addColorStop(0.65, '#ffffff'); // Pure bright warm porcelain face
+    grad.addColorStop(0, '#fce4e6');   // Soft warm peach shadow (under bangs & chin only)
+    grad.addColorStop(0.12, '#fff4f6'); // Smooth soft transition
+    grad.addColorStop(0.20, '#ffffff'); // Pure warm porcelain face (80% of face surface!)
     grad.addColorStop(1.0, '#ffffff');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 256, 1);
@@ -473,17 +473,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 map.colorSpace = THREE.SRGBColorSpace;
               }
 
-              // Face Skin -> Smooth Porcelain Anime Cel-Shaded Skin
+              // Face Skin & Body Skin -> Rich Warm Porcelain Peach Anime Skin (Mat #1: 顏 & Mat #11: 肌)
               if (
-                matName.includes('face') || matName.includes('顔') ||
-                matName.includes('skin') || matName.includes('肌') ||
-                matName.includes('head') || mapUrl.includes('颜.png') ||
-                mapUrl.includes('face')
+                rawMatName.includes('顏') || rawMatName.includes('顔') ||
+                rawMatName.includes('肌') || matName.includes('face') ||
+                matName.includes('skin') || matName.includes('head') ||
+                mapUrl.includes('颜.png') || mapUrl.includes('face')
               ) {
                 const faceMat = new THREE.MeshToonMaterial({
                   map: map,
                   gradientMap: faceToonRampTex,
-                  color: new THREE.Color(0xfff7f4), // Soft warm porcelain tone
+                  color: new THREE.Color(0xfff7f4), // Soft warm porcelain white skin tone matching Screenshot_20260809_114006.png!
                   transparent: false, // 100% Solid Opaque
                   depthWrite: true,
                   depthTest: true,
@@ -525,11 +525,12 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return shadowMat;
               }
 
-              // Eyes, Pupils, Iris (Mat #8: 目) -> Saturated Deep Cyan, Blue, Magenta & Pink Contrast!
+              // Eyes, Pupils, Iris (Mat #8: 目) -> Soft Warm Toon Shading Matching Face Skin Saturation!
               if (matName.includes('eye') || matName.includes('目') || matName.includes('hitomi') || matName.includes('pupil')) {
-                const eyeMat = new THREE.MeshBasicMaterial({
+                const eyeMat = new THREE.MeshToonMaterial({
                   map: map,
-                  color: new THREE.Color(1.0, 1.0, 1.0), // True-to-life sRGB texture colors (deep cyan, magenta, dark pupil contrast!)
+                  gradientMap: faceToonRampTex, // Shares face skin lighting and shadow ramp!
+                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
                   transparent: false,
                   depthWrite: true,
                   depthTest: true,
@@ -557,7 +558,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return browMat;
               }
 
-              // Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / ま流) -> Soft Dark Rose-Charcoal (#52464c)
+              // Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / まつ) -> Soft Dark Rose-Charcoal (#52464c)
               if (rawMatName.includes('睫') || matName.includes('eyelash') || matName.includes('eyeline') || matName.includes('まつ')) {
                 const lashMat = new THREE.MeshBasicMaterial({
                   map: map,
@@ -573,11 +574,12 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return lashMat;
               }
 
-              // Mouth, Teeth, Tongue -> Clean Vibrant Rendering
+              // Mouth, Teeth, Tongue -> Soft Warm Toon Shading Matching Face Skin Saturation!
               if (matName.includes('mouth') || matName.includes('口') || matName.includes('teeth') || matName.includes('tongue') || matName.includes('舌') || matName.includes('齒')) {
-                const mouthMat = new THREE.MeshBasicMaterial({
+                const mouthMat = new THREE.MeshToonMaterial({
                   map: map,
-                  color: new THREE.Color(0xffffff),
+                  gradientMap: faceToonRampTex, // Shares face skin light and shadow toon ramp!
+                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
                   transparent: true,
                   alphaTest: 0.05,
                   depthWrite: false,
@@ -589,7 +591,43 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return mouthMat;
               }
 
-              // Body, Hair, Clothes, Jacket, Ribbon, Skirt -> Vibrant MeshToonMaterial WITH outline!
+              // Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Vibrant Warm Platinum Silver Tint
+              if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
+                const hairMat = new THREE.MeshToonMaterial({
+                  map: map,
+                  gradientMap: animeToonRampTex,
+                  color: new THREE.Color(0xfffcf8), // Warm platinum silver tone
+                  transparent: isTransparent,
+                  alphaTest: isTransparent ? 0.35 : 0.0,
+                  side: (mat as any).side ?? THREE.FrontSide,
+                  depthWrite: !isTransparent,
+                });
+                hairMat.userData = { outlineParameters: { visible: true } };
+                hairMat.needsUpdate = true;
+                return hairMat;
+              }
+
+              // Ribbon, Gem, Butterfly Accessories -> Saturated Vibrant Teal/Cyan Tint
+              if (
+                rawMatName.includes('翼') || rawMatName.includes('胸針') || rawMatName.includes('飾') ||
+                matName.includes('gem') || matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')
+              ) {
+                const accMat = new THREE.MeshToonMaterial({
+                  map: map,
+                  gradientMap: animeToonRampTex,
+                  color: new THREE.Color(1.02, 1.08, 1.10), // Boosted vibrant teal/cyan color
+                  emissive: new THREE.Color(0x0a222c), // Subtle glowing emerald cyan accent
+                  transparent: isTransparent,
+                  alphaTest: isTransparent ? 0.35 : 0.0,
+                  side: (mat as any).side ?? THREE.FrontSide,
+                  depthWrite: !isTransparent,
+                });
+                accMat.userData = { outlineParameters: { visible: true } };
+                accMat.needsUpdate = true;
+                return accMat;
+              }
+
+              // Default Body, Clothes, Jacket, Skirt -> Vibrant MeshToonMaterial WITH outline!
               const toonMat = new THREE.MeshToonMaterial({
                 map: map,
                 gradientMap: animeToonRampTex,
@@ -601,12 +639,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               });
 
               toonMat.userData = { outlineParameters: { visible: true } };
-
-              // Subtle emissive highlight for crystal gems and hair accessories
-              if (matName.includes('gem') || matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')) {
-                toonMat.emissive = new THREE.Color(0x101b28);
-              }
-
               toonMat.needsUpdate = true;
               return toonMat;
             };
