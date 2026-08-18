@@ -277,6 +277,7 @@ export function App() {
           cancelAnimationFrame(updateFrameId);
           updateFrameId = null;
         }
+        setIsLoading(false);
         const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
         const activeEmotion = emotions.length > 0 ? emotions[emotions.length - 1] : 'happy';
         setCurrentEmotion(activeEmotion);
