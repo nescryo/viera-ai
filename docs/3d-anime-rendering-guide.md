@@ -214,17 +214,41 @@ camera.lookAt(-0.65, 1.28, 0);
 
 ---
 
+---
+
+## 🌟 9. StellarToon HSR Cel-Shading & MatCap Pipeline
+
+Viera implements the mathematical shading architecture inspired by **Blender-StellarToon (Honkai: Star Rail Goo Engine Shader)** via custom GLSL chunks injected into Three.js materials in [`stellarToonMaterials.ts`](file:///home/nescryo/Projects/Viera/src/components/3d/shaders/stellarToonMaterials.ts):
+
+### Key Pipeline Elements:
+1. **Multi-Step Dual-Shadow Ramps**:
+   * Hair: Multi-step ramp transitioning from cool deep shadow (`#b8aeb5`), warm ambient shadow (`#ede5e0`), to highlight (`#ffffff`).
+   * Body: Multi-step ramp for fabric depth (`#c4bcc3` -> `#f0e8e4` -> `#ffffff`).
+2. **Sphere Map / MatCap Blending (`SPA` & `SPH`)**:
+   * Hair Anisotropic Angel Ring: `mc1.png` with multiplicative blending.
+   * Metallic Accents & Sword: `SP0d_...bmp` with additive blending.
+   * Soft Fabric Sheen: `31.bmp` with multiplicative falloff.
+3. **Stylized Fresnel Rim Lighting**:
+   * View-space normal falloff $\text{pow}(1.0 - \mathbf{N}\cdot\mathbf{V}, 3.2)$ with vertical bias and soft cyan-white highlight.
+4. **Face Normal Softening**:
+   * Softens facial polygon normals towards front-facing view vector to prevent harsh geometric cheek and nose creases.
+5. **Luminous Emissive Boost**:
+   * Firefly's cyan wing brooch, iris, and sparkles are boosted for vibrant anime brilliance.
+
+---
+
 ## 📌 Checklist for Adding New 3D Models:
 
 - [ ] Set `outputColorSpace = SRGBColorSpace` and `toneMapping = ACESFilmicToneMapping (1.0)`.
-- [ ] Keep Ambient Light warm (`0.42`) and use a Warm Key Light (`0.90`).
+- [ ] Keep Ambient Light warm (`0.40`) and use a Warm Key Light (`0.92`).
 - [ ] Check for Traditional Chinese (`顏`) and Simplified Chinese (`顔`) material names.
 - [ ] Check for duplicate blush submeshes (`顏+`, `blush`) and set `opacity = 0`, `visible = false`.
-- [ ] Create toon ramps using smooth linear gradients with `LinearFilter`.
-- [ ] Use `MeshToonMaterial` with `faceToonRampTex` for Iris and Mouth to harmonize lighting with face skin.
+- [ ] Create toon ramps using smooth linear gradients (`createHSRHairToonRamp`, `createHSRBodyToonRamp`, `createHSRFaceToonRamp`).
+- [ ] Inject MatCap & Rim lighting chunks using `injectHSRShaderChunks`.
 - [ ] Separate eyebrow tint (`#8a7c82`) and eyelash tint (`#52464c`) from solid black.
-- [ ] Set `OutlineEffect` thickness to `0.0014` with a medium dark brownish-grey tint.
+- [ ] Set `OutlineEffect` thickness to `0.0013` with rich dark violet-charcoal tint (`[0.18, 0.16, 0.20]`).
 - [ ] Reset all inactive morph targets to `0` in the animation loop.
 
 ---
 *Documented by Ivy for Viera 3D Rendering System.* 🌸✨
+

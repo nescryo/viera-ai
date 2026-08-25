@@ -5,6 +5,12 @@ import * as MMDParser from 'mmd-parser';
 import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
+import {
+  createHSRHairToonRamp,
+  createHSRBodyToonRamp,
+  createHSRFaceToonRamp,
+  injectHSRShaderChunks
+} from './shaders/stellarToonMaterials';
 
 if (typeof window !== 'undefined') {
   (window as any).MMDParser = MMDParser;
@@ -120,55 +126,6 @@ function createAnimeForeheadShadowTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-/**
- * Creates a soft warm neutral 2D Anime Illustration Ramp Texture (Warm Shadow Transition)
- * Pure white base with warm neutral gray shadow step (NO cyan/blue shadow cast!)
- */
-function createAnimeToonRampTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#d6d0cb'); // Warm neutral gray shadow step
-    grad.addColorStop(0.35, '#f2ece8'); // Soft warm transition
-    grad.addColorStop(0.65, '#ffffff'); // Pure white highlight step
-    grad.addColorStop(1.0, '#ffffff');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 1);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/**
- * Creates a soft warm porcelain Ramp Texture specifically for Face Skin
- * Renders soft warm ambient shading under bangs, nose bridge, and chin!
- */
-function createFaceToonRampTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#fce4e6');   // Soft warm peach shadow (under bangs & chin only)
-    grad.addColorStop(0.12, '#fff4f6'); // Smooth soft transition
-    grad.addColorStop(0.20, '#ffffff'); // Pure warm porcelain face (80% of face surface!)
-    grad.addColorStop(1.0, '#ffffff');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 1);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
 
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
@@ -242,11 +199,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
 
-    // Anime Inverted-Hull Toon Outline Effect (Crisp 1.4mm anime lineart framing hair & silhouette)
+    // Anime Inverted-Hull Toon Outline Effect (Delicate & crisp 1.3mm lineart matching HSR in-game)
     const effect = new OutlineEffect(renderer, {
-      defaultThickness: 0.0014, // Crisp 1.4mm anime lineart (defines hair strands & bangs contour)
-      defaultColor: [0.20, 0.18, 0.22], // Medium-dark anime lineart color matching in-game reference
-      defaultAlpha: 0.85,
+      defaultThickness: 0.0013, // Delicate and crisp anime lineart
+      defaultColor: [0.18, 0.16, 0.20], // Rich dark violet-charcoal matching HSR in-game palette
+      defaultAlpha: 0.88,
       defaultKeepAlive: true
     });
 
@@ -258,28 +215,28 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
 
-    // 2. High-Fidelity Masterclass Lighting Pipeline
-    // Subdued Warm Ambient Light (0.38 - prevents washed out / flat white faces!)
-    const ambientLight = new THREE.AmbientLight(0xfbf8f5, 0.38);
+    // 2. High-Fidelity Masterclass Lighting Pipeline (HSR Celestial Stage)
+    // Warm Ambient Light (0.40 - warm champagne base preventing washed out faces)
+    const ambientLight = new THREE.AmbientLight(0xfdf9f6, 0.40);
     scene.add(ambientLight);
 
-    // Main Neutral/Warm Sunlight Key Light (RGB ≈ warm/neutral white)
-    const keyLight = new THREE.DirectionalLight(0xfffbf5, 0.88);
-    keyLight.position.set(2.0, 4.0, 3.0);
+    // Main Neutral/Warm Sunlight Key Light (RGB ≈ warm sunlight white)
+    const keyLight = new THREE.DirectionalLight(0xfff8f0, 0.92);
+    keyLight.position.set(2.2, 4.0, 3.2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
     keyLight.shadow.bias = -0.0003;
     scene.add(keyLight);
 
-    // Neutral Soft Fill Light (RGB ≈ neutral white - NO CYAN CAST!)
-    const fillLight = new THREE.DirectionalLight(0xf5f5f5, 0.28);
-    fillLight.position.set(-2.0, 2.0, 2.5);
+    // Neutral Soft Fill Light (RGB ≈ soft sky fill - NO CYAN CAST!)
+    const fillLight = new THREE.DirectionalLight(0xf2f4f8, 0.30);
+    fillLight.position.set(-2.2, 2.0, 2.5);
     scene.add(fillLight);
 
-    // Subtle Cool Rim Light (Very gentle cyan accent from behind - SUBDUED 0.22!)
-    const rimLight = new THREE.DirectionalLight(0xe0f2fe, 0.22);
-    rimLight.position.set(-0.5, 3.0, -3.0);
+    // Subtle Directional Rim Backlight (0.30 for silhouette separation)
+    const rimLight = new THREE.DirectionalLight(0xdef0fa, 0.30);
+    rimLight.position.set(-0.5, 3.5, -3.2);
     scene.add(rimLight);
 
     // 3. Ground Pedestal & Grid
@@ -352,10 +309,20 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        const animeToonRampTex = createAnimeToonRampTexture();
-        const faceToonRampTex = createFaceToonRampTexture();
+        // Load StellarToon MatCaps & HSR Multi-Step Toon Ramps
+        const textureLoader = new THREE.TextureLoader();
+        const metalMatCap = textureLoader.load('/models/firefly/SP0d_20190820_005614.bmp');
+        metalMatCap.colorSpace = THREE.SRGBColorSpace;
+        const hairMatCap = textureLoader.load('/models/firefly/mc1.png');
+        hairMatCap.colorSpace = THREE.SRGBColorSpace;
+        const fabricMatCap = textureLoader.load('/models/firefly/31.bmp');
+        fabricMatCap.colorSpace = THREE.SRGBColorSpace;
 
-        // Clean and optimize materials with Anime Cel-Shading & sRGB Color Space
+        const hsrHairRamp = createHSRHairToonRamp();
+        const hsrBodyRamp = createHSRBodyToonRamp();
+        const hsrFaceRamp = createHSRFaceToonRamp();
+
+        // Clean and optimize materials with HSR StellarToon Cel-Shading Pipeline
         mmdMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
@@ -375,7 +342,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 mapUrl.includes('颜赤') || mapUrl.includes('yan_chi');
 
               if (isBlushMat) {
-                const blushTex = new THREE.TextureLoader().load('/models/firefly/颜赤.png');
+                const blushTex = textureLoader.load('/models/firefly/颜赤.png');
                 blushTex.colorSpace = THREE.SRGBColorSpace;
                 const blushMat = new THREE.MeshBasicMaterial({
                   map: blushTex,
@@ -406,7 +373,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 map.colorSpace = THREE.SRGBColorSpace;
               }
 
-              // Face Skin & Body Skin -> Rich Warm Porcelain Peach Anime Skin (Mat #1: 顏 & Mat #11: 肌)
+              // 1. Face & Body Skin -> Rich Warm Porcelain Peach Anime Skin (Mat #1: 顏 & Mat #11: 肌)
               if (
                 rawMatName.includes('顏') || rawMatName.includes('顔') ||
                 rawMatName.includes('肌') || matName.includes('face') ||
@@ -415,11 +382,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const faceMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: faceToonRampTex,
-                  color: new THREE.Color(0xfff7f4), // Soft warm porcelain white skin tone matching Screenshot_20260809_114006.png!
+                  gradientMap: hsrFaceRamp,
+                  color: new THREE.Color(0xfff7f4), // Soft warm porcelain white skin tone matching in-game HSR
                   transparent: false, // 100% Solid Opaque
                   depthWrite: true,
                   depthTest: true,
+                });
+                injectHSRShaderChunks(faceMat, {
+                  rimColor: new THREE.Color(0xfff2ea),
+                  rimIntensity: 0.22,
+                  rimPower: 4.5,
+                  faceSoftening: true
                 });
                 (faceMat as any).opacity = 1.0;
                 faceMat.userData = { outlineParameters: { visible: false } };
@@ -427,7 +400,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return faceMat;
               }
 
-              // Eye Highlight Sparkles (Mat #9: 目光) -> Crystal Bright White Sparkles!
+              // 2. Eye Highlight Sparkles (Mat #9: 目光) -> Crystal Bright White Sparkles!
               if (rawMatName.includes('目光') || rawMatName.includes('sparkle') || rawMatName.includes('highlight')) {
                 const sparkleMat = new THREE.MeshBasicMaterial({
                   map: map,
@@ -443,7 +416,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return sparkleMat;
               }
 
-              // Eye Shadow Overlay (Mat #29: 目影) -> Soft Translucent Upper Eye Shadow
+              // 3. Eye Shadow Overlay (Mat #29: 目影) -> Soft Translucent Upper Eye Shadow
               if (rawMatName.includes('目影') || rawMatName.includes('eye_shadow')) {
                 const shadowMat = new THREE.MeshBasicMaterial({
                   map: map,
@@ -458,29 +431,35 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return shadowMat;
               }
 
-              // Eyes, Pupils, Iris (Mat #8: 目) -> Soft Warm Toon Shading Matching Face Skin Saturation!
+              // 4. Eyes, Pupils, Iris (Mat #8: 目) -> Saturated Soft Luminous Shading
               if (matName.includes('eye') || matName.includes('目') || matName.includes('hitomi') || matName.includes('pupil')) {
                 const eyeMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: faceToonRampTex, // Shares face skin lighting and shadow ramp!
-                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
+                  gradientMap: hsrFaceRamp,
+                  color: new THREE.Color(0xf6eff2),
+                  emissive: new THREE.Color(0x0a282a),
                   transparent: false,
                   depthWrite: true,
                   depthTest: true,
                   side: THREE.FrontSide,
+                });
+                injectHSRShaderChunks(eyeMat, {
+                  emissiveBoost: 0.20,
+                  rimColor: new THREE.Color(0x80ffff),
+                  rimIntensity: 0.30
                 });
                 eyeMat.userData = { outlineParameters: { visible: false } };
                 eyeMat.needsUpdate = true;
                 return eyeMat;
               }
 
-              // Eyebrows (Mat #3 眉 / eyebrow / まゆ) -> Soft Warm Rose-Ash Gray (#8a7c82 matching hair lineart hierarchy!)
+              // 5. Eyebrows (Mat #3 眉 / eyebrow / まゆ) -> Soft Warm Rose-Ash Gray (#8a7c82)
               if (rawMatName.includes('眉') || matName.includes('eyebrow') || matName.includes('まゆ')) {
                 const browMat = new THREE.MeshBasicMaterial({
                   map: map,
-                  color: new THREE.Color(0x8a7c82), // Soft rose-ash gray tint
+                  color: new THREE.Color(0x8a7c82),
                   transparent: true,
-                  opacity: 0.82, // Softened opacity for seamless integration with hair bangs lineart
+                  opacity: 0.82,
                   alphaTest: 0.08,
                   depthWrite: false,
                   depthTest: true,
@@ -491,11 +470,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return browMat;
               }
 
-              // Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / まつ) -> Soft Dark Rose-Charcoal (#52464c)
+              // 6. Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / まつ) -> Soft Dark Rose-Charcoal (#52464c)
               if (rawMatName.includes('睫') || matName.includes('eyelash') || matName.includes('eyeline') || matName.includes('まつ')) {
                 const lashMat = new THREE.MeshBasicMaterial({
                   map: map,
-                  color: new THREE.Color(0x52464c), // Soft dark rose-charcoal (delicate, balanced contrast)
+                  color: new THREE.Color(0x52464c),
                   transparent: true,
                   alphaTest: 0.05,
                   depthWrite: false,
@@ -507,7 +486,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return lashMat;
               }
 
-              // Mouth, Teeth, Tongue & Inner Cavity -> Soft Warm Toon Shading (NO Outlines & depthWrite: true to block background/hair outline bleed!)
+              // 7. Mouth, Teeth, Tongue & Inner Cavity -> Soft Warm Toon Shading (depthWrite: true)
               if (
                 rawMatName.includes('歯') || rawMatName.includes('齒') ||
                 rawMatName.includes('口') || matName.includes('mouth') ||
@@ -516,8 +495,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const mouthMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: faceToonRampTex, // Shares face skin light and shadow toon ramp!
-                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
+                  gradientMap: hsrFaceRamp,
+                  color: new THREE.Color(0xf5eef0),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.05 : 0.0,
                   depthWrite: true,
@@ -529,51 +508,105 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return mouthMat;
               }
 
-              // Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Vibrant Warm Platinum Silver Tint
+              // 8. Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> HSR Anisotropic Sheen & Dual-Step Ramp
               if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
                 const hairMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: animeToonRampTex,
-                  color: new THREE.Color(0xfffcf8), // Warm platinum silver tone
+                  gradientMap: hsrHairRamp,
+                  color: new THREE.Color(0xfffdfa),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
+                });
+                injectHSRShaderChunks(hairMat, {
+                  matCapTexture: hairMatCap,
+                  matCapIntensity: 0.40,
+                  matCapMode: 'multiply', // Anisotropic angel ring sheen!
+                  rimColor: new THREE.Color(0xd4f4ff),
+                  rimIntensity: 0.55,
+                  rimPower: 3.2
                 });
                 hairMat.userData = { outlineParameters: { visible: true } };
                 hairMat.needsUpdate = true;
                 return hairMat;
               }
 
-              // Ribbon, Gem, Butterfly Accessories -> Saturated Vibrant Teal/Cyan Tint
+              // 9. Ribbon, Gem, Butterfly Wings -> Luminous Vibrant Teal/Cyan Tint with Additive Specular
               if (
                 rawMatName.includes('翼') || rawMatName.includes('胸針') || rawMatName.includes('飾') ||
                 matName.includes('gem') || matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')
               ) {
                 const accMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: animeToonRampTex,
-                  color: new THREE.Color(1.02, 1.08, 1.10), // Boosted vibrant teal/cyan color
-                  emissive: new THREE.Color(0x0a222c), // Subtle glowing emerald cyan accent
+                  gradientMap: hsrHairRamp,
+                  color: new THREE.Color(1.04, 1.12, 1.14),
+                  emissive: new THREE.Color(0x0e4c45),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
+                });
+                injectHSRShaderChunks(accMat, {
+                  matCapTexture: metalMatCap,
+                  matCapIntensity: 0.45,
+                  matCapMode: 'add',
+                  rimColor: new THREE.Color(0x80ffff),
+                  rimIntensity: 0.70,
+                  rimPower: 2.8,
+                  emissiveBoost: 0.30
                 });
                 accMat.userData = { outlineParameters: { visible: true } };
                 accMat.needsUpdate = true;
                 return accMat;
               }
 
-              // Default Body, Clothes, Jacket, Skirt -> Vibrant MeshToonMaterial WITH outline!
+              // 10. Metallic Parts & Buckles -> Lustrous Additive MatCap Sheen
+              if (
+                rawMatName.includes('金') || rawMatName.includes('銀') ||
+                matName.includes('metal') || matName.includes('buckle') ||
+                matName.includes('button') || matName.includes('gold') ||
+                matName.includes('silver') || rawMatName.includes('剑')
+              ) {
+                const metalMat = new THREE.MeshToonMaterial({
+                  map: map,
+                  gradientMap: hsrBodyRamp,
+                  color: new THREE.Color(0xffffff),
+                  transparent: isTransparent,
+                  alphaTest: isTransparent ? 0.35 : 0.0,
+                  side: (mat as any).side ?? THREE.FrontSide,
+                  depthWrite: !isTransparent,
+                });
+                injectHSRShaderChunks(metalMat, {
+                  matCapTexture: metalMatCap,
+                  matCapIntensity: 0.65,
+                  matCapMode: 'add',
+                  rimColor: new THREE.Color(0xffeedd),
+                  rimIntensity: 0.50,
+                  rimPower: 3.0
+                });
+                metalMat.userData = { outlineParameters: { visible: true } };
+                metalMat.needsUpdate = true;
+                return metalMat;
+              }
+
+              // 11. Default Body, Clothes, Jacket, Skirt -> Multi-Step Cel-Shading with Soft Fabric Sheen
               const toonMat = new THREE.MeshToonMaterial({
                 map: map,
-                gradientMap: animeToonRampTex,
+                gradientMap: hsrBodyRamp,
                 color: new THREE.Color(0xffffff),
                 transparent: isTransparent,
                 alphaTest: isTransparent ? 0.35 : 0.0,
                 side: (mat as any).side ?? THREE.FrontSide,
                 depthWrite: !isTransparent,
+              });
+              injectHSRShaderChunks(toonMat, {
+                matCapTexture: fabricMatCap,
+                matCapIntensity: 0.22,
+                matCapMode: 'multiply',
+                rimColor: new THREE.Color(0xe0f2fe),
+                rimIntensity: 0.35,
+                rimPower: 4.0
               });
 
               toonMat.userData = { outlineParameters: { visible: true } };
