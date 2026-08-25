@@ -275,7 +275,7 @@ export class FacialExpressionEngine {
     }
 
     // 6. CHEEK BLUSH & FOREHEAD SHADOW OVERLAY MATERIALS
-    const targetCheekOpacity = emotion === 'blush-hardly' ? 0.38 : (emotion === 'blush' ? 0.24 : (emotion === 'pouting' ? 0.22 : (emotion === 'teasing' ? 0.12 : (emotion === 'happy' ? 0.06 : 0))));
+    const targetCheekOpacity = emotion === 'blush-hardly' ? 0.70 : (emotion === 'blush' ? 0.48 : (emotion === 'pouting' ? 0.38 : (emotion === 'teasing' ? 0.28 : (emotion === 'happy' ? 0.22 : 0.16))));
     cheekMaterials.forEach((mat) => {
       mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
       mat.visible = mat.opacity > 0.01;

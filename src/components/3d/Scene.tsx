@@ -6,10 +6,9 @@ import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
 import {
-  createHSRHairToonRamp,
-  createHSRBodyToonRamp,
   createHSRFaceToonRamp,
-  injectHSRShaderChunks
+  injectHSRHairShader,
+  injectHSRBodyShader
 } from './shaders/stellarToonMaterials';
 
 if (typeof window !== 'undefined') {
@@ -183,8 +182,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     scene.background = new THREE.Color('#0f1322'); // Space cosmic dark environment
 
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
-    camera.position.set(-0.65, 1.30, 1.50); // Spacious & elegant anime character view framing
-    camera.lookAt(-0.65, 1.28, 0);
+    camera.position.set(-0.65, 1.28, 1.28); // Flattering bust-up companion portrait framing
+    camera.lookAt(-0.65, 1.24, 0);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -309,20 +308,30 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        // Load StellarToon MatCaps & HSR Multi-Step Toon Ramps
+        // Load Official HSR Datamined Textures
         const textureLoader = new THREE.TextureLoader();
-        const metalMatCap = textureLoader.load('/models/firefly/SP0d_20190820_005614.bmp');
-        metalMatCap.colorSpace = THREE.SRGBColorSpace;
-        const hairMatCap = textureLoader.load('/models/firefly/mc1.png');
-        hairMatCap.colorSpace = THREE.SRGBColorSpace;
-        const fabricMatCap = textureLoader.load('/models/firefly/31.bmp');
-        fabricMatCap.colorSpace = THREE.SRGBColorSpace;
+        const hairLightMap = textureLoader.load('/models/firefly/Avatar_Firefly_01_Hair_LightMap.png');
+        hairLightMap.colorSpace = THREE.NoColorSpace;
 
-        const hsrHairRamp = createHSRHairToonRamp();
-        const hsrBodyRamp = createHSRBodyToonRamp();
+        const bodyLightMap = textureLoader.load('/models/firefly/Avatar_Firefly_01_Body_LightMap.png');
+        bodyLightMap.colorSpace = THREE.NoColorSpace;
+
+        const hairWarmRamp = textureLoader.load('/models/firefly/Avatar_Firefly_00_Hair_Warm_Ramp.png');
+        hairWarmRamp.colorSpace = THREE.SRGBColorSpace;
+        hairWarmRamp.minFilter = THREE.LinearFilter;
+        hairWarmRamp.magFilter = THREE.LinearFilter;
+
+        const bodyWarmRamp = textureLoader.load('/models/firefly/Avatar_Firefly_01_Body_Warm_Ramp.png');
+        bodyWarmRamp.colorSpace = THREE.SRGBColorSpace;
+        bodyWarmRamp.minFilter = THREE.LinearFilter;
+        bodyWarmRamp.magFilter = THREE.LinearFilter;
+
+        const hsrMatCap = textureLoader.load('/models/firefly/MatCap_17.png');
+        hsrMatCap.colorSpace = THREE.SRGBColorSpace;
+
         const hsrFaceRamp = createHSRFaceToonRamp();
 
-        // Clean and optimize materials with HSR StellarToon Cel-Shading Pipeline
+        // Clean and optimize materials with Official HSR Cel-Shading Pipeline
         mmdMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
@@ -334,7 +343,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               const mapUrl = ((mat as any).map?.name || (mat as any).map?.image?.src || '').toLowerCase();
 
               // Built-in PMX Blush Texture Overlay (Material #2: 顏+ / 颜赤.tga / 頬 / hoho / blush / 赤み / 照れ / pipi)
-              // Hide by default (opacity = 0 & visible = false) so Firefly's face skin (Material #1: 顏) is 100% clean!
+              // Enabled with sweet 18% living flush in relaxed state!
               const rawMatName = mat.name || '';
               const isBlushMat = 
                 rawMatName.includes('顏+') || rawMatName.includes('颜+') ||
@@ -346,9 +355,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 blushTex.colorSpace = THREE.SRGBColorSpace;
                 const blushMat = new THREE.MeshBasicMaterial({
                   map: blushTex,
-                  color: new THREE.Color('#ff7e95'), // Soft warm pastel rose-pink tint!
+                  color: new THREE.Color('#ff859c'), // Warm sweet peach-rose flush!
                   transparent: true,
-                  opacity: 0,
+                  opacity: 0.18, // Faint 18% living flush in normal/relaxed state
                   depthWrite: false,
                   depthTest: true,
                   side: THREE.DoubleSide,
@@ -357,7 +366,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 blushMat.polygonOffsetFactor = -4;
                 blushMat.polygonOffsetUnits = -4;
                 (blushMat as any).renderOrder = 10;
-                blushMat.visible = false;
+                blushMat.visible = true;
                 blushMat.userData = { outlineParameters: { visible: false } };
                 if (!cheekMaterialsRef.current.includes(blushMat)) {
                   cheekMaterialsRef.current.push(blushMat);
@@ -387,11 +396,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   transparent: false, // 100% Solid Opaque
                   depthWrite: true,
                   depthTest: true,
-                });
-                injectHSRShaderChunks(faceMat, {
-                  rimColor: new THREE.Color(0xfff2ea),
-                  rimIntensity: 0.22,
-                  rimPower: 4.5
                 });
                 (faceMat as any).opacity = 1.0;
                 faceMat.userData = { outlineParameters: { visible: false } };
@@ -436,16 +440,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   map: map,
                   gradientMap: hsrFaceRamp,
                   color: new THREE.Color(0xf6eff2),
-                  emissive: new THREE.Color(0x0a282a),
+                  emissive: new THREE.Color(0x0c3034),
                   transparent: false,
                   depthWrite: true,
                   depthTest: true,
                   side: THREE.FrontSide,
-                });
-                injectHSRShaderChunks(eyeMat, {
-                  emissiveBoost: 0.20,
-                  rimColor: new THREE.Color(0x80ffff),
-                  rimIntensity: 0.30
                 });
                 eyeMat.userData = { outlineParameters: { visible: false } };
                 eyeMat.needsUpdate = true;
@@ -507,24 +506,21 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return mouthMat;
               }
 
-              // 8. Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> HSR Anisotropic Sheen & Dual-Step Ramp
+              // 8. Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Official HSR LightMap & Angel Ring Specular
               if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
                 const hairMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: hsrHairRamp,
                   color: new THREE.Color(0xfffdfa),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                injectHSRShaderChunks(hairMat, {
-                  matCapTexture: hairMatCap,
-                  matCapIntensity: 0.40,
-                  matCapMode: 'multiply', // Anisotropic angel ring sheen!
+                injectHSRHairShader(hairMat, {
+                  lightMap: hairLightMap,
+                  warmRamp: hairWarmRamp,
                   rimColor: new THREE.Color(0xd4f4ff),
-                  rimIntensity: 0.55,
-                  rimPower: 3.2
+                  rimIntensity: 0.45
                 });
                 hairMat.userData = { outlineParameters: { visible: true } };
                 hairMat.needsUpdate = true;
@@ -538,22 +534,20 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const accMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: hsrHairRamp,
-                  color: new THREE.Color(1.04, 1.12, 1.14),
-                  emissive: new THREE.Color(0x0e4c45),
+                  color: new THREE.Color(1.05, 1.15, 1.18),
+                  emissive: new THREE.Color(0x0e5048),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                injectHSRShaderChunks(accMat, {
-                  matCapTexture: metalMatCap,
-                  matCapIntensity: 0.45,
-                  matCapMode: 'add',
+                injectHSRBodyShader(accMat, {
+                  lightMap: bodyLightMap,
+                  warmRamp: bodyWarmRamp,
+                  matCap: hsrMatCap,
                   rimColor: new THREE.Color(0x80ffff),
-                  rimIntensity: 0.70,
-                  rimPower: 2.8,
-                  emissiveBoost: 0.30
+                  rimIntensity: 0.60,
+                  emissiveBoost: 0.35
                 });
                 accMat.userData = { outlineParameters: { visible: true } };
                 accMat.needsUpdate = true;
@@ -569,43 +563,39 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const metalMat = new THREE.MeshToonMaterial({
                   map: map,
-                  gradientMap: hsrBodyRamp,
                   color: new THREE.Color(0xffffff),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                injectHSRShaderChunks(metalMat, {
-                  matCapTexture: metalMatCap,
-                  matCapIntensity: 0.65,
-                  matCapMode: 'add',
+                injectHSRBodyShader(metalMat, {
+                  lightMap: bodyLightMap,
+                  warmRamp: bodyWarmRamp,
+                  matCap: hsrMatCap,
                   rimColor: new THREE.Color(0xffeedd),
-                  rimIntensity: 0.50,
-                  rimPower: 3.0
+                  rimIntensity: 0.50
                 });
                 metalMat.userData = { outlineParameters: { visible: true } };
                 metalMat.needsUpdate = true;
                 return metalMat;
               }
 
-              // 11. Default Body, Clothes, Jacket, Skirt -> Multi-Step Cel-Shading with Soft Fabric Sheen
+              // 11. Default Body, Clothes, Jacket, Skirt -> Official Multi-Row HSR Body Shading
               const toonMat = new THREE.MeshToonMaterial({
                 map: map,
-                gradientMap: hsrBodyRamp,
                 color: new THREE.Color(0xffffff),
                 transparent: isTransparent,
                 alphaTest: isTransparent ? 0.35 : 0.0,
                 side: (mat as any).side ?? THREE.FrontSide,
                 depthWrite: !isTransparent,
               });
-              injectHSRShaderChunks(toonMat, {
-                matCapTexture: fabricMatCap,
-                matCapIntensity: 0.22,
-                matCapMode: 'multiply',
+              injectHSRBodyShader(toonMat, {
+                lightMap: bodyLightMap,
+                warmRamp: bodyWarmRamp,
+                matCap: hsrMatCap,
                 rimColor: new THREE.Color(0xe0f2fe),
-                rimIntensity: 0.35,
-                rimPower: 4.0
+                rimIntensity: 0.35
               });
 
               toonMat.userData = { outlineParameters: { visible: true } };
