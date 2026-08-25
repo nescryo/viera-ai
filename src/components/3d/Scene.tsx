@@ -4,6 +4,7 @@ import { MMDLoader, OutlineEffect } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
 import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
+import { VieraAnimationController } from './animation';
 
 if (typeof window !== 'undefined') {
   (window as any).MMDParser = MMDParser;
@@ -202,25 +203,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     onSelectEmotionRef.current = onSelectEmotion;
   }, [onSelectEmotion]);
 
-  // Ref to hold loaded MMD mesh, bones, cheek blush materials, and morph target dictionary
+  // Ref to hold loaded MMD mesh, modular animation controller, and dynamic overlay materials
   const mmdMeshRef = useRef<THREE.SkinnedMesh | null>(null);
-  const upperBodyBoneRef = useRef<THREE.Bone | null>(null);
-  const neckBoneRef = useRef<THREE.Bone | null>(null);
-  const headBoneRef = useRef<THREE.Bone | null>(null);
-  const leftEyeBoneRef = useRef<THREE.Bone | null>(null);
-  const rightEyeBoneRef = useRef<THREE.Bone | null>(null);
-  const bothEyesBoneRef = useRef<THREE.Bone | null>(null);
-  
+  const animationControllerRef = useRef<VieraAnimationController | null>(null);
   const cheekMaterialsRef = useRef<THREE.MeshBasicMaterial[]>([]);
   const foreheadShadowMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
-  const hairBonesRef = useRef<Array<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }>>([]);
-  const skirtBonesRef = useRef<Array<{ bone: THREE.Bone; baseRotZ: number; baseRotX: number; phase: number }>>([]);
-
-  const blinkTimerRef = useRef<{ nextBlinkTime: number; isBlinking: boolean; blinkProgress: number }>({
-    nextBlinkTime: 0,
-    isBlinking: false,
-    blinkProgress: 0
-  });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -350,9 +337,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         if (isDisposed) return;
 
         mmdMeshRef.current = mmdMesh;
+        animationControllerRef.current = new VieraAnimationController(mmdMesh);
         cheekMaterialsRef.current = [];
-        hairBonesRef.current = [];
-        skirtBonesRef.current = [];
         
         mmdMesh.castShadow = false;
         mmdMesh.receiveShadow = false;
@@ -364,63 +350,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         if (size.y > 0) {
           const scaleFactor = 1.65 / size.y;
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
-        }
-
-        // Setup Bones & Natural Arm Resting Pose
-        if (mmdMesh.skeleton && mmdMesh.skeleton.bones) {
-          mmdMesh.skeleton.bones.forEach((bone, index) => {
-            const name = bone.name;
-            if (name === '左腕') {
-              bone.rotation.z = -THREE.MathUtils.degToRad(46);
-            } else if (name === '右腕') {
-              bone.rotation.z = THREE.MathUtils.degToRad(46);
-            } else if (name === '上半身' || name === '上半身2' || name === '胸') {
-              upperBodyBoneRef.current = bone;
-            } else if (name === '首') {
-              neckBoneRef.current = bone;
-            } else if (name === '頭' || name === 'head') {
-              headBoneRef.current = bone;
-            }
-
-            // Eye bone detection (excluding tip/end bones like 目先.L or 目先.R)
-            if (!name.includes('先') && !name.includes('tip') && !name.includes('end') && !name.includes('End')) {
-              if (name === '左目' || name === '目.L' || name === '目_L' || name === 'eye_L' || name === 'Eye_L') {
-                leftEyeBoneRef.current = bone;
-              } else if (name === '右目' || name === '目.R' || name === '目_R' || name === 'eye_R' || name === 'Eye_R') {
-                rightEyeBoneRef.current = bone;
-              } else if (name === '両目' || name === 'eyes' || name === 'Eyes') {
-                bothEyesBoneRef.current = bone;
-              }
-            }
-
-            if (name.includes('髪') || name.includes('毛') || name.includes('hair') || name.includes('ツインテ') || name.includes('リボン')) {
-              hairBonesRef.current.push({
-                bone,
-                baseRotZ: bone.rotation.z,
-                baseRotX: bone.rotation.x,
-                phase: index * 0.4
-              });
-            }
-
-            // Identify Skirt Bones for Secondary Motion Physics (including 裾 prefix)
-            if (name.includes('スカート') || name.includes('skirt') || name.includes('裾')) {
-              skirtBonesRef.current.push({
-                bone,
-                baseRotZ: bone.rotation.z,
-                baseRotX: bone.rotation.x,
-                phase: index * 0.3
-              });
-            }
-          });
-
-          mmdMesh.skeleton.update();
-
-          console.log('[Firefly Eye Tracking Debug]', {
-            leftEye: leftEyeBoneRef.current?.name || 'NULL',
-            rightEye: rightEyeBoneRef.current?.name || 'NULL',
-            bothEyes: bothEyesBoneRef.current?.name || 'NULL',
-            matchingBones: mmdMesh.skeleton.bones.map(b => b.name).filter(n => n.includes('目') || n.toLowerCase().includes('eye'))
-          });
         }
 
         const animeToonRampTex = createAnimeToonRampTexture();
@@ -957,20 +886,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       const pX = pointerRef.current.x;
       const pY = pointerRef.current.y;
 
-      modelGroup.rotation.y = 0;
-      modelGroup.rotation.x = 0;
-
-      const targetTorsoYaw = pX * 0.18;
-      const targetTorsoPitch = -pY * 0.08;
-
-      let headTiltAdd = 0;
+      // 1. Update Head Pat Timer
+      let headPatTiltTimerVal = 0;
       if (headPatTiltTimer > 0) {
         headPatTiltTimer -= 0.016;
-        const progress = Math.max(0, headPatTiltTimer / 1.0);
-        headTiltAdd = Math.sin(progress * Math.PI) * 0.12;
+        headPatTiltTimerVal = headPatTiltTimer;
       }
 
-      // Update Sparkle Particles position & opacity
+      // 2. Update Sparkle Particles position & opacity
       if (sparkleMat.opacity > 0) {
         sparkleMat.opacity -= 0.018;
         const posAttr = sparkleGeo.attributes.position as THREE.BufferAttribute;
@@ -984,322 +907,25 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         posAttr.needsUpdate = true;
       }
 
-      const targetHeadYaw = pX * 0.32;
-      const targetHeadPitch = -pY * 0.16 + headTiltAdd;
-
-      const breathPhase = Math.sin(elapsedTime * 2.2);
-      modelGroup.position.y = breathPhase * 0.003; 
-
-      if (upperBodyBoneRef.current) {
-        upperBodyBoneRef.current.rotation.y += (targetTorsoYaw - upperBodyBoneRef.current.rotation.y) * 0.1;
-        upperBodyBoneRef.current.rotation.x = (breathPhase * 0.015) + (targetTorsoPitch * 0.5);
-      }
-
-      if (neckBoneRef.current) {
-        neckBoneRef.current.rotation.y += ((targetHeadYaw * 0.5) - neckBoneRef.current.rotation.y) * 0.1;
-        neckBoneRef.current.rotation.x = (-breathPhase * 0.008) + (targetHeadPitch * 0.5);
-      }
-
-      if (headBoneRef.current) {
-        let extraHeadPitch = 0;
-        let extraHeadYaw = 0;
-        if (emo === 'blush-hardly') {
-          extraHeadPitch = 0.14; // bashfully looking down
-          extraHeadYaw = -0.12;  // looking away
-        } else if (emo === 'teasing') {
-          extraHeadPitch = -0.06; // chin up
-        } else if (emo === 'jealous' || emo === 'pouting') {
-          extraHeadYaw = 0.12; // sulking head turn
-        } else if (emo === 'terrified') {
-          extraHeadPitch = 0.22; // Downward head tilt looking up nervously
-          extraHeadYaw = Math.sin(elapsedTime * 35.0) * 0.018; // High-frequency horror trembling
-        }
-
-        headBoneRef.current.rotation.y += (((targetHeadYaw * 0.5) + extraHeadYaw) - headBoneRef.current.rotation.y) * 0.1;
-        headBoneRef.current.rotation.x += (((targetHeadPitch * 0.5) + extraHeadPitch) - headBoneRef.current.rotation.x) * 0.1;
-      }
-
-      // Fast Lifelike Eye Tracking (Subtle, natural glance without creepy distortion)
-      const rawMouseX = pointerRef.current.targetX;
-      const rawMouseY = pointerRef.current.targetY;
-
-      // Natural eye glance angle (Subtle ±0.08 rad yaw / ±0.05 rad pitch)
-      const targetEyeYaw = rawMouseX * 0.08;
-      const targetEyePitch = -rawMouseY * 0.05;
-
-      const eyeLerpSpeed = 0.25;
-
-      if (leftEyeBoneRef.current) {
-        leftEyeBoneRef.current.rotation.y += (targetEyeYaw - leftEyeBoneRef.current.rotation.y) * eyeLerpSpeed;
-        leftEyeBoneRef.current.rotation.x += (targetEyePitch - leftEyeBoneRef.current.rotation.x) * eyeLerpSpeed;
-      }
-      if (rightEyeBoneRef.current) {
-        rightEyeBoneRef.current.rotation.y += (targetEyeYaw - rightEyeBoneRef.current.rotation.y) * eyeLerpSpeed;
-        rightEyeBoneRef.current.rotation.x += (targetEyePitch - rightEyeBoneRef.current.rotation.x) * eyeLerpSpeed;
-      }
-      if (bothEyesBoneRef.current && !leftEyeBoneRef.current && !rightEyeBoneRef.current) {
-        bothEyesBoneRef.current.rotation.y += (targetEyeYaw - bothEyesBoneRef.current.rotation.y) * eyeLerpSpeed;
-        bothEyesBoneRef.current.rotation.x += (targetEyePitch - bothEyesBoneRef.current.rotation.x) * eyeLerpSpeed;
-      }
-
-      hairBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
-        const hairSwayZ = Math.sin(elapsedTime * 2.5 + phase) * 0.04 + (targetHeadYaw * 0.12);
-        const hairSwayX = Math.cos(elapsedTime * 2.0 + phase) * 0.025 + (targetHeadPitch * 0.08);
-        
-        bone.rotation.z = baseRotZ + hairSwayZ;
-        bone.rotation.x = baseRotX + hairSwayX;
-      });
-
-      skirtBonesRef.current.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
-        const skirtSwayZ = Math.sin(elapsedTime * 2.2 + phase) * 0.015;
-        const skirtSwayX = Math.cos(elapsedTime * 1.8 + phase) * 0.010;
-
-        bone.rotation.z = baseRotZ + skirtSwayZ;
-        bone.rotation.x = baseRotX + skirtSwayX;
-      });
-
+      // 3. Ambient Particle Drift
       particles.rotation.y = elapsedTime * 0.04;
 
-      // AUTOMATIC EYE BLINKING ENGINE
-      if (mmdMeshRef.current && mmdMeshRef.current.morphTargetDictionary && mmdMeshRef.current.morphTargetInfluences) {
-        const dict = mmdMeshRef.current.morphTargetDictionary;
-        const influences = mmdMeshRef.current.morphTargetInfluences;
-
-        const getMorphIdx = (name: string) => dict[name];
-
-        const blinkIndex = getMorphIdx('まばたき') ?? getMorphIdx('blink') ?? getMorphIdx('まばたき鏡');
-
-        if (blinkIndex !== undefined) {
-          if (elapsedTime > blinkTimerRef.current.nextBlinkTime && !blinkTimerRef.current.isBlinking) {
-            blinkTimerRef.current.isBlinking = true;
-            blinkTimerRef.current.blinkProgress = 0;
-          }
-
-          if (blinkTimerRef.current.isBlinking) {
-            blinkTimerRef.current.blinkProgress += 0.08;
-            const blinkWeight = Math.sin(blinkTimerRef.current.blinkProgress * Math.PI);
-            influences[blinkIndex] = Math.max(0, blinkWeight);
-
-            if (blinkTimerRef.current.blinkProgress >= 1.0) {
-              blinkTimerRef.current.isBlinking = false;
-              influences[blinkIndex] = 0;
-              blinkTimerRef.current.nextBlinkTime = elapsedTime + 3.5 + Math.random() * 2.0;
-            }
-          }
-        }
-
-        // MMD Vowel Morph Target Lookups
-        const morphVowelA  = getMorphIdx('あ');
-        const morphVowelI  = getMorphIdx('い');
-        const morphVowelU  = getMorphIdx('う');
-        const morphVowelE  = getMorphIdx('え');
-        const morphVowelO  = getMorphIdx('お');
-
-        const morphSmileMouth = getMorphIdx('口角上げ');
-        const morphSmallMouth = getMorphIdx('ん') ?? getMorphIdx('へ');
-        const morphFrownMouth = getMorphIdx('口角下げ');
-        const morphTriangleMouth = getMorphIdx('倒ω') ?? getMorphIdx('▲') ?? getMorphIdx('△');
-        const morphPuckerMouth = getMorphIdx('口横缩げ') ?? getMorphIdx('口横缩げ2');
-
-        const morphRelaxedEye  = getMorphIdx('じと目') ?? getMorphIdx('笑い');
-        const morphRelaxedEyebrow = getMorphIdx('にこり') ?? getMorphIdx('下');
-
-        const morphAngryEyebrow = getMorphIdx('怒り') ?? getMorphIdx('真面目');
-        const morphAngryEye     = getMorphIdx('じと目') ?? getMorphIdx('怒り');
-
-        const morphSadEyebrow   = getMorphIdx('困る') ?? getMorphIdx('悲しい');
-        const morphSadEye       = getMorphIdx('じと目');
-
-        const morphSurprisedEye = getMorphIdx('びっくり') ?? getMorphIdx('目大');
-        const morphSurprisedEyebrow = getMorphIdx('上');
-
-        let targetSmileMouth = 0;
-        let targetSmallMouth = 0;
-        let targetFrownMouth = 0;
-        let targetTriangleMouth = 0;
-        let targetPuckerMouth = 0;
-
-        let targetVowelA = 0;
-        let targetVowelI = 0;
-        let targetVowelU = 0;
-        let targetVowelE = 0;
-        let targetVowelO = 0;
-
-        let targetRelaxedEye = 0;
-        let targetRelaxedEyebrow = 0;
-        let targetAngryEyebrow = 0;
-        let targetAngryEye = 0;
-        let targetSadEyebrow = 0;
-        let targetSadEye = 0;
-        let targetSurprisedEye = 0;
-        let targetSurprisedEyebrow = 0;
-
-        if (emo === 'happy') {
-          targetSmileMouth = 0.55;
-          targetVowelA = 0.32; // Firefly signature cute open-mouth smile :D
-          targetRelaxedEyebrow = 0.25;
-        } else if (emo === 'blush') {
-          targetSmallMouth = 0.45;
-          targetSadEyebrow = 0.35;
-        } else if (emo === 'blush-hardly') {
-          targetSmallMouth = 0.65;
-          targetSadEyebrow = 0.60;
-          targetRelaxedEye = 0.45;
-        } else if (emo === 'teasing') {
-          targetSmileMouth = 0.65;
-          targetRelaxedEye = 0.55;
-          targetRelaxedEyebrow = 0.35;
-        } else if (emo === 'jealous') {
-          targetFrownMouth = 0.75;
-          targetAngryEyebrow = 0.45;
-          targetRelaxedEye = 0.40;
-        } else if (emo === 'terrified') {
-          targetSadEyebrow = 0.95; // Deep distressed downturned sad inner eyebrows (困る)
-          targetSurprisedEye = 0.85; // Panicked wide pupils (びっくり)
-          targetFrownMouth = 0.45; // Distressed trembling mouth
-          targetSmallMouth = 0.35;
-        } else if (emo === 'pouting') {
-          targetSmallMouth = 0; // Sealed lips
-          targetFrownMouth = 0.12; // Very gentle soft downturn
-          targetTriangleMouth = 0.28; // Soft gentle anime pouting curve ('倒ω' / '▲')!
-          targetPuckerMouth = 0.22; // Soft natural pouting mouth width
-          targetSadEyebrow = 0.40; // Downturned cute sulking eyebrows ('困る')
-          targetAngryEyebrow = 0.15; // Soft brow tension
-          targetRelaxedEye = 0.25; // Soft sulking narrowed gaze ('じと目')
-        } else if (emo === 'relaxed') {
-          targetSmileMouth = 0.25; // Gentle sweet smile
-          targetRelaxedEyebrow = 0; // Gentle natural arched eyebrows (no downturned sad morph!)
-          targetRelaxedEye = 0; // Wide open expressive round eyes (no squished eyelids!)
-        } else if (emo === 'surprised') {
-          targetSurprisedEye = 0.85;
-          targetSurprisedEyebrow = 0.75;
-          targetVowelO = 0.55;
-        } else if (emo === 'angry') {
-          targetAngryEyebrow = 0.95;
-          targetAngryEye = 0.55;
-          targetFrownMouth = 0.85;
-          targetSmallMouth = 0.45;
-        } else if (emo === 'sad') {
-          targetSadEyebrow = 0.85;
-          targetSadEye = 0.45;
-          targetFrownMouth = 0.75;
-          targetSmallMouth = 0.35;
-        }
-
-        // Organic Emotion-Contextual Anime Speech Wave Generator (Sad, Angry, Blush, Happy)
-        if (isSpeakingRef.current) {
-          const t = elapsedTime;
-          // Multi-frequency irregular harmonics
-          const speechWave1 = Math.sin(t * 13.5);
-          const speechWave2 = Math.sin(t * 23.7) * 0.4;
-          const speechWave3 = Math.cos(t * 8.3) * 0.3;
-          const noisePause = Math.sin(t * 3.1);
-
-          // Syllable micro-pauses (brief rest when speaker pauses between words)
-          const organicFactor = noisePause < -0.3 ? 0.08 : 1.0;
-
-          const combinedWave = Math.max(0, (speechWave1 + speechWave2 + speechWave3) * 0.55);
-          const openPower = Math.pow(combinedWave, 1.1) * organicFactor;
-
-          if (emo === 'sad' || emo === 'terrified') {
-            // Melancholy / Terrified speech: NO smile, keep gentle sad downturned mouth corners (0.22)
-            targetSmileMouth = 0;
-            targetFrownMouth = 0.22;
-            targetSmallMouth = 0;
-            targetVowelA = Math.min(0.35, openPower * 0.40);
-            targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
-            targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
-          } else if (emo === 'pouting') {
-            // Pouting speech: relax static mouth narrowing & triangle mouth so speech lip-sync animates smoothly
-            targetSmileMouth = 0;
-            targetFrownMouth = 0.12;
-            targetSmallMouth = 0;
-            targetTriangleMouth = 0.10;
-            targetPuckerMouth = 0.10;
-            targetVowelA = Math.min(0.38, openPower * 0.45);
-            targetVowelI = Math.abs(Math.sin(t * 9.5)) * 0.18 * organicFactor;
-            targetVowelO = Math.abs(Math.sin(t * 6.5)) * 0.20 * organicFactor;
-          } else if (emo === 'angry' || emo === 'jealous') {
-            // Determined/Angry/Jealous speech: NO smile, keep firm mouth tension
-            targetSmileMouth = 0;
-            targetFrownMouth = 0.28;
-            targetSmallMouth = 0;
-            targetVowelA = Math.min(0.42, openPower * 0.48);
-          } else if (emo === 'blush' || emo === 'blush-hardly') {
-            // Shy speech: keep subtle blushing small mouth
-            targetSmileMouth = 0.20;
-            targetSmallMouth = 0.35 * (1 - openPower);
-            targetVowelA = Math.min(0.35, openPower * 0.38);
-          } else {
-            // Happy / Teasing / Smug / Relaxed / Neutral speech: sweet anime smile base
-            targetSmileMouth = 0.35;
-            targetVowelA = Math.min(0.52, openPower * 0.55);
-            targetVowelI = Math.abs(Math.sin(t * 11.2)) * 0.22 * organicFactor;
-            targetVowelE = Math.abs(Math.cos(t * 17.4)) * 0.18 * organicFactor;
-            targetVowelO = Math.abs(Math.sin(t * 6.8)) * 0.25 * organicFactor;
-          }
-        }
-
-        // Smoothly fade soft rose-peach cheekbone blush (0 when relaxed/neutral!)
-        const targetCheekOpacity = emo === 'blush-hardly' ? 0.38 : (emo === 'blush' ? 0.24 : (emo === 'pouting' ? 0.22 : (emo === 'teasing' ? 0.12 : (emo === 'happy' ? 0.06 : 0))));
-        cheekMaterialsRef.current.forEach((mat) => {
-          mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
-          mat.visible = mat.opacity > 0.01;
+      // 4. AIRI Modular Animation Engine Update (Spring Head Roll, Figure-8 Sway, Saccades, Smile-Blink, LipSync)
+      const delta = clock.getDelta();
+      if (animationControllerRef.current && mmdMeshRef.current) {
+        animationControllerRef.current.update({
+          mesh: mmdMeshRef.current,
+          modelGroup,
+          elapsedTime,
+          delta,
+          pointerX: pX,
+          pointerY: pY,
+          emotion: emo,
+          isSpeaking: isSpeakingRef.current || ttsService.isSpeaking(),
+          headPatTiltTimer: headPatTiltTimerVal,
+          cheekMaterials: cheekMaterialsRef.current,
+          foreheadMaterial: foreheadShadowMaterialRef.current
         });
-
-        // Smoothly fade anime forehead horror/shock dark shadow overlay
-        const targetForeheadOpacity = emo === 'terrified' ? 0.90 : 0;
-        if (foreheadShadowMaterialRef.current) {
-          foreheadShadowMaterialRef.current.opacity += (targetForeheadOpacity - foreheadShadowMaterialRef.current.opacity) * 0.15;
-        }
-
-
-
-        // Dynamic Map-based Morph Lerp (Prevents alias collision skips for shared indices like じと目)
-        const targetMap = new Map<number, number>();
-        const setMorphTarget = (idx: number | undefined, val: number) => {
-          if (idx === undefined) return;
-          const curr = targetMap.get(idx) ?? 0;
-          targetMap.set(idx, Math.max(curr, val));
-        };
-
-        const morphBlush1 = getMorphIdx('照れ');
-
-        // Keep MMD vertex morph 照れ at 0 so red decal vertices stay hidden inside head mesh.
-        // Material #2 (顏+) opacity targetCheekOpacity handles blush rendering 100% cleanly!
-        let targetBlushMorph = 0;
-        setMorphTarget(morphBlush1, targetBlushMorph);
-
-        setMorphTarget(morphVowelA, targetVowelA);
-        setMorphTarget(morphVowelI, targetVowelI);
-        setMorphTarget(morphVowelU, targetVowelU);
-        setMorphTarget(morphVowelE, targetVowelE);
-        setMorphTarget(morphVowelO, targetVowelO);
-
-        setMorphTarget(morphSmileMouth, targetSmileMouth);
-        setMorphTarget(morphSmallMouth, targetSmallMouth);
-        setMorphTarget(morphFrownMouth, targetFrownMouth);
-        setMorphTarget(morphTriangleMouth, targetTriangleMouth);
-        setMorphTarget(morphPuckerMouth, targetPuckerMouth);
-
-        setMorphTarget(morphRelaxedEye, targetRelaxedEye);
-        setMorphTarget(morphRelaxedEyebrow, targetRelaxedEyebrow);
-
-        setMorphTarget(morphSurprisedEye, targetSurprisedEye);
-        setMorphTarget(morphSurprisedEyebrow, targetSurprisedEyebrow);
-
-        setMorphTarget(morphAngryEyebrow, targetAngryEyebrow);
-        setMorphTarget(morphAngryEye, targetAngryEye);
-
-        setMorphTarget(morphSadEyebrow, targetSadEyebrow);
-        setMorphTarget(morphSadEye, targetSadEye);
-
-        // Smoothly lerp ALL morph target influences in the MMD model!
-        // Resets inactive morph targets (like blush, flustered, angry eyelids) cleanly back to 0!
-        for (let i = 0; i < influences.length; i++) {
-          const targetVal = targetMap.get(i) ?? 0;
-          influences[i] += (targetVal - influences[i]) * 0.15;
-        }
       }
 
       effect.render(scene, camera);
