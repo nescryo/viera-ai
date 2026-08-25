@@ -32,13 +32,14 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
     leftEye: null,
     rightEye: null,
     bothEyes: null,
-    hairBones: [],
-    skirtBones: []
+    hairSegments: [],
+    skirtSegments: [],
+    accessories: []
   };
 
   if (!mesh.skeleton || !mesh.skeleton.bones) return bones;
 
-  mesh.skeleton.bones.forEach((bone, index) => {
+  mesh.skeleton.bones.forEach((bone) => {
     const name = bone.name;
 
     // Center / Groove (Whole body center of gravity)
@@ -69,21 +70,31 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
     } else if (name === '右肩' || name === '右肩+') {
       bones.rightShoulder = bone;
     }
-    // Arms & Elbows & Wrists
+    // Arms, Elbows, Wrists (Natural anime idol stance with forward hand clearance)
     else if (name === '左腕') {
       bones.leftArm = bone;
-      bone.rotation.z = -THREE.MathUtils.degToRad(46);
+      bone.rotation.z = -THREE.MathUtils.degToRad(44);
+      bone.rotation.y = 0.08;
+      bone.rotation.x = 0.06;
     } else if (name === '右腕') {
       bones.rightArm = bone;
-      bone.rotation.z = THREE.MathUtils.degToRad(46);
+      bone.rotation.z = THREE.MathUtils.degToRad(44);
+      bone.rotation.y = -0.08;
+      bone.rotation.x = 0.06;
     } else if (name === '左ひじ') {
       bones.leftElbow = bone;
+      bone.rotation.z = -0.10;
+      bone.rotation.y = 0.08;
     } else if (name === '右ひじ') {
       bones.rightElbow = bone;
+      bone.rotation.z = 0.10;
+      bone.rotation.y = -0.08;
     } else if (name === '左手首') {
       bones.leftWrist = bone;
+      bone.rotation.x = 0.06;
     } else if (name === '右手首') {
       bones.rightWrist = bone;
+      bone.rotation.x = 0.06;
     }
     // Eyes (excluding tip/end bones like 目先)
     else if (!name.includes('先') && !name.includes('tip') && !name.includes('end') && !name.includes('End')) {
@@ -96,27 +107,119 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
       }
     }
 
-    // Secondary Physics Bones: Hair, Twintails, Ribbons
-    if (
-      name.includes('髪') || name.includes('毛') || name.includes('hair') ||
-      name.includes('馬尾') || name.includes('ツインテ') || name.includes('リボン') ||
-      name.includes('髮帶') || name.includes('髮飾')
-    ) {
-      bones.hairBones.push({
+    // 1. Categorized Hair Chains
+    const leftTwintailMatch = name.match(/左馬尾\d+-(\d+)/);
+    const rightTwintailMatch = name.match(/右馬尾\d+-(\d+)/);
+    const leftBackMatch = name.match(/左後髪\d+-(\d+)/);
+    const rightBackMatch = name.match(/右後髪\d+-(\d+)/);
+
+    if (leftTwintailMatch) {
+      const idx = parseInt(leftTwintailMatch[1], 10) - 1;
+      bones.hairSegments.push({
         bone,
         baseRotZ: bone.rotation.z,
         baseRotX: bone.rotation.x,
-        phase: index * 0.35
+        baseRotY: bone.rotation.y,
+        category: 'twintail_left',
+        chainIndex: Math.max(0, idx),
+        chainDepth: 5
+      });
+    } else if (rightTwintailMatch) {
+      const idx = parseInt(rightTwintailMatch[1], 10) - 1;
+      bones.hairSegments.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'twintail_right',
+        chainIndex: Math.max(0, idx),
+        chainDepth: 5
+      });
+    } else if (leftBackMatch) {
+      const idx = parseInt(leftBackMatch[1], 10) - 1;
+      bones.hairSegments.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'back_left',
+        chainIndex: Math.max(0, idx),
+        chainDepth: 9
+      });
+    } else if (rightBackMatch) {
+      const idx = parseInt(rightBackMatch[1], 10) - 1;
+      bones.hairSegments.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'back_right',
+        chainIndex: Math.max(0, idx),
+        chainDepth: 9
+      });
+    } else if (name.includes('劉海') || name.includes('側髪') || name.includes('前髪')) {
+      bones.hairSegments.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'bangs',
+        chainIndex: 0,
+        chainDepth: 2
       });
     }
 
-    // Secondary Physics Bones: Skirt
-    if (name.includes('スカート') || name.includes('skirt') || name.includes('裙') || name.includes('裾')) {
-      bones.skirtBones.push({
+    // 2. Skirt Matrix Grid (裙_<row>_<col>)
+    const skirtMatch = name.match(/裙_(\d+)_(\d+)/);
+    if (skirtMatch) {
+      const row = parseInt(skirtMatch[1], 10);
+      const col = parseInt(skirtMatch[2], 10);
+      bones.skirtSegments.push({
         bone,
         baseRotZ: bone.rotation.z,
         baseRotX: bone.rotation.x,
-        phase: index * 0.25
+        baseRotY: bone.rotation.y,
+        row,
+        col
+      });
+    }
+
+    // 3. Clothing & Accessory Ribbons
+    if (name.includes('胸結') || name.includes('胸結帶')) {
+      bones.accessories.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'chest_ribbon',
+        chainIndex: 0
+      });
+    } else if (name.includes('領結') || name.includes('後領')) {
+      bones.accessories.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'collar',
+        chainIndex: 0
+      });
+    } else if (name.includes('髪翼飾') || name.includes('髮飾結')) {
+      bones.accessories.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'hair_wing',
+        chainIndex: 0
+      });
+    } else if (name.includes('髮帶')) {
+      bones.accessories.push({
+        bone,
+        baseRotZ: bone.rotation.z,
+        baseRotX: bone.rotation.x,
+        baseRotY: bone.rotation.y,
+        category: 'hair_band',
+        chainIndex: 0
       });
     }
   });

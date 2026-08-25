@@ -1,17 +1,31 @@
 import * as THREE from 'three';
 
-export interface HairBoneData {
+export interface HairSegmentData {
   bone: THREE.Bone;
   baseRotZ: number;
   baseRotX: number;
-  phase: number;
+  baseRotY: number;
+  category: 'bangs' | 'twintail_left' | 'twintail_right' | 'back_left' | 'back_right' | 'other';
+  chainIndex: number; // 0 (root/proximal) to N (tip/distal)
+  chainDepth: number;
 }
 
-export interface SkirtBoneData {
+export interface SkirtSegmentData {
   bone: THREE.Bone;
   baseRotZ: number;
   baseRotX: number;
-  phase: number;
+  baseRotY: number;
+  row: number; // 0 (top waist) to 6 (bottom hem)
+  col: number; // 0 to 15 (radial angle around body)
+}
+
+export interface AccessoryBoneData {
+  bone: THREE.Bone;
+  baseRotZ: number;
+  baseRotX: number;
+  baseRotY: number;
+  category: 'chest_ribbon' | 'collar' | 'hair_wing' | 'hair_band';
+  chainIndex: number;
 }
 
 export interface BoneReferences {
@@ -33,8 +47,9 @@ export interface BoneReferences {
   leftEye: THREE.Bone | null;
   rightEye: THREE.Bone | null;
   bothEyes: THREE.Bone | null;
-  hairBones: HairBoneData[];
-  skirtBones: SkirtBoneData[];
+  hairSegments: HairSegmentData[];
+  skirtSegments: SkirtSegmentData[];
+  accessories: AccessoryBoneData[];
 }
 
 export interface PointerState {

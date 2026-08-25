@@ -2,16 +2,17 @@ import * as THREE from 'three';
 import type { BoneReferences, SpringDamperState } from './types';
 
 /**
- * AIRI-inspired Full-Body Procedural Idle Engine
+ * AIRI-inspired Full-Body Procedural Idle & Physics Engine
  * Implements:
  * 1. Semi-implicit Euler Spring-Damper Physics (k=120, c=16, m=1)
- * 2. Compound Multi-Frequency Harmonic Breathing (Anti-Robot Equation)
+ * 2. Compound Multi-Frequency Harmonic Breathing
  * 3. Parabolic Head Roll & Cute Tilt (首かしげ / Z-Axis Rotation)
- * 4. Whole-Body Pelvis & Hips Figure-8 Weight Shifting (2.5cm shift, 2.6° roll)
+ * 4. Whole-Body Pelvis & Hips Figure-8 Weight Shifting
  * 5. Multi-Joint Spine & Chest Counter-Balance Curvature
- * 6. Dynamic Shoulder & Arm Breathing Cascade with Inward/Outward Expansion
- * 7. Elbow & Wrist Secondary Inertia Lag
- * 8. Hair & Skirt Dynamic Spring Physics
+ * 6. Anti-Clipping Arm Clearance with Dynamic Skirt Evasion (Idol Stance)
+ * 7. Volumetric A-Line Skirt Flare & Circumferential Traveling Ripple (112 bones matrix)
+ * 8. Hierarchical Gravity-Aligned Hair Chain Physics (Twintails, 9-segment Back Hair, Bangs)
+ * 9. Secondary Clothing Ribbons & Accessories Physics
  */
 export class ProceduralIdleEngine {
   // Spring-damper physical state for Head Roll (首かしげ)
@@ -47,11 +48,10 @@ export class ProceduralIdleEngine {
       Math.cos(t * 2.3) * 0.10;
 
     // 2. WHOLE-BODY PELVIS & HIPS FIGURE-8 WEIGHT-SHIFTING
-    // Slow organic weight transfer cadence (~0.9 rad/s)
     const hipSwayX = Math.sin(t * 0.9) * 0.018; // ~1.8cm side-to-side weight shift
-    const hipRollZ = Math.sin(t * 0.9) * 0.042; // ~2.4 degrees pelvis tilt
-    const hipYawY = Math.cos(t * 0.65) * 0.030;  // ~1.7 degrees pelvis turn
-    const hipPitchX = Math.sin(t * 1.8) * 0.012; // breathing tilt
+    const hipRollZ = Math.sin(t * 0.9) * 0.040; // ~2.3 degrees pelvis tilt
+    const hipYawY = Math.cos(t * 0.65) * 0.028;  // ~1.6 degrees pelvis turn
+    const hipPitchX = Math.sin(t * 1.8) * 0.010;
 
     const centerLiftY = (breathHarmonic * 0.005) + (Math.abs(Math.sin(t * 0.9)) * 0.003);
 
@@ -70,8 +70,7 @@ export class ProceduralIdleEngine {
     }
 
     // 3. PARABOLIC HEAD ROLL & CUTE TILT (首かしげ / Z-AXIS ROTATION)
-    // Produces a sweet, rhythmic tilting of the head alternating left and right (~5.2 degrees)
-    const headTiltOscillation = Math.sin(t * 0.70) * 0.09;
+    const headTiltOscillation = Math.sin(t * 0.70) * 0.09; // ~5.2 degrees
     
     let emotionRollBonus = 0;
     if (emotion === 'happy' || emotion === 'teasing') {
@@ -90,6 +89,7 @@ export class ProceduralIdleEngine {
     this.headRollState.position += this.headRollState.velocity * clampedDelta;
 
     const headRollAngle = this.headRollState.position;
+    const headRollVel = this.headRollState.velocity;
 
     // 4. MULTI-JOINT SPINE & CHEST COUNTER-BALANCE CURVATURE
     const counterRoll = -hipRollZ * 0.75 + (Math.sin(t * 0.9 + 0.3) * 0.020);
@@ -131,95 +131,151 @@ export class ProceduralIdleEngine {
       let extraHeadYaw = 0;
 
       if (emotion === 'blush-hardly') {
-        extraHeadPitch = 0.14; // bashful look down
-        extraHeadYaw = -0.12;  // glance away
+        extraHeadPitch = 0.14;
+        extraHeadYaw = -0.12;
       } else if (emotion === 'teasing') {
-        extraHeadPitch = -0.06; // chin up
+        extraHeadPitch = -0.06;
       } else if (emotion === 'jealous' || emotion === 'pouting') {
-        extraHeadYaw = 0.12; // sulking head turn
+        extraHeadYaw = 0.12;
       } else if (emotion === 'terrified') {
         extraHeadPitch = 0.22;
-        extraHeadYaw = Math.sin(t * 35.0) * 0.018; // fear trembling
+        extraHeadYaw = Math.sin(t * 35.0) * 0.018;
       }
 
       bones.head.rotation.y += (((targetHeadYaw * 0.65) + extraHeadYaw) - bones.head.rotation.y) * 0.14;
       bones.head.rotation.x += (((targetHeadPitch * 0.65) + extraHeadPitch + headPatAdd) - bones.head.rotation.x) * 0.14;
-      bones.head.rotation.z = headRollAngle; // Cute Anime Head Roll!
+      bones.head.rotation.z = headRollAngle;
     }
 
-    // 6. DYNAMIC SHOULDER & ARM BREATHING CASCADE
+    // 6. ANTI-CLIPPING ARMS & DYNAMIC SKIRT EVASION (Idol Stance)
     const shoulderBreathPhase = Math.sin(t * 1.8 - 0.20);
-    const shoulderSwingX = Math.cos(t * 0.9) * 0.028;
+    const shoulderSwingX = Math.cos(t * 0.9) * 0.025;
 
     if (bones.leftShoulder) {
-      bones.leftShoulder.rotation.z = (shoulderBreathPhase * 0.040) + (headRollAngle * 0.15);
+      bones.leftShoulder.rotation.z = (shoulderBreathPhase * 0.038) + (headRollAngle * 0.14);
       bones.leftShoulder.rotation.x = shoulderSwingX;
     }
     if (bones.rightShoulder) {
-      bones.rightShoulder.rotation.z = (-shoulderBreathPhase * 0.040) + (headRollAngle * 0.15);
+      bones.rightShoulder.rotation.z = (-shoulderBreathPhase * 0.038) + (headRollAngle * 0.14);
       bones.rightShoulder.rotation.x = -shoulderSwingX;
     }
 
-    // Base resting arm pose (±45 degrees) with visible breathing expansion and idle swinging
-    const baseArmAngle = THREE.MathUtils.degToRad(45);
-    const armBreathZ = Math.sin(t * 1.8 - 0.40) * 0.055; // ~3.2 degrees breathing expansion
-    const armSwingX = Math.sin(t * 0.9 - 0.35) * 0.080;   // ~4.6 degrees natural arm swing
-    const armTwistY = Math.cos(t * 0.75) * 0.038;
+    // Forward Clearance Offset: Arms rest slightly in front of the skirt plane
+    const baseArmAngle = THREE.MathUtils.degToRad(44);
+    const armBreathZ = Math.sin(t * 1.8 - 0.40) * 0.045; // ~2.6 degrees breathing expansion
+    const armSwingX = Math.sin(t * 0.9 - 0.35) * 0.065;   // ~3.7 degrees gentle forward arm swing
+
+    // Dynamic Skirt Evasion: When hips roll left, left skirt billows outward -> push left arm away!
+    const leftSkirtEvasion = Math.max(0, -hipRollZ) * 0.50;
+    const rightSkirtEvasion = Math.max(0, hipRollZ) * 0.50;
 
     if (bones.leftArm) {
-      bones.leftArm.rotation.z = -baseArmAngle + armBreathZ + (counterRoll * 0.30);
-      bones.leftArm.rotation.x = armSwingX;
-      bones.leftArm.rotation.y = armTwistY;
+      bones.leftArm.rotation.z = -baseArmAngle + armBreathZ - leftSkirtEvasion;
+      bones.leftArm.rotation.y = 0.08 + (Math.cos(t * 0.75) * 0.025);
+      bones.leftArm.rotation.x = 0.06 + armSwingX;
     }
     if (bones.rightArm) {
-      bones.rightArm.rotation.z = baseArmAngle - armBreathZ + (counterRoll * 0.30);
-      bones.rightArm.rotation.x = -armSwingX * 0.85; // Natural asymmetric arm swing
-      bones.rightArm.rotation.y = -armTwistY;
+      bones.rightArm.rotation.z = baseArmAngle - armBreathZ + rightSkirtEvasion;
+      bones.rightArm.rotation.y = -0.08 - (Math.cos(t * 0.75) * 0.025);
+      bones.rightArm.rotation.x = 0.06 - (armSwingX * 0.85);
     }
 
-    // 7. ELBOWS & WRISTS SECONDARY INERTIA LAG
-    const elbowBreath = Math.abs(Math.sin(t * 1.8 - 0.60) * 0.055);
-    const elbowSwing = Math.sin(t * 0.9 - 0.50) * 0.050;
+    // Elbows slightly flared outward to clear skirt volume
+    const elbowBreath = Math.abs(Math.sin(t * 1.8 - 0.60) * 0.045);
+    const elbowSwing = Math.sin(t * 0.9 - 0.50) * 0.040;
 
     if (bones.leftElbow) {
-      bones.leftElbow.rotation.z = -0.06 - elbowBreath;
-      bones.leftElbow.rotation.y = elbowSwing;
+      bones.leftElbow.rotation.z = -0.10 - elbowBreath;
+      bones.leftElbow.rotation.y = 0.08 + elbowSwing;
     }
     if (bones.rightElbow) {
-      bones.rightElbow.rotation.z = 0.06 + elbowBreath;
-      bones.rightElbow.rotation.y = -elbowSwing;
+      bones.rightElbow.rotation.z = 0.10 + elbowBreath;
+      bones.rightElbow.rotation.y = -0.08 - elbowSwing;
     }
 
-    // Wrists / Hands natural inertia lagging behind the arm movement
-    const wristPitch = Math.sin(t * 0.9 - 0.75) * 0.060;
-    const wristRoll = Math.sin(t * 1.8 - 0.75) * 0.035;
+    // Wrists / Hands gently relaxed in front of thigh silhouette
+    const wristPitch = Math.sin(t * 0.9 - 0.75) * 0.050;
+    const wristRoll = Math.sin(t * 1.8 - 0.75) * 0.025;
 
     if (bones.leftWrist) {
-      bones.leftWrist.rotation.x = wristPitch;
+      bones.leftWrist.rotation.x = 0.06 + wristPitch;
       bones.leftWrist.rotation.z = wristRoll;
     }
     if (bones.rightWrist) {
-      bones.rightWrist.rotation.x = -wristPitch;
+      bones.rightWrist.rotation.x = 0.06 - wristPitch;
       bones.rightWrist.rotation.z = -wristRoll;
     }
 
-    // 8. HAIR & SKIRT SECONDARY INERTIA
-    const headRollVel = this.headRollState.velocity;
+    // 7. VOLUMETRIC A-LINE SKIRT FLARE & CIRCUMFERENTIAL TRAVELING RIPPLE
+    bones.skirtSegments.forEach(({ bone, baseRotZ, baseRotX, row, col }) => {
+      const theta = col * (Math.PI * 2 / 16); // Radial angle (0 to 2pi)
 
-    bones.hairBones.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
-      const hairSwayZ = Math.sin(t * 2.2 + phase) * 0.055 + (targetHeadYaw * 0.12) - (headRollVel * 0.05);
-      const hairSwayX = Math.cos(t * 1.8 + phase) * 0.035 + (targetHeadPitch * 0.08);
-      
-      bone.rotation.z = baseRotZ + hairSwayZ;
-      bone.rotation.x = baseRotX + hairSwayX;
+      // Progressive A-line flare: lower rows flare wider outward
+      const rowFlare = (row + 1) * 0.016; // ~6.5 degrees at bottom hem
+
+      // Traveling circumferential ripple
+      const wave = Math.sin(t * 2.2 + col * (Math.PI * 2 / 16) * 2) * 0.014 * ((row + 1) / 7);
+
+      // Pelvis roll response: side of the skirt follows hip tilt
+      const hipOffset = Math.sin(theta) * (hipRollZ * 0.65);
+
+      bone.rotation.x = baseRotX + Math.cos(theta) * (rowFlare + wave) + (hipPitchX * 0.4);
+      bone.rotation.z = baseRotZ + Math.sin(theta) * (rowFlare + wave) + hipOffset;
     });
 
-    bones.skirtBones.forEach(({ bone, baseRotZ, baseRotX, phase }) => {
-      const skirtSwayZ = Math.sin(t * 1.9 + phase) * 0.025 + (hipRollZ * 0.75);
-      const skirtSwayX = Math.cos(t * 1.5 + phase) * 0.018 + (hipPitchX * 0.6);
+    // 8. HIERARCHICAL GRAVITY-ALIGNED HAIR CHAIN PHYSICS
+    bones.hairSegments.forEach(({ bone, baseRotZ, baseRotX, category, chainIndex, chainDepth }) => {
+      const depthFactor = (chainIndex + 1) / chainDepth; // 0.1 to 1.0 (tips move most!)
+      const lagPhase = chainIndex * 0.22;                // Progressive wave lag
 
-      bone.rotation.z = baseRotZ + skirtSwayZ;
-      bone.rotation.x = baseRotX + skirtSwayX;
+      if (category === 'twintail_left') {
+        // Gravity-counter alignment: pulls hair down when head tilts
+        const gravityCounter = -headRollAngle * 0.85 * depthFactor;
+        const inertiaSway = -headRollVel * 0.07 * depthFactor;
+        const harmonicFloat = Math.sin(t * 2.2 - lagPhase) * 0.045 * depthFactor;
+
+        bone.rotation.z = baseRotZ + gravityCounter + inertiaSway + harmonicFloat;
+        bone.rotation.x = baseRotX + Math.cos(t * 1.8 - lagPhase) * 0.030 * depthFactor + (targetHeadPitch * 0.06);
+      } 
+      else if (category === 'twintail_right') {
+        const gravityCounter = -headRollAngle * 0.85 * depthFactor;
+        const inertiaSway = -headRollVel * 0.07 * depthFactor;
+        const harmonicFloat = -Math.sin(t * 2.2 - lagPhase) * 0.045 * depthFactor;
+
+        bone.rotation.z = baseRotZ + gravityCounter + inertiaSway + harmonicFloat;
+        bone.rotation.x = baseRotX + Math.cos(t * 1.8 - lagPhase) * 0.030 * depthFactor + (targetHeadPitch * 0.06);
+      } 
+      else if (category === 'back_left' || category === 'back_right') {
+        // Long 9-segment back hair: fluid heavy silk cascade
+        const gravityCounter = -headRollAngle * 0.95 * depthFactor;
+        const inertiaSway = -headRollVel * 0.10 * depthFactor;
+        const flowingWave = Math.sin(t * 1.7 - lagPhase) * 0.048 * depthFactor;
+
+        bone.rotation.z = baseRotZ + gravityCounter + inertiaSway + flowingWave;
+        bone.rotation.x = baseRotX + Math.cos(t * 1.3 - lagPhase) * 0.035 * depthFactor;
+      } 
+      else {
+        // Bangs / Front hair: short, light, subtle bounce
+        const bangsBounce = Math.sin(t * 2.8) * 0.012;
+        bone.rotation.z = baseRotZ + bangsBounce - (headRollAngle * 0.20);
+        bone.rotation.x = baseRotX + Math.cos(t * 2.0) * 0.010;
+      }
+    });
+
+    // 9. CLOTHING RIBBONS & ACCESSORIES PHYSICS
+    bones.accessories.forEach(({ bone, baseRotZ, baseRotX, category }) => {
+      if (category === 'chest_ribbon') {
+        // Responds to breathing expansion and chest pitch
+        const ribbonFlutter = Math.sin(t * 2.4) * 0.025;
+        bone.rotation.x = baseRotX + (breathHarmonic * 0.020) + ribbonFlutter;
+        bone.rotation.z = baseRotZ + (counterRoll * 0.20);
+      } else if (category === 'collar') {
+        bone.rotation.x = baseRotX + (breathHarmonic * 0.010);
+      } else if (category === 'hair_wing' || category === 'hair_band') {
+        // Bouncy spring response to head roll
+        const wingSpring = Math.sin(t * 3.0) * 0.035 - (headRollAngle * 0.30);
+        bone.rotation.z = baseRotZ + wingSpring;
+      }
     });
   }
 }
