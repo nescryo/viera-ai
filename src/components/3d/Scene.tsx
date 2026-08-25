@@ -411,7 +411,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   depthTest: true,
                 });
                 (faceMat as any).opacity = 1.0;
-                faceMat.userData = { outlineParameters: { visible: false } };
+                faceMat.userData = {
+                  outlineParameters: {
+                    visible: true,
+                    thickness: 0.00055,
+                    color: [0.472, 0.327, 0.345], // Official HSR Face Outline (soft warm rosy-brown #785358)
+                    alpha: 0.85
+                  }
+                };
                 faceMat.needsUpdate = true;
                 return faceMat;
               }
