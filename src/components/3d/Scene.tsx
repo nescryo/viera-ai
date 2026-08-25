@@ -194,11 +194,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
 
-    // Anime Inverted-Hull Toon Outline Effect (Delicate & crisp 1.3mm lineart matching HSR in-game)
+    // Anime Inverted-Hull Toon Outline Effect (Delicate & fine 0.65mm lineart matching HSR in-game)
     const effect = new OutlineEffect(renderer, {
-      defaultThickness: 0.0013, // Delicate and crisp anime lineart
-      defaultColor: [0.18, 0.16, 0.20], // Rich dark violet-charcoal matching HSR in-game palette
-      defaultAlpha: 0.88,
+      defaultThickness: 0.00065, // Ultra-fine & delicate anime lineart
+      defaultColor: [0.38, 0.35, 0.40], // Soft slate-lavender matching HSR in-game palette
+      defaultAlpha: 0.85,
       defaultKeepAlive: true
     });
 
@@ -530,7 +530,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                hairMat.userData = { outlineParameters: { visible: true } };
+                hairMat.userData = {
+                  outlineParameters: {
+                    visible: true,
+                    thickness: 0.0006,
+                    color: [0.55, 0.50, 0.54], // Soft pastel lavender-ash matching platinum silver hair
+                    alpha: 0.80
+                  }
+                };
                 hairMat.needsUpdate = true;
                 return hairMat;
               }
@@ -550,7 +557,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                accMat.userData = { outlineParameters: { visible: true } };
+                accMat.userData = {
+                  outlineParameters: {
+                    visible: true,
+                    thickness: 0.0006,
+                    color: [0.12, 0.36, 0.33], // Dark mint-teal outline for ribbon
+                    alpha: 0.85
+                  }
+                };
                 accMat.needsUpdate = true;
                 return accMat;
               }
@@ -572,7 +586,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                metalMat.userData = { outlineParameters: { visible: true } };
+                metalMat.userData = {
+                  outlineParameters: {
+                    visible: true,
+                    thickness: 0.00055,
+                    color: [0.42, 0.34, 0.26], // Soft warm gold-bronze outline
+                    alpha: 0.85
+                  }
+                };
                 metalMat.needsUpdate = true;
                 return metalMat;
               }
@@ -587,7 +608,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 side: (mat as any).side ?? THREE.FrontSide,
                 depthWrite: !isTransparent,
               });
-              toonMat.userData = { outlineParameters: { visible: true } };
+              toonMat.userData = {
+                outlineParameters: {
+                  visible: true,
+                  thickness: 0.0007,
+                  color: [0.36, 0.33, 0.39], // Soft slate-violet outline for clothes & skirt
+                  alpha: 0.82
+                }
+              };
               toonMat.needsUpdate = true;
               return toonMat;
             };
