@@ -48,24 +48,22 @@ export class ProceduralIdleEngine {
 
     // 2. WHOLE-BODY PELVIS & HIPS FIGURE-8 WEIGHT-SHIFTING
     // Slow organic weight transfer cadence (~0.9 rad/s)
-    const hipSwayX = Math.sin(t * 0.9) * 0.022; // ~2.2cm side-to-side weight shift
+    const hipSwayX = Math.sin(t * 0.9) * 0.018; // ~1.8cm side-to-side weight shift
     const hipRollZ = Math.sin(t * 0.9) * 0.042; // ~2.4 degrees pelvis tilt
     const hipYawY = Math.cos(t * 0.65) * 0.030;  // ~1.7 degrees pelvis turn
     const hipPitchX = Math.sin(t * 1.8) * 0.012; // breathing tilt
 
     const centerLiftY = (breathHarmonic * 0.005) + (Math.abs(Math.sin(t * 0.9)) * 0.003);
 
-    // Subtle model group float
+    // Apply global root sway & breathing lift to modelGroup without collapsing bone rest heights!
+    modelGroup.position.x = -0.65 + hipSwayX;
     modelGroup.position.y = centerLiftY;
 
     if (bones.center) {
-      bones.center.position.x = hipSwayX;
-      bones.center.position.y = centerLiftY * 0.5;
       bones.center.rotation.y = hipYawY * 0.5;
     }
 
     if (bones.hips) {
-      bones.hips.position.x = hipSwayX * 0.5;
       bones.hips.rotation.z = hipRollZ;
       bones.hips.rotation.y = hipYawY;
       bones.hips.rotation.x = hipPitchX;
