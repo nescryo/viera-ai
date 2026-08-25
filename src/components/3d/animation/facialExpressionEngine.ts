@@ -266,7 +266,12 @@ export class FacialExpressionEngine {
     // 5. SMOOTH MORPH INTERPOLATION STEP
     for (let i = 0; i < influences.length; i++) {
       const targetVal = this.targetMorphMap.get(i) ?? 0;
-      influences[i] += (targetVal - influences[i]) * 0.15;
+      if (i === morphBlink || i === morphSmileBlink) {
+        // Direct snappy assignment for reflex blinks so it perfectly tracks the exact 0.18s sine curve
+        influences[i] = targetVal;
+      } else {
+        influences[i] += (targetVal - influences[i]) * 0.15;
+      }
     }
 
     // 6. CHEEK BLUSH & FOREHEAD SHADOW OVERLAY MATERIALS

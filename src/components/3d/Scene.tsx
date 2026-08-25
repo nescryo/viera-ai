@@ -853,7 +853,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     const animate = () => {
       if (isDisposed) return;
       animationFrameId = requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const elapsedTime = clock.elapsedTime;
       
       // Normalize & Map Emotion Tags cleanly
       const rawEmo = (currentEmotionRef.current || 'relaxed').toLowerCase().trim();
@@ -911,7 +912,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       particles.rotation.y = elapsedTime * 0.04;
 
       // 4. AIRI Modular Animation Engine Update (Spring Head Roll, Figure-8 Sway, Saccades, Smile-Blink, LipSync)
-      const delta = clock.getDelta();
       if (animationControllerRef.current && mmdMeshRef.current) {
         animationControllerRef.current.update({
           mesh: mmdMeshRef.current,
