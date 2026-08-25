@@ -15,8 +15,10 @@ export interface SkirtBoneData {
 }
 
 export interface BoneReferences {
+  center: THREE.Bone | null;
   hips: THREE.Bone | null;
   upperBody: THREE.Bone | null;
+  upperBody1: THREE.Bone | null;
   upperBody2: THREE.Bone | null;
   neck: THREE.Bone | null;
   head: THREE.Bone | null;
@@ -26,6 +28,8 @@ export interface BoneReferences {
   rightArm: THREE.Bone | null;
   leftElbow: THREE.Bone | null;
   rightElbow: THREE.Bone | null;
+  leftWrist: THREE.Bone | null;
+  rightWrist: THREE.Bone | null;
   leftEye: THREE.Bone | null;
   rightEye: THREE.Bone | null;
   bothEyes: THREE.Bone | null;

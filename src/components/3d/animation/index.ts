@@ -14,8 +14,10 @@ export * from './facialExpressionEngine';
  */
 export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
   const bones: BoneReferences = {
+    center: null,
     hips: null,
     upperBody: null,
+    upperBody1: null,
     upperBody2: null,
     neck: null,
     head: null,
@@ -25,6 +27,8 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
     rightArm: null,
     leftElbow: null,
     rightElbow: null,
+    leftWrist: null,
+    rightWrist: null,
     leftEye: null,
     rightEye: null,
     bothEyes: null,
@@ -37,13 +41,19 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
   mesh.skeleton.bones.forEach((bone, index) => {
     const name = bone.name;
 
-    // Hips / Pelvis / Center
-    if (name === '下半身' || name === 'センター' || name === 'グルーブ' || name === '腰') {
+    // Center / Groove (Whole body center of gravity)
+    if (name === 'センター' || name === 'グルーブ') {
+      if (!bones.center) bones.center = bone;
+    }
+    // Hips / Pelvis / Lower body
+    else if (name === '下半身' || name === '腰') {
       if (!bones.hips) bones.hips = bone;
     }
     // Upper Body / Spine / Chest
-    else if (name === '上半身' || name === '上半身1') {
-      if (!bones.upperBody) bones.upperBody = bone;
+    else if (name === '上半身') {
+      bones.upperBody = bone;
+    } else if (name === '上半身1') {
+      bones.upperBody1 = bone;
     } else if (name === '上半身2' || name === '胸') {
       bones.upperBody2 = bone;
     }
@@ -59,7 +69,7 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
     } else if (name === '右肩' || name === '右肩+') {
       bones.rightShoulder = bone;
     }
-    // Arms & Elbows
+    // Arms & Elbows & Wrists
     else if (name === '左腕') {
       bones.leftArm = bone;
       bone.rotation.z = -THREE.MathUtils.degToRad(46);
@@ -70,6 +80,10 @@ export function extractBoneReferences(mesh: THREE.SkinnedMesh): BoneReferences {
       bones.leftElbow = bone;
     } else if (name === '右ひじ') {
       bones.rightElbow = bone;
+    } else if (name === '左手首') {
+      bones.leftWrist = bone;
+    } else if (name === '右手首') {
+      bones.rightWrist = bone;
     }
     // Eyes (excluding tip/end bones like 目先)
     else if (!name.includes('先') && !name.includes('tip') && !name.includes('end') && !name.includes('End')) {
