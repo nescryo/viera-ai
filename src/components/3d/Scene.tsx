@@ -5,11 +5,7 @@ import * as MMDParser from 'mmd-parser';
 import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
-import {
-  createHSRFaceToonRamp,
-  injectHSRHairShader,
-  injectHSRBodyShader
-} from './shaders/stellarToonMaterials';
+import { createHSRFaceToonRamp } from './shaders/stellarToonMaterials';
 
 if (typeof window !== 'undefined') {
   (window as any).MMDParser = MMDParser;
@@ -523,7 +519,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return mouthMat;
               }
 
-              // 8. Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Official HSR LightMap & Angel Ring Specular
+              // 8. Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Official HSR Hair Warm Ramp
               if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
                 const hairMat = new THREE.MeshToonMaterial({
                   map: map,
@@ -534,18 +530,12 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
                 });
-                injectHSRHairShader(hairMat, {
-                  lightMap: hairLightMap,
-                  warmRamp: hairWarmRamp,
-                  rimColor: new THREE.Color(0xd4f4ff),
-                  rimIntensity: 0.45
-                });
                 hairMat.userData = { outlineParameters: { visible: true } };
                 hairMat.needsUpdate = true;
                 return hairMat;
               }
 
-              // 9. Ribbon, Gem, Butterfly Wings -> Luminous Vibrant Teal/Cyan Tint with Additive Specular
+              // 9. Ribbon, Gem, Butterfly Wings -> Luminous Vibrant Teal/Cyan Tint
               if (
                 rawMatName.includes('翼') || rawMatName.includes('胸針') || rawMatName.includes('飾') ||
                 matName.includes('gem') || matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')
@@ -553,27 +543,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 const accMat = new THREE.MeshToonMaterial({
                   map: map,
                   gradientMap: bodyWarmRamp,
-                  color: new THREE.Color(1.05, 1.15, 1.18),
-                  emissive: new THREE.Color(0x0e5048),
+                  color: new THREE.Color(1.08, 1.18, 1.20),
+                  emissive: new THREE.Color(0x0a3c36),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
-                });
-                injectHSRBodyShader(accMat, {
-                  lightMap: bodyLightMap,
-                  warmRamp: bodyWarmRamp,
-                  matCap: hsrMatCap,
-                  rimColor: new THREE.Color(0x80ffff),
-                  rimIntensity: 0.60,
-                  emissiveBoost: 0.35
                 });
                 accMat.userData = { outlineParameters: { visible: true } };
                 accMat.needsUpdate = true;
                 return accMat;
               }
 
-              // 10. Metallic Parts & Buckles -> Lustrous Additive MatCap Sheen
+              // 10. Metallic Parts & Buckles -> Lustrous Warm Gold/Silver Accents
               if (
                 rawMatName.includes('金') || rawMatName.includes('銀') ||
                 matName.includes('metal') || matName.includes('buckle') ||
@@ -584,17 +566,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                   map: map,
                   gradientMap: bodyWarmRamp,
                   color: new THREE.Color(0xffffff),
+                  emissive: new THREE.Color(0x181208),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
                   depthWrite: !isTransparent,
-                });
-                injectHSRBodyShader(metalMat, {
-                  lightMap: bodyLightMap,
-                  warmRamp: bodyWarmRamp,
-                  matCap: hsrMatCap,
-                  rimColor: new THREE.Color(0xffeedd),
-                  rimIntensity: 0.50
                 });
                 metalMat.userData = { outlineParameters: { visible: true } };
                 metalMat.needsUpdate = true;
@@ -611,14 +587,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 side: (mat as any).side ?? THREE.FrontSide,
                 depthWrite: !isTransparent,
               });
-              injectHSRBodyShader(toonMat, {
-                lightMap: bodyLightMap,
-                warmRamp: bodyWarmRamp,
-                matCap: hsrMatCap,
-                rimColor: new THREE.Color(0xe0f2fe),
-                rimIntensity: 0.35
-              });
-
               toonMat.userData = { outlineParameters: { visible: true } };
               toonMat.needsUpdate = true;
               return toonMat;
