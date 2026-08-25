@@ -391,8 +391,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 injectHSRShaderChunks(faceMat, {
                   rimColor: new THREE.Color(0xfff2ea),
                   rimIntensity: 0.22,
-                  rimPower: 4.5,
-                  faceSoftening: true
+                  rimPower: 4.5
                 });
                 (faceMat as any).opacity = 1.0;
                 faceMat.userData = { outlineParameters: { visible: false } };
