@@ -206,21 +206,21 @@ export class ProceduralIdleEngine {
       bones.rightWrist.rotation.z = -wristRoll;
     }
 
-    // 7. VOLUMETRIC A-LINE SKIRT FLARE & CIRCUMFERENTIAL TRAVELING RIPPLE
+    // 7. NATURAL CLOTH DRAPE & HIP-INERTIA SKIRT SWAY (NO Radial Inhalation/Exhalation)
     bones.skirtSegments.forEach(({ bone, baseRotZ, baseRotX, row, col }) => {
-      const theta = col * (Math.PI * 2 / 16); // Radial angle (0 to 2pi)
+      // Depth factor from waist (0) down to hem (6)
+      const rowFactor = (row + 1) / 7.0;
 
-      // Progressive A-line flare: lower rows flare wider outward
-      const rowFlare = (row + 1) * 0.016; // ~6.5 degrees at bottom hem
+      // Natural skirt sway following pelvis weight shifting
+      const skirtRoll = hipRollZ * 0.85 * rowFactor;
+      const skirtPitch = hipPitchX * 0.60 * rowFactor;
 
-      // Traveling circumferential ripple
-      const wave = Math.sin(t * 2.2 + col * (Math.PI * 2 / 16) * 2) * 0.014 * ((row + 1) / 7);
+      // Subtle, gentle cloth drape breeze (independent slow cadence, non-radial)
+      const softBreezeZ = Math.sin(t * 1.2 + col * 0.35) * 0.005 * rowFactor;
+      const softBreezeX = Math.cos(t * 0.9 + col * 0.35) * 0.004 * rowFactor;
 
-      // Pelvis roll response: side of the skirt follows hip tilt
-      const hipOffset = Math.sin(theta) * (hipRollZ * 0.65);
-
-      bone.rotation.x = baseRotX + Math.cos(theta) * (rowFlare + wave) + (hipPitchX * 0.4);
-      bone.rotation.z = baseRotZ + Math.sin(theta) * (rowFlare + wave) + hipOffset;
+      bone.rotation.z = baseRotZ + skirtRoll + softBreezeZ;
+      bone.rotation.x = baseRotX + skirtPitch + softBreezeX;
     });
 
     // 8. HIERARCHICAL GRAVITY-ALIGNED HAIR CHAIN PHYSICS
