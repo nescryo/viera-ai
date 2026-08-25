@@ -182,8 +182,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     scene.background = new THREE.Color('#0f1322'); // Space cosmic dark environment
 
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
-    camera.position.set(-0.65, 1.28, 1.28); // Flattering bust-up companion portrait framing
-    camera.lookAt(-0.65, 1.24, 0);
+    camera.position.set(-0.52, 1.34, 1.28); // Shifted slightly right & up to position Firefly bottom-left
+    camera.lookAt(-0.52, 1.28, 0);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -375,6 +375,23 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return blushMat;
               }
 
+              // Hide all duplicate expression/outline overlay shells (+ meshes: 衣+, 裙+, 後腦勺+, 髮飾翼+, 胸針飾+, 衣金屬+) & biaoq
+              if (
+                (rawMatName.includes('+') && !isBlushMat) ||
+                rawMatName.includes('biaoq') ||
+                rawMatName.includes('bq')
+              ) {
+                const hiddenOverlayMat = new THREE.MeshBasicMaterial({
+                  transparent: true,
+                  opacity: 0,
+                  depthWrite: false,
+                  depthTest: true,
+                  visible: false,
+                });
+                hiddenOverlayMat.userData = { outlineParameters: { visible: false } };
+                return hiddenOverlayMat;
+              }
+
               const isTransparent = mat.transparent || mat.opacity < 0.98;
               const map = (mat as any).map || null;
 
@@ -510,7 +527,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
                 const hairMat = new THREE.MeshToonMaterial({
                   map: map,
-                  color: new THREE.Color(0xfffdfa),
+                  gradientMap: hairWarmRamp,
+                  color: new THREE.Color(0xffffff),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
                   side: (mat as any).side ?? THREE.FrontSide,
@@ -534,6 +552,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const accMat = new THREE.MeshToonMaterial({
                   map: map,
+                  gradientMap: bodyWarmRamp,
                   color: new THREE.Color(1.05, 1.15, 1.18),
                   emissive: new THREE.Color(0x0e5048),
                   transparent: isTransparent,
@@ -563,6 +582,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               ) {
                 const metalMat = new THREE.MeshToonMaterial({
                   map: map,
+                  gradientMap: bodyWarmRamp,
                   color: new THREE.Color(0xffffff),
                   transparent: isTransparent,
                   alphaTest: isTransparent ? 0.35 : 0.0,
@@ -584,6 +604,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               // 11. Default Body, Clothes, Jacket, Skirt -> Official Multi-Row HSR Body Shading
               const toonMat = new THREE.MeshToonMaterial({
                 map: map,
+                gradientMap: bodyWarmRamp,
                 color: new THREE.Color(0xffffff),
                 transparent: isTransparent,
                 alphaTest: isTransparent ? 0.35 : 0.0,

@@ -10,9 +10,6 @@ import * as THREE from 'three';
  */
 
 // 1x1 neutral fallback texture
-const defaultWhiteTexture = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
-defaultWhiteTexture.needsUpdate = true;
-
 const defaultMidTexture = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
 defaultMidTexture.needsUpdate = true;
 
@@ -54,14 +51,12 @@ export function injectHSRHairShader(
 ): void {
   const {
     lightMap,
-    warmRamp,
-    rimColor = new THREE.Color(0xdef4ff),
+    rimColor = new THREE.Color(0xd4f4ff),
     rimIntensity = 0.45
   } = options;
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uHsrHairLightMap = { value: lightMap };
-    shader.uniforms.uHsrHairRamp = { value: warmRamp };
     shader.uniforms.uHsrRimColor = { value: rimColor };
     shader.uniforms.uHsrRimIntensity = { value: rimIntensity };
 
@@ -69,7 +64,6 @@ export function injectHSRHairShader(
       '#include <common>',
       `#include <common>
       uniform sampler2D uHsrHairLightMap;
-      uniform sampler2D uHsrHairRamp;
       uniform vec3 uHsrRimColor;
       uniform float uHsrRimIntensity;`
     );
@@ -82,32 +76,18 @@ export function injectHSRHairShader(
       vec3 hsrNormal = normalize( vNormal );
       vec3 hsrViewDir = normalize( vViewPosition );
       
-      // 1. Sample Official Hair LightMap (R=AO/Shadow, G=Threshold, B=Specular, A=Rim)
+      // 1. Sample Official Hair LightMap (R=AO, G=Threshold, B=Specular, A=Rim)
       vec4 hsrLM = texture2D( uHsrHairLightMap, vUv );
-      float hsrAO = hsrLM.r;
-      float hsrThresholdOffset = ( hsrLM.g - 0.5 ) * 0.40;
       float hsrSpecMask = hsrLM.b;
       float hsrRimMask = max( hsrLM.a, 0.45 );
 
-      // 2. Front-Top Directional Light
-      vec3 keyLightDir = normalize( vec3( 0.25, 0.60, 0.75 ) );
-      float hsrNdotL = dot( hsrNormal, keyLightDir );
-      float halfLambert = hsrNdotL * 0.5 + 0.5;
-
-      // 3. Sample Official HSR Hair Warm Ramp
-      float shadowCoord = clamp( halfLambert * hsrAO + hsrThresholdOffset, 0.01, 0.99 );
-      vec3 hsrRampColor = texture2D( uHsrHairRamp, vec2( shadowCoord, 0.5 ) ).rgb;
-      
-      // Softly apply ramp shadow to diffuse
-      totalEmissiveRadiance += diffuseColor.rgb * ( hsrRampColor - 1.0 ) * 0.65;
-
-      // 4. Anisotropic Hair Specular Shine (Angel Ring from LightMap Channel B)
+      // 2. Anisotropic Hair Specular Shine (Angel Ring from LightMap Channel B)
       if ( hsrSpecMask > 0.01 ) {
-        vec3 angelRing = vec3( 0.96, 0.98, 1.0 ) * ( hsrSpecMask * 0.55 );
+        vec3 angelRing = vec3( 0.96, 0.98, 1.0 ) * ( hsrSpecMask * 0.45 );
         totalEmissiveRadiance += angelRing;
       }
 
-      // 5. Stylized Fresnel Rim Light
+      // 3. Stylized Fresnel Rim Light
       float hsrNdotV = max( 0.0, dot( hsrNormal, hsrViewDir ) );
       float hsrRim = pow( clamp( 1.0 - hsrNdotV, 0.0, 1.0 ), 3.2 );
       float hsrVerticalBias = clamp( hsrNormal.y * 0.5 + 0.5, 0.3, 1.0 );
@@ -133,7 +113,6 @@ export function injectHSRBodyShader(
 ): void {
   const {
     lightMap,
-    warmRamp,
     matCap = null,
     rimColor = new THREE.Color(0xe0f2fe),
     rimIntensity = 0.35,
@@ -142,7 +121,6 @@ export function injectHSRBodyShader(
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uHsrBodyLightMap = { value: lightMap };
-    shader.uniforms.uHsrBodyRamp = { value: warmRamp };
     shader.uniforms.uHsrHasMatCap = { value: matCap ? 1.0 : 0.0 };
     shader.uniforms.uHsrMatCap = { value: matCap || defaultMidTexture };
     shader.uniforms.uHsrRimColor = { value: rimColor };
@@ -153,7 +131,6 @@ export function injectHSRBodyShader(
       '#include <common>',
       `#include <common>
       uniform sampler2D uHsrBodyLightMap;
-      uniform sampler2D uHsrBodyRamp;
       uniform float uHsrHasMatCap;
       uniform sampler2D uHsrMatCap;
       uniform vec3 uHsrRimColor;
@@ -171,40 +148,27 @@ export function injectHSRBodyShader(
       
       // 1. Sample Official Body LightMap (R=AO, G=Material Row, B=Specular, A=Rim)
       vec4 hsrLM = texture2D( uHsrBodyLightMap, vUv );
-      float hsrAO = hsrLM.r;
-      float hsrMatRow = clamp( hsrLM.g, 0.01, 0.99 );
       float hsrSpecMask = hsrLM.b;
       float hsrRimMask = max( hsrLM.a, 0.40 );
 
-      // 2. Front-Top Directional Light
-      vec3 keyLightDir = normalize( vec3( 0.25, 0.60, 0.75 ) );
-      float hsrNdotL = dot( hsrNormal, keyLightDir );
-      float halfLambert = hsrNdotL * 0.5 + 0.5;
-
-      // 3. Sample Official Multi-Row Body Warm Ramp
-      float shadowCoord = clamp( halfLambert * hsrAO, 0.01, 0.99 );
-      vec3 hsrRampColor = texture2D( uHsrBodyRamp, vec2( shadowCoord, hsrMatRow ) ).rgb;
-      
-      totalEmissiveRadiance += diffuseColor.rgb * ( hsrRampColor - 1.0 ) * 0.55;
-
-      // 4. Specular / Metallic Accents (from LightMap Channel B)
+      // 2. Specular / Metallic Accents (from LightMap Channel B)
       if ( hsrSpecMask > 0.01 ) {
-        totalEmissiveRadiance += diffuseColor.rgb * ( hsrSpecMask * 0.40 );
+        totalEmissiveRadiance += diffuseColor.rgb * ( hsrSpecMask * 0.35 );
       }
 
-      // 5. Official MatCap Sheen
+      // 3. Official MatCap Sheen
       if ( uHsrHasMatCap > 0.5 ) {
         vec2 matCapUv = hsrNormal.xy * 0.5 + 0.5;
         vec4 mc = texture2D( uHsrMatCap, matCapUv );
-        totalEmissiveRadiance += ( mc.rgb - 0.5 ) * 0.20 * diffuseColor.rgb;
+        totalEmissiveRadiance += ( mc.rgb - 0.5 ) * 0.18 * diffuseColor.rgb;
       }
 
-      // 6. Stylized Fresnel Rim Light
+      // 4. Stylized Fresnel Rim Light
       float hsrNdotV = max( 0.0, dot( hsrNormal, hsrViewDir ) );
       float hsrRim = pow( clamp( 1.0 - hsrNdotV, 0.0, 1.0 ), 3.6 );
       totalEmissiveRadiance += uHsrRimColor * ( hsrRim * uHsrRimIntensity * hsrRimMask );
 
-      // 7. Emissive Accent Boost
+      // 5. Emissive Accent Boost
       if ( uHsrEmissiveBoost > 0.001 ) {
         totalEmissiveRadiance += diffuseColor.rgb * uHsrEmissiveBoost;
       }
