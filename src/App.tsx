@@ -279,7 +279,7 @@ export function App() {
         }
         setIsLoading(false);
         const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
-        const activeEmotion = emotions[0] || 'happy';
+        const activeEmotion = emotions.length > 0 ? emotions[emotions.length - 1] : 'happy';
         setCurrentEmotion(activeEmotion);
 
         const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';
@@ -420,7 +420,7 @@ export function App() {
         }
         setIsLoading(false);
         const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
-        const activeEmotion = emotions[0] || 'happy';
+        const activeEmotion = emotions.length > 0 ? emotions[emotions.length - 1] : 'happy';
         setCurrentEmotion(activeEmotion);
 
         const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';

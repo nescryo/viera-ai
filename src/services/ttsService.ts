@@ -972,11 +972,13 @@ class TTSService {
         : '/fish_audio_api/v1/tts';
 
       const selectedModel = apiConfig?.fishAudioModel || 's2.1-pro-free';
+      // Clean model name for Fish Audio header (e.g. 's2.1-pro-free' or 's2.1-pro')
+      const headerModel = selectedModel.replace(/^fish-audio\//, '');
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'model': selectedModel
+        'model': headerModel
       };
 
       const payload: Record<string, any> = isOpenRouter
@@ -989,15 +991,14 @@ class TTSService {
             text: synthText,
             format: 'mp3',
             latency: 'normal',
-            normalize: true,
-            model: selectedModel
+            normalize: true
           };
 
       if (!isOpenRouter && refId) {
         payload.reference_id = refId;
       }
 
-      console.log(`[Viera TTS Log] Sending Fish Audio request to ${endpoint} (Model: ${selectedModel}, Voice Ref: ${refId || 'default'})...`);
+      console.log(`[Viera TTS Log] Sending Fish Audio request to ${endpoint} (Header Model: ${headerModel}, Voice Ref: ${refId || 'default'})...`);
 
       let response = await fetch(endpoint, {
         method: 'POST',
@@ -1019,9 +1020,9 @@ class TTSService {
         });
       }
 
-      // Retry 2: If direct Fish Audio API returns 402 (Insufficient API Credit) and OpenRouter key is available, retry via OpenRouter!
-      if (!response.ok && response.status === 402 && apiConfig?.openRouterApiKey && !isOpenRouter) {
-        console.warn("[Viera TTS Warning] Fish Audio direct API returned 402 Insufficient API credit. Retrying via OpenRouter Gateway...");
+      // Retry 2: If direct Fish Audio API returns 401 (Invalid Token) or 402 (Insufficient Credit) and OpenRouter key is available, retry via OpenRouter!
+      if (!response.ok && (response.status === 401 || response.status === 402) && apiConfig?.openRouterApiKey && !isOpenRouter) {
+        console.warn(`[Viera TTS Warning] Fish Audio direct API returned status ${response.status}. Retrying automatically via OpenRouter Gateway...`);
         const openRouterEndpoint = 'https://openrouter.ai/api/v1/audio/speech';
         const openRouterHeaders = {
           'Content-Type': 'application/json',
@@ -1047,6 +1048,13 @@ class TTSService {
         throw new Error(`Fish Audio API returned status ${response.status}: ${errText}`);
       }
 
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const jsonBody = await response.json().catch(() => ({}));
+        console.error("[Viera TTS Error] Fish Audio endpoint returned JSON error instead of audio bytes:", jsonBody);
+        throw new Error(`Fish Audio API returned JSON response: ${JSON.stringify(jsonBody)}`);
+      }
+
       const arrayBuffer = await response.arrayBuffer();
       if (currentSessionId !== this.currentSpeechSessionId) return;
 
@@ -1063,9 +1071,9 @@ class TTSService {
         },
         () => this.speakEdgeNeural(text, persona, onStart, onEnd)
       );
-    } catch (err) {
+    } catch (err: any) {
       if (currentSessionId !== this.currentSpeechSessionId) return;
-      console.warn("[Viera TTS Warning] Fish Audio fetch failed, falling back to Edge Neural Voice:", err);
+      console.warn("[Viera TTS Warning] Fish Audio fetch failed, falling back to Edge Neural Voice. Reason:", err?.message || err);
       this.speakEdgeNeural(text, persona, onStart, onEnd);
     }
   }
