@@ -194,9 +194,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
 
-    // Anime Inverted-Hull Toon Outline Effect (Crisp solid black lineart)
+    // Anime Inverted-Hull Toon Outline Effect (Delicate solid black lineart)
     const effect = new OutlineEffect(renderer, {
-      defaultThickness: 0.0028, // Crisp & clear anime lineart (~3.2px)
+      defaultThickness: 0.0016, // Fine & elegant anime lineart (~2.0px)
       defaultColor: [0.0, 0.0, 0.0], // Solid true anime black
       defaultAlpha: 1.0,
       defaultKeepAlive: true
@@ -414,7 +414,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 faceMat.userData = {
                   outlineParameters: {
                     visible: true,
-                    thickness: 0.0024,
+                    thickness: 0.0013,
                     color: [0.0, 0.0, 0.0], // Solid true black face outline
                     alpha: 1.0
                   }
@@ -540,7 +540,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 hairMat.userData = {
                   outlineParameters: {
                     visible: true,
-                    thickness: 0.0028,
+                    thickness: 0.0016,
                     color: [0.0, 0.0, 0.0], // Solid true black hair outlines
                     alpha: 1.0
                   }
@@ -567,7 +567,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 accMat.userData = {
                   outlineParameters: {
                     visible: true,
-                    thickness: 0.0026,
+                    thickness: 0.0015,
                     color: [0.0, 0.0, 0.0], // Solid true black ribbon outlines
                     alpha: 1.0
                   }
@@ -596,7 +596,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 metalMat.userData = {
                   outlineParameters: {
                     visible: true,
-                    thickness: 0.0024,
+                    thickness: 0.0013,
                     color: [0.0, 0.0, 0.0], // Solid true black metal outlines
                     alpha: 1.0
                   }
@@ -618,7 +618,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               toonMat.userData = {
                 outlineParameters: {
                   visible: true,
-                  thickness: 0.0028,
+                  thickness: 0.0016,
                   color: [0.0, 0.0, 0.0], // Solid true black clothing outlines
                   alpha: 1.0
                 }
