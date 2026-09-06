@@ -1,85 +1,93 @@
-# 🌸 Viera — 3D Interactive Anime Roleplay Assistant
+# Viera 3D
 
-**Viera** is an ultra-immersive, interactive 3D anime companion application powered by **Three.js / WebGL 3D MMD Models**, **Google OAuth 2.0 Auth**, **DeepSeek AI & LM Studio Local LLM**, and **VOICEVOX Japanese Anime Text-to-Speech Engine**.
+Viera is an interactive web application that brings a 3D anime character to life as a virtual companion directly inside your web browser. This project features the character **Firefly** from the game *Honkai: Star Rail*.
 
-Featuring **Firefly (AR-26710)** from *Honkai: Star Rail*, Viera combines 3D raycasting touch interactions, real-time facial blendshape emotions, dynamic user name & Japanese honorifics (`-san` / `-chan`), multi-session conversation history.
-
----
-
-## ✨ Key Features
-
-- 🔐 **Google OAuth 2.0 Auth & "Complete Your Setup" Onboarding**:
-  - Secure Google Identity Services (GIS SDK) client-side login gate.
-  - Onboarding setup for handle `@username`, Display Name, Avatar Upload Picker, and Gender selection.
-  - Modern c.ai floating label input containers (`.cai-input-group`) & custom glass gender dropdown.
-
-
-- 🎨 **Interactive 3D MMD Character**:
-  - **Head Pat Zone (`y >= 1.35`)**: Triggers soft porcelain cheek blush textures, head tilts, golden sparkle particles, and cute anime interjections.
-  - **Ribbon Touch Zone (`1.08 <= y < 1.35`)**: Triggers surprised facial expressions, sparkle bursts, and interjections.
-  - **60 FPS Raycasting Optimization**: Ultra-smooth mouse tracking without CPU lag.
-
-- 🎙️ **VOICEVOX Japanese Anime TTS & Subtitle Engine**:
-  - Integrated local VOICEVOX engine (`http://localhost:50021`) & Fish Audio / Edge-TTS support.
-  - **Customizable Anime Speakers**: Choose from 30+ character styles (Default: **Shikikoku Metan — Ama-ama / Sweet & Calm Anime Girl**).
-  - **Dynamic Prosody Modulation**: Automatic pitch and intonation adjustments for punctuation (`!`, `?`, `-`, `...`).
-
-- 🟦 **Deep Royal Blue Modern Dark-Glass UI (`#3b82f6`)**:
-  - Sleek glassmorphism UI with curated Deep Royal Blue accent colors, glowing action buttons, and custom scrollbars.
+You can chat with Firefly, listen to her voice with translated text subtitles, watch her expressive facial animations and natural movements, and interact directly through screen touch or mouse clicks.
 
 ---
 
-## 🚀 Getting Started
+## What Can It Do?
+
+- **Lifelike 3D Character**: The character moves naturally on your screen—breathing, blinking, and following your cursor or finger with her gaze and head movement.
+- **Interactive Touch Reactions**: You can interact with the character using your mouse or touch screen:
+  - Patting her head triggers sparkling effects and a cheerful, bashful reaction.
+  - Touching her upper attire triggers shy or pouting reactions.
+- **Conversational AI**: Chat freely about any topic. The character responds warmly like a companion with an expressive and friendly personality.
+- **Expressive Anime Voice**: Responses can be spoken out loud with an anime voice style, complete with mouth movements synchronized to her speech.
+- **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
+- **User Profiles & Chat History**: Sign in with your Google account to save your chat sessions, customize your display name, and set your profile avatar.
+
+---
+
+## Getting Started
 
 ### Prerequisites
-1. **Node.js**: v18 or higher.
-2. **Google OAuth Client ID**: Client ID registered on Google Cloud Console for `http://localhost:5173`.
-3. **VOICEVOX Desktop Engine**: VOICEVOX AppImage or executable listening on `http://localhost:50021`.
-4. **LM Studio** (Optional for local offline LLM): Server running on `http://localhost:1234/v1`.
+Before you begin, make sure you have the following installed on your computer:
+1. **Node.js** (version 18 or higher)
+2. A modern web browser (such as Google Chrome or Microsoft Edge)
 
-### 1. Environment Configuration
+### Installation Steps
 
-Create a `.env` file in the root directory:
+1. **Install project dependencies**:
+   ```bash
+   npm install
+   ```
 
-```env
-VITE_GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
-VITE_DEEPSEEK_API_KEY=your_optional_deepseek_api_key
-```
+2. **Set up configuration**:
+   Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Open the `.env` file in any text editor and enter the API keys you wish to use (such as your DeepSeek API key for AI chat and Google Client ID for user sign-in).
 
-### 2. Installation
-
-```bash
-# Clone repository
-git clone https://github.com/nescryo/Viera-AI.git
-cd Viera
-
-# Install dependencies
-npm install
-```
-
-### 3. Start VOICEVOX Server
-
-```bash
-# Launch VOICEVOX AppImage
-~/.voicevox/VOICEVOX.AppImage --no-sandbox
-```
-
-### 4. Launch Viera Web App
-
-```bash
-npm run dev
-```
-
-Open your browser at **[http://localhost:5173](http://localhost:5173)**!
+3. **Start the application**:
+   ```bash
+   npm run dev
+   ```
+   Open your browser and visit `http://localhost:5173`.
 
 ---
 
-## 🛠️ Tech Stack
+## Optional: Local Voice Server
 
-- **Frontend Framework**: React 19 + TypeScript + Vite
-- **Auth & Identity**: Google Identity Services SDK (OAuth 2.0 JWT decoding)
-- **3D Graphics Engine**: Three.js + three-stdlib (MMDLoader & Canvas Textures)
-- **Voice Engine**: VOICEVOX API (via Vite Proxy `/voicevox_api`) & Web Audio API DSP
-- **Styling**: Vanilla CSS (Custom Design System with Glassmorphism & Cyberpunk Neon Tokens)
+By default, the application can use voice synthesis through your browser or cloud services. If you want to run a local anime voice server on your own computer without extra cost:
+
+1. Install the required Python voice module:
+   ```bash
+   pip install edge-tts
+   ```
+
+2. Start the local voice bridge:
+   ```bash
+   python3 vits_server.py
+   ```
+   The voice server will run in the background and connect automatically to Viera.
 
 ---
+
+## Controls & Interaction Guide
+
+| Action | How to Interact | Character Response |
+| :--- | :--- | :--- |
+| **Move Mouse** | Move your cursor across the screen | The character's head and eyes follow your cursor. |
+| **Head Pat** | Click the head or hair area | The character tilts her head, smiles warmly, and speaks cheerfully. |
+| **Upper Attire Touch** | Click the upper chest or clothing | The character reacts with shy or pouting expressions. |
+| **Speak (Microphone)** | Click the microphone icon in the chat bar | Your voice is transcribed into chat text. |
+| **Replay Voice** | Click the speaker icon on any message | Replays the character's spoken voice for that message. |
+
+---
+
+## Available Commands
+
+```bash
+npm run dev       # Start the local development server
+npm run build     # Build the project for production
+npm run preview   # Preview the production build locally
+```
+
+---
+
+## Disclaimer & License
+
+- The 3D character **Firefly** and *Honkai: Star Rail* are trademarks and intellectual property of **miHoYo / HoYoverse**. All related character assets are used strictly under non-commercial fan-creation fair use guidelines.
+- The source code of this project is released under the [MIT License](LICENSE).
