@@ -120,56 +120,6 @@ function createAnimeForeheadShadowTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-/**
- * Creates a soft warm neutral 2D Anime Illustration Ramp Texture (Warm Shadow Transition)
- * Pure white base with warm neutral gray shadow step (NO cyan/blue shadow cast!)
- */
-function createAnimeToonRampTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#d6d0cb'); // Warm neutral gray shadow step
-    grad.addColorStop(0.35, '#f2ece8'); // Soft warm transition
-    grad.addColorStop(0.65, '#ffffff'); // Pure white highlight step
-    grad.addColorStop(1.0, '#ffffff');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 1);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/**
- * Creates a soft warm porcelain Ramp Texture specifically for Face Skin
- * Renders soft warm ambient shading under bangs, nose bridge, and chin!
- */
-function createFaceToonRampTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    const grad = ctx.createLinearGradient(0, 0, 256, 0);
-    grad.addColorStop(0, '#fce4e6');   // Soft warm peach shadow (under bangs & chin only)
-    grad.addColorStop(0.12, '#fff4f6'); // Smooth soft transition
-    grad.addColorStop(0.20, '#ffffff'); // Pure warm porcelain face (80% of face surface!)
-    grad.addColorStop(1.0, '#ffffff');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 256, 1);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
-
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   isSpeaking,
@@ -239,14 +189,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMapping = THREE.LinearToneMapping;
+    renderer.toneMappingExposure = 1.05;
 
-    // Anime Inverted-Hull Toon Outline Effect (Crisp 1.4mm anime lineart framing hair & silhouette)
+    // Anime Inverted-Hull Toon Outline Effect (Clean, crisp, well-defined anime lineart)
     const effect = new OutlineEffect(renderer, {
-      defaultThickness: 0.0014, // Crisp 1.4mm anime lineart (defines hair strands & bangs contour)
-      defaultColor: [0.20, 0.18, 0.22], // Medium-dark anime lineart color matching in-game reference
-      defaultAlpha: 0.85,
+      defaultThickness: 0.0036, // Crisp, bolder anime lineart defining silhouette & contours
+      defaultColor: [0.18, 0.16, 0.20],
+      defaultAlpha: 0.95,
       defaultKeepAlive: true
     });
 
@@ -258,28 +208,28 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
 
-    // 2. High-Fidelity Masterclass Lighting Pipeline
-    // Subdued Warm Ambient Light (0.38 - prevents washed out / flat white faces!)
-    const ambientLight = new THREE.AmbientLight(0xfbf8f5, 0.38);
-    scene.add(ambientLight);
+    // 2. High-Fidelity Masterclass Anime Lighting Pipeline
+    // Soft, omnidirectional ambient illumination (eliminates pitch-black & muddy shadows)
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd0d5e2, 0.72);
+    scene.add(hemiLight);
 
-    // Main Neutral/Warm Sunlight Key Light (RGB ≈ warm/neutral white)
-    const keyLight = new THREE.DirectionalLight(0xfffbf5, 0.88);
-    keyLight.position.set(2.0, 4.0, 3.0);
+    // Main studio key light (soft front-top angle: evenly illuminates character face & uniform)
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.78);
+    keyLight.position.set(0.4, 1.8, 3.2);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
     keyLight.shadow.mapSize.height = 2048;
     keyLight.shadow.bias = -0.0003;
     scene.add(keyLight);
 
-    // Neutral Soft Fill Light (RGB ≈ neutral white - NO CYAN CAST!)
-    const fillLight = new THREE.DirectionalLight(0xf5f5f5, 0.28);
-    fillLight.position.set(-2.0, 2.0, 2.5);
+    // Neutral soft fill light from opposite angle
+    const fillLight = new THREE.DirectionalLight(0xf2f5ff, 0.30);
+    fillLight.position.set(-1.8, 1.2, 2.2);
     scene.add(fillLight);
 
-    // Subtle Cool Rim Light (Very gentle cyan accent from behind - SUBDUED 0.22!)
-    const rimLight = new THREE.DirectionalLight(0xe0f2fe, 0.22);
-    rimLight.position.set(-0.5, 3.0, -3.0);
+    // Subtle cool rim light from behind (highlights hair silhouette)
+    const rimLight = new THREE.DirectionalLight(0xe8f4ff, 0.35);
+    rimLight.position.set(0.0, 2.8, -2.5);
     scene.add(rimLight);
 
     // 3. Ground Pedestal & Grid
@@ -352,23 +302,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        const animeToonRampTex = createAnimeToonRampTexture();
-        const faceToonRampTex = createFaceToonRampTexture();
-
-        // Clean and optimize materials with Anime Cel-Shading & sRGB Color Space
+        // Clean and optimize materials with authentic HoYoverse cel-shading & outlines
         mmdMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            mesh.receiveShadow = false; // Never receive geometric self-shadows on anime character body
 
             const optimizeMaterial = (mat: THREE.Material): THREE.Material => {
-              const matName = (mat.name || '').toLowerCase();
+              const rawMatName = mat.name || '';
+              const matName = rawMatName.toLowerCase();
               const mapUrl = ((mat as any).map?.name || (mat as any).map?.image?.src || '').toLowerCase();
 
               // Built-in PMX Blush Texture Overlay (Material #2: 顏+ / 颜赤.tga / 頬 / hoho / blush / 赤み / 照れ / pipi)
-              // Hide by default (opacity = 0 & visible = false) so Firefly's face skin (Material #1: 顏) is 100% clean!
-              const rawMatName = mat.name || '';
               const isBlushMat = 
                 rawMatName.includes('顏+') || rawMatName.includes('颜+') ||
                 rawMatName.includes('顏赤') || rawMatName.includes('颜赤') ||
@@ -379,7 +325,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 blushTex.colorSpace = THREE.SRGBColorSpace;
                 const blushMat = new THREE.MeshBasicMaterial({
                   map: blushTex,
-                  color: new THREE.Color('#ff7e95'), // Soft warm pastel rose-pink tint!
+                  color: new THREE.Color('#ff7e95'),
                   transparent: true,
                   opacity: 0,
                   depthWrite: false,
@@ -399,41 +345,42 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return blushMat;
               }
 
-              const isTransparent = mat.transparent || mat.opacity < 0.98;
-              const map = (mat as any).map || null;
+              const toonMat = mat as THREE.MeshToonMaterial;
 
-              if (map) {
-                map.colorSpace = THREE.SRGBColorSpace;
+              // Ensure diffuse texture is rendered in sRGB color space with high-quality filtering
+              if (toonMat.map) {
+                toonMat.map.colorSpace = THREE.SRGBColorSpace;
+                toonMat.map.generateMipmaps = true;
+                toonMat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                toonMat.map.magFilter = THREE.LinearFilter;
+                toonMat.map.needsUpdate = true;
               }
 
-              // Face Skin & Body Skin -> Rich Warm Porcelain Peach Anime Skin (Mat #1: 顏 & Mat #11: 肌)
-              if (
-                rawMatName.includes('顏') || rawMatName.includes('顔') ||
-                rawMatName.includes('肌') || matName.includes('face') ||
-                matName.includes('skin') || matName.includes('head') ||
-                mapUrl.includes('颜.png') || mapUrl.includes('face')
-              ) {
-                const faceMat = new THREE.MeshToonMaterial({
-                  map: map,
-                  gradientMap: faceToonRampTex,
-                  color: new THREE.Color(0xfff7f4), // Soft warm porcelain white skin tone matching Screenshot_20260809_114006.png!
-                  transparent: false, // 100% Solid Opaque
-                  depthWrite: true,
-                  depthTest: true,
-                });
-                (faceMat as any).opacity = 1.0;
-                faceMat.userData = { outlineParameters: { visible: false } };
-                faceMat.needsUpdate = true;
-                return faceMat;
+              // Preserve official HoYoverse sphere maps (matcaps for hair sheen & metallic highlights)
+              const envMap = (toonMat as any).envMap;
+              if (envMap) {
+                envMap.colorSpace = THREE.SRGBColorSpace;
+                envMap.generateMipmaps = true;
+                envMap.minFilter = THREE.LinearMipmapLinearFilter;
+                envMap.magFilter = THREE.LinearFilter;
+                envMap.needsUpdate = true;
               }
 
-              // Eye Highlight Sparkles (Mat #9: 目光) -> Crystal Bright White Sparkles!
+              // Preserve authentic PMX toon ramp textures (toon3.png for face/skin, toon4.png for clothes/hair)
+              if (toonMat.gradientMap) {
+                toonMat.gradientMap.minFilter = THREE.NearestFilter;
+                toonMat.gradientMap.magFilter = THREE.NearestFilter;
+                toonMat.gradientMap.generateMipmaps = false;
+                toonMat.gradientMap.needsUpdate = true;
+              }
+
+              // Eye Highlight Sparkles (Mat #9: 目光) -> Pure crystal white
               if (rawMatName.includes('目光') || rawMatName.includes('sparkle') || rawMatName.includes('highlight')) {
                 const sparkleMat = new THREE.MeshBasicMaterial({
-                  map: map,
+                  map: toonMat.map,
                   color: new THREE.Color(0xffffff),
                   transparent: true,
-                  alphaTest: 0.02,
+                  alphaTest: 0.05,
                   depthWrite: false,
                   depthTest: true,
                   side: THREE.DoubleSide,
@@ -446,10 +393,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
               // Eye Shadow Overlay (Mat #29: 目影) -> Soft Translucent Upper Eye Shadow
               if (rawMatName.includes('目影') || rawMatName.includes('eye_shadow')) {
                 const shadowMat = new THREE.MeshBasicMaterial({
-                  map: map,
+                  map: toonMat.map,
                   color: new THREE.Color(0xffffff),
                   transparent: true,
-                  opacity: 0.35,
+                  opacity: 0.30,
                   depthWrite: false,
                   depthTest: true,
                 });
@@ -458,44 +405,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return shadowMat;
               }
 
-              // Eyes, Pupils, Iris (Mat #8: 目) -> Soft Warm Toon Shading Matching Face Skin Saturation!
-              if (matName.includes('eye') || matName.includes('目') || matName.includes('hitomi') || matName.includes('pupil')) {
-                const eyeMat = new THREE.MeshToonMaterial({
-                  map: map,
-                  gradientMap: faceToonRampTex, // Shares face skin lighting and shadow ramp!
-                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
-                  transparent: false,
-                  depthWrite: true,
-                  depthTest: true,
-                  side: THREE.FrontSide,
-                });
-                eyeMat.userData = { outlineParameters: { visible: false } };
-                eyeMat.needsUpdate = true;
-                return eyeMat;
-              }
-
-              // Eyebrows (Mat #3 眉 / eyebrow / まゆ) -> Soft Warm Rose-Ash Gray (#8a7c82 matching hair lineart hierarchy!)
-              if (rawMatName.includes('眉') || matName.includes('eyebrow') || matName.includes('まゆ')) {
-                const browMat = new THREE.MeshBasicMaterial({
-                  map: map,
-                  color: new THREE.Color(0x8a7c82), // Soft rose-ash gray tint
-                  transparent: true,
-                  opacity: 0.82, // Softened opacity for seamless integration with hair bangs lineart
-                  alphaTest: 0.08,
-                  depthWrite: false,
-                  depthTest: true,
-                  side: THREE.DoubleSide,
-                });
-                browMat.userData = { outlineParameters: { visible: false } };
-                browMat.needsUpdate = true;
-                return browMat;
-              }
-
-              // Eyelashes, Eyelines (Mat #3 睫 / eyelash / eyeline / まつ) -> Soft Dark Rose-Charcoal (#52464c)
-              if (rawMatName.includes('睫') || matName.includes('eyelash') || matName.includes('eyeline') || matName.includes('まつ')) {
+              // Eyebrows and Lashes (Mat #3: 眉睫)
+              if (rawMatName.includes('眉') || rawMatName.includes('睫') || matName.includes('eyebrow') || matName.includes('eyelash')) {
                 const lashMat = new THREE.MeshBasicMaterial({
-                  map: map,
-                  color: new THREE.Color(0x52464c), // Soft dark rose-charcoal (delicate, balanced contrast)
+                  map: toonMat.map,
+                  color: new THREE.Color(0xffffff),
                   transparent: true,
                   alphaTest: 0.05,
                   depthWrite: false,
@@ -507,76 +421,115 @@ export const Scene: React.FC<SceneProps> = React.memo(({
                 return lashMat;
               }
 
-              // Mouth, Teeth, Tongue & Inner Cavity -> Soft Warm Toon Shading (NO Outlines & depthWrite: true to block background/hair outline bleed!)
+              // Mouth, Tongue, Teeth (口, 舌, 齒)
               if (
-                rawMatName.includes('歯') || rawMatName.includes('齒') ||
+                rawMatName.includes('歯') || rawMatName.includes('齒') || rawMatName.includes('齿') ||
                 rawMatName.includes('口') || matName.includes('mouth') ||
                 matName.includes('teeth') || matName.includes('tooth') ||
-                matName.includes('tongue') || matName.includes('舌')
+                matName.includes('tongue') || rawMatName.includes('舌')
               ) {
-                const mouthMat = new THREE.MeshToonMaterial({
-                  map: map,
-                  gradientMap: faceToonRampTex, // Shares face skin light and shadow toon ramp!
-                  color: new THREE.Color(0xf5eef0), // Soft warm tone harmonized with face skin (#fff7f4)
-                  transparent: isTransparent,
-                  alphaTest: isTransparent ? 0.05 : 0.0,
-                  depthWrite: true,
-                  depthTest: true,
-                  side: THREE.DoubleSide,
-                });
-                mouthMat.userData = { outlineParameters: { visible: false } };
-                mouthMat.needsUpdate = true;
-                return mouthMat;
+                toonMat.color.set(0xffffff);
+                toonMat.emissive.set(0x0e0e12);
+                toonMat.depthWrite = true;
+                toonMat.depthTest = true;
+                toonMat.userData = { outlineParameters: { visible: false } };
+                toonMat.needsUpdate = true;
+                return toonMat;
               }
 
-              // Hair Materials (Mat #10: 髪 & Mat #16: 後腦勺) -> Vibrant Warm Platinum Silver Tint
-              if (rawMatName.includes('髪') || rawMatName.includes('頭') || matName.includes('hair')) {
-                const hairMat = new THREE.MeshToonMaterial({
-                  map: map,
-                  gradientMap: animeToonRampTex,
-                  color: new THREE.Color(0xfffcf8), // Warm platinum silver tone
-                  transparent: isTransparent,
-                  alphaTest: isTransparent ? 0.35 : 0.0,
-                  side: (mat as any).side ?? THREE.FrontSide,
-                  depthWrite: !isTransparent,
-                });
-                hairMat.userData = { outlineParameters: { visible: true } };
-                hairMat.needsUpdate = true;
-                return hairMat;
+              // Eyes, Pupils, Iris (Mat #8: 目, Mat #7: 白目)
+              if (matName.includes('eye') || rawMatName.includes('目') || matName.includes('hitomi') || matName.includes('pupil')) {
+                toonMat.color.set(0xffffff);
+                toonMat.emissive.set(0x101016);
+                toonMat.depthWrite = true;
+                toonMat.depthTest = true;
+                toonMat.userData = { outlineParameters: { visible: false } };
+                toonMat.needsUpdate = true;
+                return toonMat;
               }
 
-              // Ribbon, Gem, Butterfly Accessories -> Saturated Vibrant Teal/Cyan Tint
+              // Face Skin & Body Skin (Mat #1: 顏 & Mat #11: 肌 & Mat #12: 肌2)
+              if (
+                rawMatName.includes('顏') || rawMatName.includes('顔') ||
+                rawMatName.includes('肌') || matName.includes('face') ||
+                matName.includes('skin') || matName.includes('head') ||
+                mapUrl.includes('颜.png') || mapUrl.includes('face')
+              ) {
+                toonMat.color.set(0xffffff);
+                toonMat.emissive.set(0x121014); // Soft warm porcelain glow
+                toonMat.depthWrite = true;
+                toonMat.depthTest = true;
+                toonMat.transparent = false;
+                // Soft warm reddish-brown anime lineart matching HoYoverse specs!
+                toonMat.userData = { 
+                  outlineParameters: { 
+                    visible: true, 
+                    thickness: 0.0030, 
+                    color: [0.55, 0.28, 0.26], 
+                    alpha: 0.90 
+                  } 
+                };
+                toonMat.needsUpdate = true;
+                return toonMat;
+              }
+
+              // Hair Materials (Mat #10: 髪, Mat #16: 後腦勺, Mat #27: 後腦勺+)
+              if (rawMatName.includes('髪') || rawMatName.includes('頭') || rawMatName.includes('後腦勺') || matName.includes('hair')) {
+                toonMat.color.set(0xffffff);
+                toonMat.emissive.set(0x101018);
+                toonMat.depthWrite = true;
+                toonMat.depthTest = true;
+                toonMat.userData = { 
+                  outlineParameters: { 
+                    visible: true, 
+                    thickness: 0.0034, 
+                    color: [0.28, 0.26, 0.33], 
+                    alpha: 0.90 
+                  } 
+                };
+                toonMat.needsUpdate = true;
+                return toonMat;
+              }
+
+              // Ribbon, Gem, Butterfly & Metal Accessories (翼, 胸針, 飾, 金屬)
               if (
                 rawMatName.includes('翼') || rawMatName.includes('胸針') || rawMatName.includes('飾') ||
-                matName.includes('gem') || matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')
+                rawMatName.includes('金屬') || rawMatName.includes('金属') || matName.includes('gem') ||
+                matName.includes('ribbon') || matName.includes('hair_acc') || matName.includes('crystal')
               ) {
-                const accMat = new THREE.MeshToonMaterial({
-                  map: map,
-                  gradientMap: animeToonRampTex,
-                  color: new THREE.Color(1.02, 1.08, 1.10), // Boosted vibrant teal/cyan color
-                  emissive: new THREE.Color(0x0a222c), // Subtle glowing emerald cyan accent
-                  transparent: isTransparent,
-                  alphaTest: isTransparent ? 0.35 : 0.0,
-                  side: (mat as any).side ?? THREE.FrontSide,
-                  depthWrite: !isTransparent,
-                });
-                accMat.userData = { outlineParameters: { visible: true } };
-                accMat.needsUpdate = true;
-                return accMat;
+                toonMat.color.set(0xffffff);
+                toonMat.emissive.set(0x12141c);
+                toonMat.depthWrite = true;
+                toonMat.depthTest = true;
+                toonMat.userData = { 
+                  outlineParameters: { 
+                    visible: true, 
+                    thickness: 0.0030, 
+                    color: [0.20, 0.16, 0.14], 
+                    alpha: 0.92 
+                  } 
+                };
+                toonMat.needsUpdate = true;
+                return toonMat;
               }
 
-              // Default Body, Clothes, Jacket, Skirt -> Vibrant MeshToonMaterial WITH outline!
-              const toonMat = new THREE.MeshToonMaterial({
-                map: map,
-                gradientMap: animeToonRampTex,
-                color: new THREE.Color(0xffffff),
-                transparent: isTransparent,
-                alphaTest: isTransparent ? 0.35 : 0.0,
-                side: (mat as any).side ?? THREE.FrontSide,
-                depthWrite: !isTransparent,
-              });
-
-              toonMat.userData = { outlineParameters: { visible: true } };
+              // Default Body, Clothes, Jacket, Skirt (衣, 裙, 内着, 襪, 鞋)
+              toonMat.color.set(0xffffff);
+              toonMat.emissive.set(0x0a0a10);
+              toonMat.depthWrite = true;
+              toonMat.depthTest = true;
+              const isTransparent = toonMat.transparent || toonMat.opacity < 0.98;
+              if (isTransparent) {
+                toonMat.alphaTest = 0.02;
+              }
+              toonMat.userData = { 
+                outlineParameters: { 
+                  visible: true, 
+                  thickness: 0.0036, 
+                  color: [0.15, 0.14, 0.18], 
+                  alpha: 0.98 
+                } 
+              };
               toonMat.needsUpdate = true;
               return toonMat;
             };
