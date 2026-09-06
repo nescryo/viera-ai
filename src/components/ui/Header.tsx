@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import type { Persona, ApiConfig, UserProfile } from '../../types';
-import { Settings, Sparkles, Upload, Circle, MessageSquare, User } from 'lucide-react';
+import { Settings, Sparkles, Circle, MessageSquare, User } from 'lucide-react';
 import { checkLmStudioConnection } from '../../services/aiService';
 
 interface HeaderProps {
   currentPersona: Persona;
   onOpenSettings: () => void;
-  onOpenModelUploader: () => void;
   onOpenHistory: () => void;
   onOpenProfile: () => void;
   apiConfig: ApiConfig;
@@ -16,7 +15,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentPersona,
   onOpenSettings,
-  onOpenModelUploader,
   onOpenHistory,
   onOpenProfile,
   apiConfig,
@@ -82,10 +80,6 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        <button className="icon-btn" onClick={onOpenModelUploader} title="Load Custom 3D Model (.vrm / .glb / .pmx)">
-          <Upload size={18} />
-          <span className="btn-label-desktop">3D Model</span>
-        </button>
 
         {/* 1. Conversation History Icon (Left of Settings) */}
         <button className="icon-btn history-btn" onClick={onOpenHistory} title="Conversations History">

@@ -20,12 +20,7 @@ export class FacialExpressionEngine {
   // Active smooth morph influences
   private targetMorphMap: Map<number, number> = new Map();
 
-  /**
-   * Cubic Ease-In-Out
-   */
-  public static easeInOutCubic(t: number): number {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  }
+
 
   /**
    * Updates all facial morph targets on the SkinnedMesh

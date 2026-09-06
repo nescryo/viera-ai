@@ -20,8 +20,6 @@ export class GazeTrackingEngine {
   // MMD Safe Gaze Angle Limits
   public static readonly EYE_YAW_LIMIT = 0.35;   // ~20 degrees
   public static readonly EYE_PITCH_LIMIT = 0.25; // ~14.3 degrees
-  public static readonly HEAD_YAW_LIMIT = 0.20;  // ~11.5 degrees
-  public static readonly HEAD_PITCH_LIMIT = 0.12; // ~6.9 degrees
 
   /**
    * Updates eye bones with smooth gaze tracking & micro-saccades
