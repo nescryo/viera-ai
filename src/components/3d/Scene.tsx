@@ -237,44 +237,52 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     stageLoader.setResourcePath('/models/stages/CharacterSphere/');
     stageLoader.load(
       '/models/stages/CharacterSphere/CharacterSphere_HSRV.pmx',
-      (stageMesh) => {
+      (rawStageMesh) => {
         if (isDisposed) return;
-        // Scale to 0.0825 (matching Firefly 1.65m human scale)
-        stageMesh.scale.set(0.0825, 0.0825, 0.0825);
-        stageMesh.position.set(-0.65, 0, 0);
 
-        stageMesh.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const m = child as THREE.Mesh;
-            m.castShadow = false;
-            m.receiveShadow = false;
-            if (m.material) {
-              const origMat = (Array.isArray(m.material) ? m.material[0] : m.material) as any;
-              let stageTex = origMat.map;
-              if (!stageTex) {
-                stageTex = new THREE.TextureLoader().load('/models/stages/CharacterSphere/textures/Tex_CharacterSphere_HSR.png');
-              }
-              if (stageTex) {
-                stageTex.colorSpace = THREE.SRGBColorSpace;
-                stageTex.generateMipmaps = true;
-                stageTex.minFilter = THREE.LinearMipmapLinearFilter;
-                stageTex.magFilter = THREE.LinearFilter;
-                stageTex.needsUpdate = true;
-              }
-              const stageMat = new THREE.MeshBasicMaterial({
-                map: stageTex,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                depthTest: true,
-              });
-              stageMat.userData = { outlineParameters: { visible: false } };
-              m.material = stageMat;
-              m.renderOrder = -100;
-            }
+        // Extract pure BufferGeometry to prevent SkinnedMesh empty morphTarget shader compilation crash
+        const origGeo = rawStageMesh.geometry;
+        const cleanGeo = new THREE.BufferGeometry();
+        cleanGeo.setAttribute('position', origGeo.attributes.position.clone());
+        cleanGeo.setAttribute('normal', origGeo.attributes.normal.clone());
+        cleanGeo.setAttribute('uv', origGeo.attributes.uv.clone());
+        if (origGeo.index) {
+          cleanGeo.setIndex(origGeo.index.clone());
+        }
+
+        const texLoader = new THREE.TextureLoader();
+        const stageTex = texLoader.load(
+          '/models/stages/CharacterSphere/textures/Tex_CharacterSphere_HSR.png',
+          () => {
+            if (isDisposed) return;
+            stageMat.visible = true;
+            stageMat.needsUpdate = true;
           }
+        );
+        stageTex.colorSpace = THREE.SRGBColorSpace;
+        stageTex.flipY = false;
+        stageTex.wrapS = THREE.RepeatWrapping;
+        stageTex.wrapT = THREE.RepeatWrapping;
+
+        const stageMat = new THREE.MeshBasicMaterial({
+          map: stageTex,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: true,
+          visible: false, // Prevents white flash glitch while 5.5MB texture is downloading
         });
+        stageMat.userData = { outlineParameters: { visible: false } };
+
+        const stageMesh = new THREE.Mesh(cleanGeo, stageMat);
+        // Calibrate stage sphere scale and vertical center for portrait framing
+        stageMesh.scale.set(0.12, 0.12, 0.12);
+        stageMesh.position.set(-0.65, 0.5, 0);
+        stageMesh.renderOrder = -100;
+        stageMesh.castShadow = false;
+        stageMesh.receiveShadow = false;
 
         scene.add(stageMesh);
+        origGeo.dispose();
       },
       undefined,
       (err) => {
