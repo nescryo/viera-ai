@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, Persona } from '../../types';
 import { 
-  Send, Volume2, VolumeX, Copy, Check, ChevronLeft, ChevronRight, 
-  Mic, MicOff, ThumbsUp, ThumbsDown, Sparkles, Smile
+  Send, Volume2, VolumeX, Copy, Check, RotateCcw,
+  Mic, MicOff, Sparkles, Smile
 } from 'lucide-react';
 
 interface ChatOverlayProps {
@@ -90,7 +90,6 @@ const ChatMessageItem: React.FC<{
               title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
             >
               {isCurrentlySpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
-              <span>{isCurrentlySpeaking ? "Stop" : "Listen"}</span>
             </button>
 
             <button 
@@ -101,20 +100,13 @@ const ChatMessageItem: React.FC<{
               {copiedId === msg.id ? <Check size={15} color="#23a55a" /> : <Copy size={15} />}
             </button>
 
-            <div className="cai-swipe-controls">
-              <button className="cai-swipe-btn" title="Previous response">
-                <ChevronLeft size={15} />
-              </button>
-              <span className="cai-swipe-indicator">1 / 1</span>
-              <button className="cai-swipe-btn" title="Next response" onClick={onRegenerateResponse}>
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            <div className="cai-feedback-btns">
-              <button className="cai-mini-btn" title="Good response"><ThumbsUp size={13} /></button>
-              <button className="cai-mini-btn" title="Bad response"><ThumbsDown size={13} /></button>
-            </div>
+            <button 
+              className="cai-action-btn"
+              onClick={onRegenerateResponse}
+              title="Regenerate response"
+            >
+              <RotateCcw size={15} />
+            </button>
           </div>
         )}
       </div>

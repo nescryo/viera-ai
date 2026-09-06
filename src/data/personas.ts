@@ -19,10 +19,7 @@ CRITICAL DUAL-LANGUAGE OUTPUT RULES:
 <ja>こんにちは、トレイルブレイザーさん！今日もお話しできて嬉しいです。</ja>
 <en>Hello, Trailblazer-san! I'm so happy to talk with you again today.</en>`,
   avatarUrl: '/firefly-icon.jpeg',
-  vrmModelUrl: '',
-  accentColor: '#52c41a', // Firefly green / teal glow
   voice: { pitch: 1.15, rate: 0.98, lang: 'en-US' },
   category: 'Honkai: Star Rail'
 };
 
-export const PERSONA_PRESETS: Persona[] = [FIREFLY_PERSONA];

@@ -493,22 +493,24 @@
 .cai-msg-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-  padding-top: 4px;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 2px;
 }
 
 .cai-action-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 0.75rem;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 0;
+  border-radius: 6px;
   transition: all 0.2s ease;
 }
 
@@ -519,50 +521,9 @@
 
 .speaking-active {
   color: var(--accent-blurple);
-  font-weight: 600;
+  background: rgba(88, 101, 242, 0.15);
   animation: pulseGlow 1.5s infinite;
 }
-
-.cai-swipe-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
-.cai-swipe-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-
-.cai-swipe-btn:hover { color: var(--text-normal); }
-
-.cai-swipe-indicator {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.cai-feedback-btns {
-  display: flex;
-  gap: 4px;
-}
-
-.cai-mini-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-}
-
-.cai-mini-btn:hover { color: var(--text-normal); }
 
 /* Typing indicator */
 .typing-indicator-card .cai-dots-loader {

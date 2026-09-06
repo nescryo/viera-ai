@@ -7,21 +7,10 @@ export interface TTSBoundaryEvent {
   word?: string;
 }
 
-interface QueueItem {
-  text: string;
-  persona: Persona;
-  apiConfig?: ApiConfig;
-  onStart?: () => void;
-  onEnd?: () => void;
-}
-
 class TTSService {
   private synth: SpeechSynthesis | null = null;
   private currentAudio: HTMLAudioElement | null = null;
-  private audioQueue: QueueItem[] = [];
-  private isProcessingQueue: boolean = false;
   private audioCtx: AudioContext | null = null;
-  private originalJaTextCache: Map<string, string> = new Map();
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -129,53 +118,7 @@ class TTSService {
     }
   }
 
-  public enqueueClause(
-    text: string,
-    persona: Persona,
-    apiConfig?: ApiConfig,
-    onStart?: () => void,
-    onEnd?: () => void
-  ) {
-    const cleanText = text
-      .replace(/\*.*?\*/g, '')
-      .replace(/\[.*?\]/g, '')
-      .trim();
 
-    if (!cleanText) return;
-
-    this.audioQueue.push({ text: cleanText, persona, apiConfig, onStart, onEnd });
-    this.processQueue();
-  }
-
-  private async processQueue() {
-    if (this.isProcessingQueue || this.audioQueue.length === 0) return;
-    this.isProcessingQueue = true;
-
-    const item = this.audioQueue.shift();
-    if (!item) {
-      this.isProcessingQueue = false;
-      return;
-    }
-
-    const onFinish = () => {
-      if (item.onEnd) item.onEnd();
-      this.isProcessingQueue = false;
-      this.processQueue();
-    };
-
-    const ttsProvider = item.apiConfig?.ttsProvider || 'voicevox';
-    if (ttsProvider === 'fish-audio') {
-      await this.speakFishAudio(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
-    } else if (ttsProvider === 'voicevox') {
-      await this.speakVoicevox(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
-    } else if (ttsProvider === 'style-bert-vits2') {
-      await this.speakStyleBertVits2(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
-    } else if (ttsProvider === 'vits') {
-      await this.speakLocalVits(item.text, item.persona, item.apiConfig, item.onStart, onFinish);
-    } else {
-      this.speakEdgeNeural(item.text, item.persona, item.onStart, onFinish);
-    }
-  }
 
   public prepareTextForSpeech(text: string): string {
     if (!text) return '';
@@ -259,20 +202,8 @@ class TTSService {
     return result;
   }
 
-  private setJaCache(key: string, value: string) {
-    if (this.originalJaTextCache.size > 200) {
-      const firstKey = this.originalJaTextCache.keys().next().value;
-      if (firstKey !== undefined) {
-        this.originalJaTextCache.delete(firstKey);
-      }
-    }
-    this.originalJaTextCache.set(key, value);
-  }
-
   public stop() {
     this.currentSpeechSessionId++;
-    this.audioQueue = [];
-    this.isProcessingQueue = false;
     if (this.currentBufferSource) {
       try {
         this.currentBufferSource.onended = null;
@@ -508,10 +439,6 @@ class TTSService {
       return animeDict[lower];
     }
 
-    if (this.originalJaTextCache.has(lower)) {
-      return this.originalJaTextCache.get(lower)!;
-    }
-
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -532,49 +459,7 @@ class TTSService {
     return cleanStutterText;
   }
 
-  public async translateJapaneseToEnglish(text: string): Promise<string> {
-    if (!/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
-      return text;
-    }
-    try {
-      const cleanJa = text.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').trim();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanJa)}&langpair=ja|en`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      const data = await res.json();
-      if (data && data.responseData && data.responseData.translatedText) {
-        const rawText = data.responseData.translatedText;
-        let enResult = rawText;
-        if (typeof DOMParser !== 'undefined') {
-          const doc = new DOMParser().parseFromString(rawText, 'text/html');
-          enResult = doc.documentElement.textContent || rawText;
-        }
 
-        // Post-process MyMemory honorific translation artifacts (e.g. "Yokoyama of San" / "Yokoyama's Chan" -> "Yokoyama-san" / "Yokoyama-chan")
-        enResult = enResult
-          .replace(/\b([A-Za-z0-9_]+) (?:of|'s|no) (?:San|san)\b/gi, '$1-san')
-          .replace(/\b([A-Za-z0-9_]+) (?:of|'s|no) (?:Chan|chan)\b/gi, '$1-chan')
-          .replace(/\b([A-Za-z0-9_]+)-(?:no|of)-(?:San|san)\b/gi, '$1-san')
-          .replace(/\b([A-Za-z0-9_]+)-(?:no|of)-(?:Chan|chan)\b/gi, '$1-chan');
-        
-        // Cache the English translation back to the original Japanese text!
-        if (enResult && !enResult.includes('MYMEMORY WARNING')) {
-          this.setJaCache(enResult.trim().toLowerCase(), text);
-          const cleanEn = enResult.replace(/\[.*?\]/g, '').replace(/\*.*?\*/g, '').trim().toLowerCase();
-          if (cleanEn) {
-            this.setJaCache(cleanEn, text);
-          }
-          return enResult;
-        }
-      }
-    } catch (e) {
-      console.warn("Auto JA->EN subtitle translation failed or timed out:", e);
-    }
-    return text;
-  }
 
   // Point 3: Dynamic Emotion Detection & Universal Voicevox Style Switching
   private voicevoxSpeakersCache: VoicevoxSpeaker[] | null = null;

@@ -32,45 +32,7 @@ const TESTING_EMOTIONS = [
   { id: 'sad', label: 'Sad' }
 ];
 
-/**
- * Creates a Soft Rose-Peach Anime Cheek Blush Texture
- */
-function createSoftPorcelainCheekTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
 
-  if (ctx) {
-    ctx.clearRect(0, 0, 256, 256);
-
-    const gradient = ctx.createRadialGradient(128, 128, 6, 128, 128, 118);
-    gradient.addColorStop(0, 'rgba(255, 120, 140, 0.25)');
-    gradient.addColorStop(0.45, 'rgba(255, 160, 175, 0.10)');
-    gradient.addColorStop(0.8, 'rgba(255, 185, 195, 0.02)');
-    gradient.addColorStop(1, 'rgba(255, 185, 195, 0)');
-
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(128, 128, 118, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(230, 80, 100, 0.15)';
-    ctx.lineWidth = 2.0;
-
-    for (let x = 55; x <= 201; x += 18) {
-      const heightOffset = Math.sin(((x - 55) / 146) * Math.PI) * 40;
-      ctx.beginPath();
-      ctx.moveTo(x, 128 - heightOffset);
-      ctx.lineTo(x, 128 + heightOffset);
-      ctx.stroke();
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
 
 
 
@@ -331,7 +293,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     const mmdLoader = new MMDLoader();
     mmdLoader.setResourcePath('/models/firefly/');
     const pmxUrl = '/models/firefly/firefly.pmx';
-    const softPorcelainCheekTex = createSoftPorcelainCheekTexture();
 
     mmdLoader.load(
       pmxUrl,
@@ -960,7 +921,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
-      softPorcelainCheekTex.dispose();
 
       scene.traverse((object) => {
         if ((object as THREE.Mesh).isMesh) {

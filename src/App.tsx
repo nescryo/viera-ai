@@ -9,7 +9,6 @@ import * as historyService from './services/historyService';
 import { Header } from './components/ui/Header';
 import { ChatOverlay } from './components/ui/ChatOverlay';
 import { SettingsModal } from './components/ui/SettingsModal';
-import { ModelUploaderModal } from './components/ui/ModelUploaderModal';
 import { LoginModal } from './components/ui/LoginModal';
 import { SetupOnboardingModal } from './components/ui/SetupOnboardingModal';
 import { ConversationHistoryModal } from './components/ui/ConversationHistoryModal';
@@ -33,7 +32,6 @@ export function App() {
 
   // Modals state
   const [showSettings, setShowSettings] = useState(false);
-  const [showUploader, setShowUploader] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -70,7 +68,6 @@ export function App() {
       lmStudioModel: 'local-model',
       deepseekApiKey: envDeepseekKey,
       deepseekModel: 'deepseek-chat',
-      geminiApiKey: '',
       openRouterApiKey: envOpenRouterKey,
       openRouterModel: '',
       ttsProvider: 'voicevox',
@@ -478,7 +475,6 @@ export function App() {
       <Header
         currentPersona={currentPersona}
         onOpenSettings={() => setShowSettings(true)}
-        onOpenModelUploader={() => setShowUploader(true)}
         onOpenHistory={() => setShowHistory(true)}
         onOpenProfile={() => setShowProfile(true)}
         apiConfig={apiConfig}
@@ -516,16 +512,6 @@ export function App() {
           apiConfig={apiConfig}
           onSaveConfig={handleSaveConfig}
           onClose={() => setShowSettings(false)}
-        />
-      )}
-
-      {/* 4. Model Uploader Modal */}
-      {showUploader && (
-        <ModelUploaderModal
-          onLoadModelFile={(file) => {
-            console.log("Loaded custom 3D model file:", file.name);
-          }}
-          onClose={() => setShowUploader(false)}
         />
       )}
 

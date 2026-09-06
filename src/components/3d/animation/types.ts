@@ -52,12 +52,7 @@ export interface BoneReferences {
   accessories: AccessoryBoneData[];
 }
 
-export interface PointerState {
-  x: number;
-  y: number;
-  targetX: number;
-  targetY: number;
-}
+
 
 export interface SaccadeState {
   currentX: number;

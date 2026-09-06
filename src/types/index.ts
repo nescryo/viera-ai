@@ -10,9 +10,6 @@ export interface ChatMessage {
   emotions?: string[];
   actions?: string[];
   timestamp: string;
-  swipes?: string[];
-  activeSwipeIndex?: number;
-  isAudioPlaying?: boolean;
 }
 
 export interface Persona {
@@ -22,8 +19,6 @@ export interface Persona {
   greeting: string;
   systemPrompt: string;
   avatarUrl: string;
-  vrmModelUrl?: string;
-  accentColor: string;
   voice: {
     pitch: number;
     rate: number;
@@ -42,23 +37,15 @@ export interface ApiConfig {
   lmStudioModel: string;
   deepseekApiKey?: string;
   deepseekModel?: string;
-  geminiApiKey: string;
   openRouterApiKey: string;
   openRouterModel: string;
   ttsProvider?: TtsProvider;
   vitsServerUrl?: string;
   styleBertUrl?: string;
-  edgeVoice?: string;
   voicevoxSpeakerId?: number;
   fishAudioApiKey?: string;
   fishAudioReferenceId?: string;
   fishAudioModel?: string;
-}
-
-export interface ExpressionState {
-  currentEmotion: string;
-  intensity: number;
-  isSpeaking: boolean;
 }
 
 export interface VoicevoxStyle {
