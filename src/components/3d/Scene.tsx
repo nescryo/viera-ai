@@ -175,7 +175,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0f1322'); // Space cosmic dark environment
 
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 500);
     camera.position.set(-0.65, 1.30, 1.50); // Spacious & elegant anime character view framing
     camera.lookAt(-0.65, 1.28, 0);
 
@@ -232,13 +232,76 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     rimLight.position.set(0.0, 2.8, -2.5);
     scene.add(rimLight);
 
-    // 3. Ground Pedestal & Grid
-    const gridHelper = new THREE.GridHelper(10, 20, 0x3b82f6, 0x2b2d31);
-    gridHelper.position.set(-0.65, 0, 0);
-    scene.add(gridHelper);
+    // 3. Load Official HoYoverse HSR CharacterSphere Skydome Stage
+    const stageLoader = new MMDLoader();
+    stageLoader.setResourcePath('/models/stages/CharacterSphere/');
+    stageLoader.load(
+      '/models/stages/CharacterSphere/CharacterSphere_HSRV.pmx',
+      (rawStageMesh) => {
+        if (isDisposed) return;
 
-    // 4. Floating Firefly Particles
-    const particleCount = 180;
+        // Extract pure BufferGeometry to prevent SkinnedMesh empty morphTarget shader compilation crash
+        const origGeo = rawStageMesh.geometry;
+        const cleanGeo = new THREE.BufferGeometry();
+        cleanGeo.setAttribute('position', origGeo.attributes.position.clone());
+        cleanGeo.setAttribute('normal', origGeo.attributes.normal.clone());
+        cleanGeo.setAttribute('uv', origGeo.attributes.uv.clone());
+        if (origGeo.index) {
+          cleanGeo.setIndex(origGeo.index.clone());
+        }
+
+        const texLoader = new THREE.TextureLoader();
+        const stageTex = texLoader.load(
+          '/models/stages/CharacterSphere/textures/Tex_CharacterSphere_HSR.png',
+          () => {
+            if (isDisposed) return;
+            stageMat.visible = true;
+            stageMat.needsUpdate = true;
+          }
+        );
+        stageTex.colorSpace = THREE.SRGBColorSpace;
+        stageTex.flipY = false;
+        stageTex.wrapS = THREE.RepeatWrapping;
+        stageTex.wrapT = THREE.RepeatWrapping;
+
+        const stageMat = new THREE.MeshBasicMaterial({
+          map: stageTex,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          depthTest: true,
+          visible: false, // Prevents white flash glitch while 5.5MB texture is downloading
+        });
+        stageMat.userData = { outlineParameters: { visible: false } };
+
+        const stageMesh = new THREE.Mesh(cleanGeo, stageMat);
+        // Calibrate stage sphere scale and vertical center for portrait framing
+        stageMesh.scale.set(0.12, 0.12, 0.12);
+        stageMesh.position.set(-0.65, 0.5, 0);
+        stageMesh.renderOrder = -100;
+        stageMesh.castShadow = false;
+        stageMesh.receiveShadow = false;
+
+        scene.add(stageMesh);
+        origGeo.dispose();
+      },
+      undefined,
+      (err) => {
+        console.warn('CharacterSphere stage load warning:', err);
+      }
+    );
+
+    // Ground Contact Shadow Receiver (Invisible floor plane receiving soft foot shadows)
+    const groundShadowGeo = new THREE.PlaneGeometry(6, 6);
+    groundShadowGeo.rotateX(-Math.PI / 2);
+    const groundShadowMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+    groundShadowMat.userData = { outlineParameters: { visible: false } };
+    const groundShadow = new THREE.Mesh(groundShadowGeo, groundShadowMat);
+    groundShadow.position.set(-0.65, 0.005, 0);
+    groundShadow.receiveShadow = true;
+    scene.add(groundShadow);
+
+    // 4. Floating Cosmic Starlight Dust Particles
+    const particleCount = 200;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
 
@@ -250,10 +313,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const particleMaterial = new THREE.PointsMaterial({
-      color: new THREE.Color(currentPersona.accentColor || '#3b82f6'),
+      color: new THREE.Color('#dbe7ff'),
       size: 0.035,
       transparent: true,
-      opacity: 0.65
+      opacity: 0.70
     });
     const particles = new THREE.Points(geometry, particleMaterial);
     scene.add(particles);
@@ -262,17 +325,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     const modelGroup = new THREE.Group();
     modelGroup.position.set(-0.65, 0, 0);
     scene.add(modelGroup);
-
-    // Pedestal Base
-    const pedestalGeo = new THREE.CylinderGeometry(0.8, 0.9, 0.08, 32);
-    const pedestalMat = new THREE.MeshStandardMaterial({
-      color: 0x2b2d31,
-      roughness: 0.5,
-      metalness: 0.6
-    });
-    const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
-    pedestal.position.y = 0.04;
-    modelGroup.add(pedestal);
 
     // 6. Load Firefly .pmx Model
     THREE.Cache.enabled = false;
