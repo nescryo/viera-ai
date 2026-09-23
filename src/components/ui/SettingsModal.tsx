@@ -1,12 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { ApiConfig, ApiProvider, TtsProvider } from '../../types';
-import { X, Save, Server, Cpu, CheckCircle, Volume2, Sparkles, Key, Globe } from 'lucide-react';
+import { 
+  X, Save, Server, Cpu, CheckCircle, Volume2, Sparkles, Key, Globe,
+  Zap, Brain, ChevronDown, Check
+} from 'lucide-react';
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
   onSaveConfig: (newConfig: ApiConfig) => void;
   onClose: () => void;
 }
+
+const DEEPSEEK_MODELS = [
+  {
+    id: 'deepseek-chat',
+    name: 'DeepSeek-V3 (Chat Engine)',
+    badge: 'Low-Latency • Conversational',
+    desc: 'Optimized for expressive persona dialogue, contextual coherence, and real-time streaming synthesis.',
+    icon: Zap,
+    color: '#eab308'
+  },
+  {
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek-R1 (Inference & CoT)',
+    badge: 'Deep Reasoning • Analytical',
+    desc: 'Multi-step chain-of-thought logic processing designed for complex reasoning and deep contextual recall.',
+    icon: Brain,
+    color: '#a855f7'
+  }
+] as const;
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   apiConfig,
@@ -18,6 +40,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [lmStudioModel, setLmStudioModel] = useState(apiConfig.lmStudioModel);
   const [deepseekApiKey, setDeepseekApiKey] = useState(apiConfig.deepseekApiKey || '');
   const [deepseekModel, setDeepseekModel] = useState(apiConfig.deepseekModel || 'deepseek-chat');
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'fish-audio');
 
   const [fishAudioApiKey, setFishAudioApiKey] = useState(apiConfig.fishAudioApiKey || '');
@@ -75,7 +110,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Sparkles size={24} style={{ color: '#3b82f6' }} />
                 <div className="provider-card-info">
                   <span className="p-title">DeepSeek AI (Cloud API)</span>
-                  <span className="p-desc">High Quality RP • 20M+ Tokens</span>
+                  <span className="p-desc">Cloud LLM Infrastructure • High-Throughput API Gateway</span>
                 </div>
                 {provider === 'deepseek' && <CheckCircle size={18} className="p-check" />}
               </button>
@@ -88,7 +123,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Cpu size={24} />
                 <div className="provider-card-info">
                   <span className="p-title">LM Studio (Local)</span>
-                  <span className="p-desc">Free • Offline • localhost:1234</span>
+                  <span className="p-desc">Local Inference Server • Private OpenAI-Compatible Endpoint</span>
                 </div>
                 {provider === 'lmstudio' && <CheckCircle size={18} className="p-check" />}
               </button>
@@ -101,7 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Server size={24} />
                 <div className="provider-card-info">
                   <span className="p-title">Demo Roleplay Engine</span>
-                  <span className="p-desc">Instant offline mock responses</span>
+                  <span className="p-desc">Offline Simulation Sandbox • Zero-Latency Deterministic Fallback</span>
                 </div>
                 {provider === 'mock' && <CheckCircle size={18} className="p-check" />}
               </button>
@@ -122,21 +157,79 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="form-input"
                 />
                 {import.meta.env.VITE_DEEPSEEK_API_KEY && !deepseekApiKey && (
-                  <small style={{ color: '#10b981', marginTop: '4px', display: 'block' }}>
-                    ✓ API Key automatically detected from .env file!
+                  <small style={{ color: '#10b981', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Check size={14} /> Environment variable detected: secure key loaded from local configuration.
                   </small>
                 )}
               </div>
-              <div className="form-group">
-                <label className="form-label">DeepSeek Model</label>
-                <select
-                  value={deepseekModel}
-                  onChange={(e) => setDeepseekModel(e.target.value)}
-                  className="form-input"
+              
+              <div className="form-group" style={{ position: 'relative' }} ref={modelDropdownRef}>
+                <label className="form-label" id="deepseek-model-label">DeepSeek Model Architecture</label>
+                <div
+                  className="model-custom-select-trigger glass-panel"
+                  onClick={() => setIsModelDropdownOpen((prev) => !prev)}
+                  tabIndex={0}
+                  role="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={isModelDropdownOpen}
+                  aria-labelledby="deepseek-model-label"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setIsModelDropdownOpen((prev) => !prev);
+                    }
+                  }}
                 >
-                  <option value="deepseek-chat">⚡ deepseek-chat (DeepSeek-V3: Recommended for Roleplay & 3D Expressions)</option>
-                  <option value="deepseek-reasoner">🧠 deepseek-reasoner (DeepSeek-R1: Deep Chain-of-Thought Reasoning)</option>
-                </select>
+                  <div className="trigger-content">
+                    {(() => {
+                      const selected = DEEPSEEK_MODELS.find(m => m.id === deepseekModel) || DEEPSEEK_MODELS[0];
+                      const IconComp = selected.icon;
+                      return (
+                        <div className="trigger-model-pill">
+                          <IconComp size={18} style={{ color: selected.color }} />
+                          <div className="trigger-text-group">
+                            <span className="model-name">{selected.name}</span>
+                            <span className="model-badge">{selected.badge}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <ChevronDown size={16} className={`dropdown-arrow ${isModelDropdownOpen ? 'open' : ''}`} />
+                </div>
+
+                {isModelDropdownOpen && (
+                  <div className="model-custom-dropdown-menu glass-panel fade-in" role="listbox">
+                    {DEEPSEEK_MODELS.map((item) => {
+                      const isSelected = deepseekModel === item.id;
+                      const IconComp = item.icon;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`model-dropdown-option ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            setDeepseekModel(item.id);
+                            setIsModelDropdownOpen(false);
+                          }}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          <div className="option-left">
+                            <IconComp size={20} style={{ color: item.color }} />
+                            <div className="option-info">
+                              <div className="option-header-row">
+                                <span className="option-model-name">{item.name}</span>
+                                <span className="option-badge">{item.badge}</span>
+                              </div>
+                              <span className="option-desc">{item.desc}</span>
+                            </div>
+                          </div>
+                          {isSelected && <Check size={16} className="option-check" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -177,7 +270,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Sparkles size={24} />
                 <div className="provider-card-info">
                   <span className="p-title">Fish Audio S2.1 Pro</span>
-                  <span className="p-desc">Zero-Shot Voice Cloning • Free / API</span>
+                  <span className="p-desc">Zero-Shot Neural Acoustic Model • Dynamic Prosody Alignment</span>
                 </div>
                 {ttsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" />}
               </button>
@@ -190,7 +283,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Volume2 size={24} />
                 <div className="provider-card-info">
                   <span className="p-title">Edge-TTS Neural Voice</span>
-                  <span className="p-desc">100% Free • Zero-Delay (under 0.2s)</span>
+                  <span className="p-desc">Real-Time Cloud Neural Voice • Low-Latency Edge Network</span>
                 </div>
                 {ttsProvider === 'edge' && <CheckCircle size={18} className="p-check" />}
               </button>
@@ -203,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Globe size={24} />
                 <div className="provider-card-info">
                   <span className="p-title">Other / Custom TTS</span>
-                  <span className="p-desc">ElevenLabs • OpenAI • Custom Server</span>
+                  <span className="p-desc">External Speech Service Gateway • ElevenLabs / OpenAI Audio API</span>
                 </div>
                 {ttsProvider === 'custom' && <CheckCircle size={18} className="p-check" />}
               </button>
