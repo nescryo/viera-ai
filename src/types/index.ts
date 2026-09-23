@@ -29,7 +29,7 @@ export interface Persona {
 
 export type ApiProvider = 'deepseek' | 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
 
-export type TtsProvider = 'fish-audio' | 'voicevox' | 'edge' | 'vits' | 'style-bert-vits2' | 'webspeech';
+export type TtsProvider = 'fish-audio' | 'edge' | 'custom' | 'webspeech';
 
 export interface ApiConfig {
   provider: ApiProvider;
@@ -40,25 +40,13 @@ export interface ApiConfig {
   openRouterApiKey: string;
   openRouterModel: string;
   ttsProvider?: TtsProvider;
-  vitsServerUrl?: string;
-  styleBertUrl?: string;
-  voicevoxSpeakerId?: number;
   fishAudioApiKey?: string;
   fishAudioReferenceId?: string;
   fishAudioModel?: string;
-}
-
-export interface VoicevoxStyle {
-  id: number;
-  name: string;
-  type?: string;
-}
-
-export interface VoicevoxSpeaker {
-  name: string;
-  speaker_uuid: string;
-  styles: VoicevoxStyle[];
-  version?: string;
+  customTtsUrl?: string;
+  customTtsApiKey?: string;
+  customTtsModel?: string;
+  customTtsVoiceId?: string;
 }
 
 export interface UserProfile {

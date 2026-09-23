@@ -1,47 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import type { ApiConfig, ApiProvider, TtsProvider, VoicevoxSpeaker } from '../../types';
-import { X, Save, Server, Cpu, CheckCircle, Volume2, Mic, Radio, Sparkles, Key } from 'lucide-react';
-
-const formatSpeakerName = (name: string): string => {
-  const map: Record<string, string> = {
-    '四国めたん': '🌸 Shikikoku Metan',
-    'ずんだもん': '⚡ Zundamon',
-    '春日部つむぎ': '🌾 Kasukabe Tsumugi',
-    '雨晴はう': '🎀 Amehare Hau',
-    '波音リツ': '📻 Namine Ritsu',
-    '冥鳴ひまり': '💕 Meimei Himari',
-    '九州そら': '☁️ Kyushu Sora',
-    'もち子さん': '🍡 Mochiko-san',
-    '剣崎牝犬': '⚔️ Kenzaki',
-    'ホワイトカルティ': '❄️ White Culita',
-    '後鬼': '👹 Goki',
-    'No.7': '🤖 No.7',
-    'ちび式じい': '👴 Chibi Shiki-jii',
-    '櫻歌ミコ': '🌸 Ouka Miko',
-    '小夜/Sayo': '🌙 Sayo',
-    'ナースロボ＿タイプＴ': '💉 Nurse Robot Type-T'
-  };
-  return map[name] || `🎙️ ${name}`;
-};
-
-const formatStyleName = (styleName: string): string => {
-  const map: Record<string, string> = {
-    'ノーマル': 'Normal',
-    'あまあま': 'Sweet (Ama-ama)',
-    'ツンツン': 'Tsundere',
-    'セクシー': 'Sexy',
-    'ささやき': 'Whisper',
-    'ヒソヒソ': 'Soft Whisper',
-    'ヘロヘロ': 'Dizzy',
-    'なみだめ': 'Tearful / Sad',
-    '喜び': 'Joy',
-    '悲しみ': 'Sadness',
-    '怒り': 'Angry',
-    '人前少女': 'Public Girl',
-    '酔い': 'Drunk'
-  };
-  return map[styleName] || styleName;
-};
+import React, { useState } from 'react';
+import type { ApiConfig, ApiProvider, TtsProvider } from '../../types';
+import { X, Save, Server, Cpu, CheckCircle, Volume2, Sparkles, Key, Globe } from 'lucide-react';
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
@@ -60,26 +19,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [deepseekApiKey, setDeepseekApiKey] = useState(apiConfig.deepseekApiKey || '');
   const [deepseekModel, setDeepseekModel] = useState(apiConfig.deepseekModel || 'deepseek-chat');
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'fish-audio');
-  const [vitsServerUrl, setVitsServerUrl] = useState(apiConfig.vitsServerUrl || 'http://localhost:5000/tts');
 
-  const [voicevoxSpeakerId, setVoicevoxSpeakerId] = useState<number>(apiConfig.voicevoxSpeakerId ?? 0);
   const [fishAudioApiKey, setFishAudioApiKey] = useState(apiConfig.fishAudioApiKey || '');
   const [fishAudioReferenceId, setFishAudioReferenceId] = useState(apiConfig.fishAudioReferenceId || '7f92f8afb8ec43bf81429cc1c9199cb1');
   const [fishAudioModel, setFishAudioModel] = useState(apiConfig.fishAudioModel || 's2.1-pro-free');
-  const [speakers, setSpeakers] = useState<VoicevoxSpeaker[]>([]);
 
-  useEffect(() => {
-    if (ttsProvider === 'voicevox') {
-      fetch('/voicevox_api/speakers')
-        .then((res) => (res.ok ? res.json() : []))
-        .then((data: VoicevoxSpeaker[]) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setSpeakers(data);
-          }
-        })
-        .catch((err) => console.warn('Could not load live VOICEVOX speakers:', err));
-    }
-  }, [ttsProvider]);
+  const [customTtsUrl, setCustomTtsUrl] = useState(apiConfig.customTtsUrl || '');
+  const [customTtsApiKey, setCustomTtsApiKey] = useState(apiConfig.customTtsApiKey || '');
+  const [customTtsModel, setCustomTtsModel] = useState(apiConfig.customTtsModel || '');
+  const [customTtsVoiceId, setCustomTtsVoiceId] = useState(apiConfig.customTtsVoiceId || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,11 +39,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       deepseekApiKey,
       deepseekModel,
       ttsProvider,
-      vitsServerUrl,
-      voicevoxSpeakerId,
       fishAudioApiKey,
       fishAudioReferenceId,
-      fishAudioModel
+      fishAudioModel,
+      customTtsUrl,
+      customTtsApiKey,
+      customTtsModel,
+      customTtsVoiceId
     });
     onClose();
   };
@@ -218,7 +168,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="form-group" style={{ marginTop: '1.2rem' }}>
             <label className="form-label">2. Select TTS Voice Engine</label>
-            <div className="provider-selector-grid">
+            <div className="provider-selector-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <button
                 type="button"
                 className={`provider-card ${ttsProvider === 'fish-audio' ? 'active' : ''}`}
@@ -230,19 +180,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="p-desc">Zero-Shot Voice Cloning • Free / API</span>
                 </div>
                 {ttsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" />}
-              </button>
-
-              <button
-                type="button"
-                className={`provider-card ${ttsProvider === 'voicevox' ? 'active' : ''}`}
-                onClick={() => setTtsProvider('voicevox')}
-              >
-                <Radio size={24} />
-                <div className="provider-card-info">
-                  <span className="p-title">VOICEVOX Anime Voice</span>
-                  <span className="p-desc">Local Server • http://localhost:50021</span>
-                </div>
-                {ttsProvider === 'voicevox' && <CheckCircle size={18} className="p-check" />}
               </button>
 
               <button
@@ -260,15 +197,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <button
                 type="button"
-                className={`provider-card ${ttsProvider === 'vits' ? 'active' : ''}`}
-                onClick={() => setTtsProvider('vits')}
+                className={`provider-card ${ttsProvider === 'custom' ? 'active' : ''}`}
+                onClick={() => setTtsProvider('custom')}
               >
-                <Mic size={24} />
+                <Globe size={24} />
                 <div className="provider-card-info">
-                  <span className="p-title">Local Custom VITS Bridge</span>
-                  <span className="p-desc">Local Model • http://localhost:5000/tts</span>
+                  <span className="p-title">Other / Custom TTS</span>
+                  <span className="p-desc">ElevenLabs • OpenAI • Custom Server</span>
                 </div>
-                {ttsProvider === 'vits' && <CheckCircle size={18} className="p-check" />}
+                {ttsProvider === 'custom' && <CheckCircle size={18} className="p-check" />}
               </button>
             </div>
           </div>
@@ -325,56 +262,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {ttsProvider === 'voicevox' && (
+          {ttsProvider === 'custom' && (
             <div className="provider-details-box fade-in">
               <div className="form-group">
-                <label className="form-label">Select VOICEVOX Base Character & Preferred Style</label>
-                <select
-                  value={voicevoxSpeakerId}
-                  onChange={(e) => setVoicevoxSpeakerId(Number(e.target.value))}
-                  className="form-input"
-                >
-                  {speakers.length > 0 ? (
-                    speakers.map((spk) => (
-                      <optgroup key={spk.speaker_uuid || spk.name} label={formatSpeakerName(spk.name)}>
-                        {spk.styles.map((style) => (
-                          <option key={style.id} value={style.id}>
-                            {formatSpeakerName(spk.name)} - {formatStyleName(style.name)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))
-                  ) : (
-                    <>
-                      <option value={0}>🌸 Shikikoku Metan - Sweet (Ama-ama)</option>
-                      <option value={2}>✨ Shikikoku Metan - Normal</option>
-                      <option value={6}>💢 Shikikoku Metan - Tsundere</option>
-                      <option value={36}>🌙 Shikikoku Metan - Whisper</option>
-                      <option value={10}>🎀 Amehare Hau - Gentle Nurse</option>
-                      <option value={14}>💕 Meimei Himari - Cute Girl</option>
-                      <option value={9}>📻 Namine Ritsu - Calm Female</option>
-                      <option value={3}>⚡ Zundamon - Normal</option>
-                      <option value={1}>🍬 Zundamon - Sweet (Ama-ama)</option>
-                      <option value={7}>💢 Zundamon - Tsundere</option>
-                      <option value={38}>🌙 Zundamon - Whisper</option>
-                    </>
-                  )}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {ttsProvider === 'vits' && (
-            <div className="provider-details-box fade-in">
-              <div className="form-group">
-                <label className="form-label">Local VITS Voice Server URL</label>
+                <label className="form-label">Endpoint URL</label>
                 <input
                   type="text"
-                  value={vitsServerUrl}
-                  onChange={(e) => setVitsServerUrl(e.target.value)}
-                  placeholder="http://localhost:5000/tts"
+                  value={customTtsUrl}
+                  onChange={(e) => setCustomTtsUrl(e.target.value)}
+                  placeholder="https://api.service.com/v1/audio/speech"
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                <label className="form-label">API Key</label>
+                <input
+                  type="password"
+                  value={customTtsApiKey}
+                  onChange={(e) => setCustomTtsApiKey(e.target.value)}
+                  placeholder="sk-... or xi-api-key (optional)"
                   className="form-input"
                 />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '0.8rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Voice ID</label>
+                  <input
+                    type="text"
+                    value={customTtsVoiceId}
+                    onChange={(e) => setCustomTtsVoiceId(e.target.value)}
+                    placeholder="e.g. 21m00Tcm4TlvDq8ikWAM, nova"
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Model Name</label>
+                  <input
+                    type="text"
+                    value={customTtsModel}
+                    onChange={(e) => setCustomTtsModel(e.target.value)}
+                    placeholder="e.g. eleven_multilingual_v2, tts-1"
+                    className="form-input"
+                  />
+                </div>
               </div>
             </div>
           )}

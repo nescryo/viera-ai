@@ -57,7 +57,7 @@ export function App() {
           deepseekApiKey: parsed.deepseekApiKey || envDeepseekKey,
           openRouterApiKey: parsed.openRouterApiKey || envOpenRouterKey,
           fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
-          ttsProvider: parsed.ttsProvider || 'fish-audio'
+          ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio')
         };
       } catch (e) {
         console.warn("Failed to parse saved apiConfig:", e);
@@ -72,9 +72,12 @@ export function App() {
       openRouterApiKey: envOpenRouterKey,
       openRouterModel: '',
       ttsProvider: 'fish-audio',
-      voicevoxSpeakerId: 0,
       fishAudioApiKey: envFishAudioKey,
-      fishAudioReferenceId: ''
+      fishAudioReferenceId: '',
+      customTtsUrl: '',
+      customTtsApiKey: '',
+      customTtsModel: '',
+      customTtsVoiceId: ''
     };
   });
 

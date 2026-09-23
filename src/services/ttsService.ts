@@ -1,4 +1,4 @@
-import type { Persona, ApiConfig, VoicevoxSpeaker, VoicevoxStyle } from '../types';
+import type { Persona, ApiConfig } from '../types';
 
 export interface TTSBoundaryEvent {
   name: string;
@@ -128,7 +128,7 @@ class TTSService {
     if (jaMatch && jaMatch[1].trim()) {
       result = jaMatch[1].trim();
     }
-    return result
+    const cleaned = result
       .replace(/<[^>]+>/g, '')
       .replace(/\*.*?\*/g, '')
       .replace(/\[.*?\]/g, '')
@@ -137,6 +137,8 @@ class TTSService {
       .replace(/[\r\n]+/g, '、') // Replace newlines with Japanese comma so Fish Audio doesn't cut off mid-text!
       .replace(/\s+/g, ' ')
       .trim();
+
+    return this.normalizeJapaneseSentenceFlow(cleaned);
   }
 
   public speak(
@@ -160,12 +162,8 @@ class TTSService {
 
     if (ttsProvider === 'fish-audio') {
       this.speakFishAudio(targetText, persona, apiConfig, onStart, onEnd);
-    } else if (ttsProvider === 'style-bert-vits2') {
-      this.speakStyleBertVits2(targetText, persona, apiConfig, onStart, onEnd);
-    } else if (ttsProvider === 'voicevox') {
-      this.speakVoicevox(targetText, persona, apiConfig, onStart, onEnd);
-    } else if (ttsProvider === 'vits') {
-      this.speakLocalVits(targetText, persona, apiConfig, onStart, onEnd);
+    } else if (ttsProvider === 'custom') {
+      this.speakCustomTTS(targetText, persona, apiConfig, onStart, onEnd);
     } else if (ttsProvider === 'edge') {
       this.speakEdgeNeural(targetText, persona, onStart, onEnd, onBoundary);
     } else {
@@ -461,24 +459,6 @@ class TTSService {
 
 
 
-  // Point 3: Dynamic Emotion Detection & Universal Voicevox Style Switching
-  private voicevoxSpeakersCache: VoicevoxSpeaker[] | null = null;
-
-  public async fetchVoicevoxSpeakers(): Promise<VoicevoxSpeaker[]> {
-    if (this.voicevoxSpeakersCache) return this.voicevoxSpeakersCache;
-    try {
-      const res = await fetch('/voicevox_api/speakers');
-      if (res.ok) {
-        const data: VoicevoxSpeaker[] = await res.json();
-        this.voicevoxSpeakersCache = data;
-        return data;
-      }
-    } catch (e) {
-      console.warn("Failed to fetch VOICEVOX speakers list:", e);
-    }
-    return [];
-  }
-
   private detectEmotionFromText(text: string): 'tsundere' | 'sweet' | 'whisper' | 'sad' | 'joy' | 'shy' | 'blush-hardly' | 'teasing' | 'jealous' | 'terrified' | 'pouting' | 'relaxed' {
     const lower = text.toLowerCase();
     
@@ -520,179 +500,94 @@ class TTSService {
     return 'relaxed';
   }
 
-  private resolveEmotionSpeakerStyle(
-    baseSpeakerId: number,
-    emotion: string,
-    speakers: VoicevoxSpeaker[]
-  ): number {
-    if (!speakers || speakers.length === 0) return baseSpeakerId;
-
-    const targetSpeaker = speakers.find(s => s.styles.some(st => st.id === baseSpeakerId));
-    if (!targetSpeaker || targetSpeaker.styles.length <= 1) {
-      return baseSpeakerId;
-    }
-
-    let styleMatch: VoicevoxStyle | undefined;
-
-    if (emotion === 'tsundere' || emotion === 'jealous' || emotion === 'pouting') {
-      styleMatch = targetSpeaker.styles.find(s => /ツン|怒|ツンデレ/i.test(s.name));
-    } else if (emotion === 'sweet' || emotion === 'joy' || emotion === 'shy' || emotion === 'teasing' || emotion === 'smug') {
-      styleMatch = targetSpeaker.styles.find(s => s.id === baseSpeakerId) || targetSpeaker.styles.find(s => /ノーマル|通常/i.test(s.name));
-    } else if (emotion === 'whisper') {
-      styleMatch = targetSpeaker.styles.find(s => /ささやき|ウィスパー/i.test(s.name));
-    } else if (emotion === 'sad' || emotion === 'blush-hardly') {
-      styleMatch = targetSpeaker.styles.find(s => /悲|なみだ|泣/i.test(s.name));
-    } else if (emotion === 'terrified') {
-      styleMatch = targetSpeaker.styles.find(s => /驚|叫び|怒/i.test(s.name));
-    }
-
-    // Protection: Never pick a creepy whisper style (ヒソヒソ) for non-whisper emotions!
-    if (styleMatch && /ヒソヒソ/i.test(styleMatch.name) && emotion !== 'whisper') {
-      return baseSpeakerId;
-    }
-
-    return styleMatch ? styleMatch.id : baseSpeakerId;
-  }
-
-  // 2. VOICEVOX Anime Voice Engine Integration (http://localhost:50021)
-  private async speakVoicevox(
+  // Universal Smart Auto-Detect Custom TTS (ElevenLabs, OpenAI, OpenRouter, Local/Custom Server)
+  private async speakCustomTTS(
     text: string,
     persona: Persona,
     apiConfig?: ApiConfig,
     onStart?: () => void,
     onEnd?: () => void
   ) {
-    const voicevoxHost = '/voicevox_api';
-    const baseSpeakerId = apiConfig?.voicevoxSpeakerId ?? 0; // Default to ID 0: Shikikoku Metan (Ama-ama / Sweet & Calm Anime Girl)
+    const rawUrl = (apiConfig?.customTtsUrl || '').trim();
+    if (!rawUrl) {
+      console.warn("[Viera TTS] Custom TTS URL not configured. Falling back to Edge Neural.");
+      this.speakEdgeNeural(text, persona, onStart, onEnd);
+      return;
+    }
+
+    const apiKey = apiConfig?.customTtsApiKey?.trim() || '';
+    const customModel = apiConfig?.customTtsModel?.trim() || '';
+    const customVoice = apiConfig?.customTtsVoiceId?.trim() || '';
 
     try {
-      // Auto translate English text to Japanese for authentic anime dubbing
-      const jaText = await this.translateToJapanese(text);
+      const isElevenLabs = rawUrl.toLowerCase().includes('elevenlabs.io');
+      const isOpenAI = rawUrl.toLowerCase().includes('openai.com') || rawUrl.toLowerCase().includes('openrouter.ai');
 
-      // Protection: If text is still raw English and has no Japanese Kana, fallback to Edge Neural English voice instead of forcing VOICEVOX Katakana accent!
-      const isStillEnglish = !/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(jaText) && /[a-zA-Z]{3,}/.test(jaText);
-      if (isStillEnglish) {
-        console.warn("Text is English and could not be translated to Japanese. Using Edge Neural fallback to avoid Katakana accent artifact:", text);
-        this.speakEdgeNeural(text, persona, onStart, onEnd);
-        return;
-      }
+      let targetUrl = rawUrl;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      let body: string;
 
-      // Apply Point 2: Normalize Japanese sentence flow, breathing punctuation, dialogue brackets & pitch cadence
-      const formattedJaText = this.normalizeJapaneseSentenceFlow(jaText);
-
-      // Apply Point 3: Dynamic Emotion Detection & Universal Voicevox Style Switching
-      const emotion = this.detectEmotionFromText(text);
-      const speakers = await this.fetchVoicevoxSpeakers();
-      const activeSpeakerId = this.resolveEmotionSpeakerStyle(baseSpeakerId, emotion, speakers);
-
-      const queryRes = await fetch(`${voicevoxHost}/audio_query?text=${encodeURIComponent(formattedJaText)}&speaker=${activeSpeakerId}`, {
-        method: 'POST'
-      });
-
-      if (!queryRes.ok) {
-        throw new Error(`VOICEVOX audio_query status ${queryRes.status}`);
-      }
-
-      const queryJson = await queryRes.json();
-
-      // Base prosody & rhythm fine-tuning for natural non-robotic flow
-      queryJson.pauseLengthScale = (queryJson.pauseLengthScale ?? 1.0) * 0.88;
-      queryJson.intonationScale = (queryJson.intonationScale ?? 1.0) * 1.12;
-
-      // Emotion-driven Prosody Modulation & Fine-tuning (Slower, Smooth, Zero Distortion)
-      if (emotion === 'tsundere') {
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.03;
-        queryJson.intonationScale = 1.18;
-        queryJson.speedScale = 0.94;
-      } else if (emotion === 'shy') {
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.03;
-        queryJson.intonationScale = 1.15;
-        queryJson.speedScale = 0.92;
-        queryJson.volumeScale = (queryJson.volumeScale ?? 1.0) * 1.05;
-      } else if (emotion === 'sweet' || emotion === 'joy') {
-        // Firefly Sweet & Happy (Slower, warm, smooth & crystal clear tempo)
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.02;
-        queryJson.intonationScale = 1.15;
-        queryJson.speedScale = 0.91; // Slower, relaxed & sweet!
-        queryJson.volumeScale = (queryJson.volumeScale ?? 1.0) * 1.05;
-      } else if (emotion === 'whisper') {
-        queryJson.volumeScale = (queryJson.volumeScale ?? 1.0) * 0.90;
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) - 0.01;
-        queryJson.speedScale = 0.88;
-        queryJson.postPhonemeLength = (queryJson.postPhonemeLength ?? 0.15) + 0.15;
-      } else if (emotion === 'sad') {
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) - 0.03;
-        queryJson.speedScale = 0.86;
-        queryJson.intonationScale = 1.05;
+      if (isElevenLabs) {
+        // Smart Auto-Detect for ElevenLabs:
+        // Format: POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+        const voiceId = customVoice || '21m00Tcm4TlvDq8ikWAM';
+        if (!targetUrl.includes('/v1/text-to-speech/')) {
+          targetUrl = `${targetUrl.replace(/\/+$/, '')}/v1/text-to-speech/${voiceId}`;
+        }
+        if (apiKey) {
+          headers['xi-api-key'] = apiKey;
+        }
+        body = JSON.stringify({
+          text,
+          model_id: customModel || 'eleven_multilingual_v2',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        });
+      } else if (isOpenAI) {
+        // Smart Auto-Detect for OpenAI / OpenRouter:
+        // Format: POST /v1/audio/speech
+        if (targetUrl.endsWith('.com') || targetUrl.endsWith('.ai') || targetUrl.endsWith('.com/') || targetUrl.endsWith('.ai/')) {
+          targetUrl = `${targetUrl.replace(/\/+$/, '')}/v1/audio/speech`;
+        }
+        if (apiKey) {
+          headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
+        }
+        body = JSON.stringify({
+          model: customModel || 'tts-1',
+          input: text,
+          voice: customVoice || 'nova',
+          response_format: 'mp3'
+        });
       } else {
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.02;
-        queryJson.speedScale = 0.93; // Slower, smooth tempo for normal voice
+        // Universal Custom Server (OpenAI-compatible + Simple { text, input } dual payload):
+        if (apiKey) {
+          headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
+          headers['x-api-key'] = apiKey;
+        }
+        body = JSON.stringify({
+          input: text,
+          text: text,
+          model: customModel || 'tts-1',
+          voice: customVoice || 'default',
+          response_format: 'mp3'
+        });
       }
 
-      // Check for ultra-short interjections & hesitation fillers (e.g. "えーっとね、", "あのね、", "えっ？", <= 8 chars)
-      const isShortInterjection = formattedJaText.length <= 8;
-      const hasHesitation = formattedJaText.includes('えーっと') || formattedJaText.includes('あのー') || formattedJaText.includes('あのね') || formattedJaText.includes('んー');
-
-      if (isShortInterjection || hasHesitation) {
-        // Ensure browser audio buffer has enough time to initialize & finish playback without clipping short sounds
-        queryJson.prePhonemeLength = Math.max(queryJson.prePhonemeLength ?? 0.1, 0.25);
-        queryJson.postPhonemeLength = Math.max(queryJson.postPhonemeLength ?? 0.40, 0.40);
-        queryJson.speedScale = 0.88; // Relaxed speed for cute, resonant anime hesitation
-        queryJson.volumeScale = (queryJson.volumeScale ?? 1.0) * 1.18; // Boost volume so short sounds are crisp and clear
-      } else {
-        // Enforce a minimum 0.25s (250ms) silent lead-in buffer to prevent initial syllable clipping (e.g. "konnichiwa" -> "nichiwa")
-        queryJson.prePhonemeLength = Math.max(queryJson.prePhonemeLength ?? 0.1, 0.25);
-        queryJson.postPhonemeLength = Math.max(queryJson.postPhonemeLength ?? 0.1, 0.20);
-      }
-
-      // Dynamic Audio Prosody & Intonation Modulation based on punctuation
-      const hasCutoff = text.includes('-') || text.includes('—');
-      const hasExclamation = text.includes('!') || text.includes('！');
-      const hasEllipsis = text.includes('...') || text.includes('…');
-      const hasQuestion = text.includes('?') || text.includes('？');
-
-      if (hasCutoff) {
-        // Abrupt cut-off (e.g. "what-"): Snappy speed, safe trailing silence (never clip!)
-        queryJson.speedScale = 0.98;
-        queryJson.postPhonemeLength = Math.max(queryJson.postPhonemeLength ?? 0.1, 0.20);
-        queryJson.pauseLengthScale = 0.6;
-      }
-
-      if (hasExclamation) {
-        // Subtle pitch lift preserving sweet anime voice
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.02;
-        queryJson.intonationScale = Math.min(queryJson.intonationScale ?? 1.15, 1.18);
-      }
-
-      if (hasEllipsis) {
-        // Lengthened speech & gentle pause for (...)
-        queryJson.speedScale = 0.88;
-        queryJson.postPhonemeLength = (queryJson.postPhonemeLength ?? 0.1) + 0.25;
-        queryJson.pauseLengthScale = (queryJson.pauseLengthScale ?? 0.88) * 1.20;
-      }
-
-      if (hasQuestion) {
-        // Inquiring pitch curve lift
-        queryJson.pitchScale = (queryJson.pitchScale ?? 0) + 0.04;
-        queryJson.intonationScale = Math.min(queryJson.intonationScale ?? 1.15, 1.18);
-      }
-
-      // Hard Safety Caps to guarantee zero audio distortion/corruption!
-      queryJson.speedScale = Math.min(queryJson.speedScale ?? 0.92, 0.95);
-      queryJson.intonationScale = Math.min(queryJson.intonationScale ?? 1.15, 1.20);
-
-      const synthRes = await fetch(`${voicevoxHost}/synthesis?speaker=${activeSpeakerId}`, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(queryJson)
+        headers,
+        body
       });
 
-      if (!synthRes.ok) {
-        throw new Error(`VOICEVOX synthesis status ${synthRes.status}`);
+      if (!response.ok) {
+        throw new Error(`Custom TTS HTTP status ${response.status}: ${response.statusText}`);
       }
 
-      const arrayBuffer = await synthRes.arrayBuffer();
-
+      const arrayBuffer = await response.arrayBuffer();
       await this.playProcessedArrayBuffer(
         arrayBuffer,
         onStart,
@@ -700,102 +595,7 @@ class TTSService {
         () => this.speakEdgeNeural(text, persona, onStart, onEnd)
       );
     } catch (err) {
-      console.warn("VOICEVOX Server offline or CORS blocked, using Edge Neural fallback:", err);
-      this.speakEdgeNeural(text, persona, onStart, onEnd);
-    }
-  }
-
-  // Style-Bert-VITS2 Anime Voice Engine API (http://localhost:5000/voice)
-  private async speakStyleBertVits2(
-    text: string,
-    persona: Persona,
-    apiConfig?: ApiConfig,
-    onStart?: () => void,
-    onEnd?: () => void
-  ) {
-    const baseUrl = apiConfig?.styleBertUrl || '/style_bert_api/voice';
-    const proxyUrl = baseUrl.startsWith('http://localhost:5000') ? baseUrl.replace('http://localhost:5000', '/style_bert_api') : baseUrl;
-    
-    try {
-      // Auto translate English text to Japanese for authentic anime dubbing
-      const jaText = await this.translateToJapanese(text);
-      const requestUrl = `${proxyUrl}?text=${encodeURIComponent(jaText)}&model_name=Firefly`;
-
-      const response = await fetch(requestUrl);
-      if (!response.ok) {
-        throw new Error(`Style-Bert-VITS2 API status ${response.status}`);
-      }
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      this.currentAudio = audio;
-
-      audio.onplay = () => {
-        if (onStart) onStart();
-      };
-
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        this.currentAudio = null;
-        if (onEnd) onEnd();
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        this.currentAudio = null;
-        this.speakEdgeNeural(text, persona, onStart, onEnd);
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.warn("Style-Bert-VITS2 Server offline, falling back to Edge Neural Voice:", err);
-      this.speakEdgeNeural(text, persona, onStart, onEnd);
-    }
-  }
-
-  // 3. Local VITS Anime Voice Server Integration (Sherpa-ONNX / Style-Bert-VITS2)
-  private async speakLocalVits(
-    text: string,
-    persona: Persona,
-    apiConfig?: ApiConfig,
-    onStart?: () => void,
-    onEnd?: () => void
-  ) {
-    const vitsUrl = apiConfig?.vitsServerUrl || 'http://localhost:5000/tts';
-
-    try {
-      const response = await fetch(`${vitsUrl}?text=${encodeURIComponent(text)}&character=${encodeURIComponent(persona.name)}`);
-      
-      if (!response.ok) {
-        throw new Error(`VITS Server returned status ${response.status}`);
-      }
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      this.currentAudio = audio;
-
-      audio.onplay = () => {
-        if (onStart) onStart();
-      };
-
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        this.currentAudio = null;
-        if (onEnd) onEnd();
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        this.currentAudio = null;
-        // Fallback to Edge Neural if VITS local server is offline
-        this.speakEdgeNeural(text, persona, onStart, onEnd);
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.warn("Local VITS Server offline, falling back to Edge Neural Voice:", err);
+      console.warn("[Viera TTS] Custom TTS request failed, falling back to Edge Neural:", err);
       this.speakEdgeNeural(text, persona, onStart, onEnd);
     }
   }
