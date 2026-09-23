@@ -59,7 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [lmStudioModel, setLmStudioModel] = useState(apiConfig.lmStudioModel);
   const [deepseekApiKey, setDeepseekApiKey] = useState(apiConfig.deepseekApiKey || '');
   const [deepseekModel, setDeepseekModel] = useState(apiConfig.deepseekModel || 'deepseek-chat');
-  const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'voicevox');
+  const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'fish-audio');
   const [vitsServerUrl, setVitsServerUrl] = useState(apiConfig.vitsServerUrl || 'http://localhost:5000/tts');
 
   const [voicevoxSpeakerId, setVoicevoxSpeakerId] = useState<number>(apiConfig.voicevoxSpeakerId ?? 0);

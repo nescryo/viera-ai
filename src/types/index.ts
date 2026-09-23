@@ -29,7 +29,7 @@ export interface Persona {
 
 export type ApiProvider = 'deepseek' | 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
 
-export type TtsProvider = 'edge' | 'vits' | 'voicevox' | 'style-bert-vits2' | 'webspeech' | 'fish-audio';
+export type TtsProvider = 'fish-audio' | 'voicevox' | 'edge' | 'vits' | 'style-bert-vits2' | 'webspeech';
 
 export interface ApiConfig {
   provider: ApiProvider;

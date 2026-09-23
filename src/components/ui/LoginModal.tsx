@@ -83,7 +83,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
             </div>
             <div className="bullet-item">
               <ShieldCheck size={18} className="bullet-icon" />
-              <span>VOICEVOX Japanese Anime Dubbing & Intonation</span>
+              <span>Fish Audio & Neural Anime Voice Synthesis</span>
             </div>
             <div className="bullet-item">
               <ShieldCheck size={18} className="bullet-icon" />

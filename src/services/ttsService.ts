@@ -156,7 +156,7 @@ class TTSService {
       return;
     }
 
-    const ttsProvider = apiConfig?.ttsProvider || 'voicevox';
+    const ttsProvider = apiConfig?.ttsProvider || 'fish-audio';
 
     if (ttsProvider === 'fish-audio') {
       this.speakFishAudio(targetText, persona, apiConfig, onStart, onEnd);

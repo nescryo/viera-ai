@@ -56,7 +56,8 @@ export function App() {
           deepseekModel: parsed.deepseekModel || 'deepseek-chat',
           deepseekApiKey: parsed.deepseekApiKey || envDeepseekKey,
           openRouterApiKey: parsed.openRouterApiKey || envOpenRouterKey,
-          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey
+          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
+          ttsProvider: parsed.ttsProvider || 'fish-audio'
         };
       } catch (e) {
         console.warn("Failed to parse saved apiConfig:", e);
@@ -70,7 +71,7 @@ export function App() {
       deepseekModel: 'deepseek-chat',
       openRouterApiKey: envOpenRouterKey,
       openRouterModel: '',
-      ttsProvider: 'voicevox',
+      ttsProvider: 'fish-audio',
       voicevoxSpeakerId: 0,
       fishAudioApiKey: envFishAudioKey,
       fishAudioReferenceId: ''
