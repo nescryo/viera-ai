@@ -79,7 +79,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
             <h2 className="modal-title">Conversations</h2>
           </div>
           
-          <button className="new-chat-btn-top" onClick={onCreateNewChat}>
+          <button className="new-chat-btn-top" onClick={onCreateNewChat} aria-label="Create new conversation">
             <Plus size={16} />
             <span>+ New</span>
           </button>
@@ -113,11 +113,12 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
                           onChange={(e) => setEditingTitle(e.target.value)}
                           className="rename-input glass-input"
                           autoFocus
+                          aria-label="Edit session title"
                         />
-                        <button type="submit" className="card-action-btn check-btn" title="Save">
+                        <button type="submit" className="card-action-btn check-btn" title="Save" aria-label="Save new title">
                           <Check size={14} />
                         </button>
-                        <button type="button" className="card-action-btn cancel-btn" onClick={() => setEditingId(null)} title="Cancel">
+                        <button type="button" className="card-action-btn cancel-btn" onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel editing">
                           <X size={14} />
                         </button>
                       </form>
@@ -140,6 +141,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
                           className="card-action-btn edit-btn"
                           onClick={(e) => handleStartRename(e, s)}
                           title="Rename Session"
+                          aria-label={`Rename session ${s.title}`}
                         >
                           <Edit2 size={14} />
                         </button>
@@ -147,6 +149,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
                           className="card-action-btn delete-btn"
                           onClick={(e) => handleDeleteClick(e, s)}
                           title="Delete Session"
+                          aria-label={`Delete session ${s.title}`}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -165,13 +168,14 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
             <button
               className="clear-all-btn"
               onClick={() => setShowClearAllConfirm(true)}
+              aria-label="Clear all conversation history"
             >
               <Trash2 size={14} />
               <span>Clear All History</span>
             </button>
           )}
 
-          <button className="modal-close-btn-ghost" onClick={onClose}>
+          <button className="modal-close-btn-ghost" onClick={onClose} aria-label="Close modal">
             Close
           </button>
         </div>

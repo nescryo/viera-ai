@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { MMDLoader, OutlineEffect } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
+import { ChevronDown } from 'lucide-react';
 import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
@@ -93,6 +94,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   const [modelLoaded, setModelLoaded] = useState(false);
   const [loadStatus, setLoadStatus] = useState<string>("Loading Firefly 3D Model...");
+  const [isEmotionListOpen, setIsEmotionListOpen] = useState<boolean>(() => 
+    typeof window !== 'undefined' ? window.innerWidth > 900 : false
+  );
 
   // Keep track of currentEmotion in ref to avoid re-loading 3D model on emotion changes
   const currentEmotionRef = useRef(currentEmotion);
@@ -960,18 +964,31 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         {/* Vertical Emotion Testing Toolbar */}
         <div className="testing-emotions-bar">
-          <span className="testing-label">Test Expression</span>
-          <div className="testing-emotions-list">
-            {TESTING_EMOTIONS.map((emo) => (
-              <button
-                key={emo.id}
-                className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
-                onClick={() => onSelectEmotion?.(emo.id)}
-              >
-                {emo.label}
-              </button>
-            ))}
-          </div>
+          <button 
+            type="button"
+            className="testing-label-toggle"
+            onClick={() => setIsEmotionListOpen((prev) => !prev)}
+            aria-expanded={isEmotionListOpen}
+            aria-label="Toggle expressions list"
+          >
+            <span>Test Expression</span>
+            <ChevronDown size={14} className={`toggle-arrow ${isEmotionListOpen ? 'open' : ''}`} />
+          </button>
+          
+          {isEmotionListOpen && (
+            <div className="testing-emotions-list">
+              {TESTING_EMOTIONS.map((emo) => (
+                <button
+                  key={emo.id}
+                  className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
+                  onClick={() => onSelectEmotion?.(emo.id)}
+                  aria-label={`Test expression: ${emo.label}`}
+                >
+                  {emo.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, Persona } from '../../types';
 import { 
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
-  Mic, MicOff, Sparkles, Smile
+  Mic, MicOff, Sparkles, Smile, ChevronDown, MessageCircle
 } from 'lucide-react';
 
 interface ChatOverlayProps {
@@ -88,24 +88,27 @@ const ChatMessageItem: React.FC<{
               className={`cai-action-btn ${isCurrentlySpeaking ? 'speaking-active' : ''}`}
               onClick={() => isCurrentlySpeaking ? onStopSpeaking() : onSpeakMessage(msg)}
               title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
+              aria-label={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
             >
-              {isCurrentlySpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
+              {isCurrentlySpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </button>
 
             <button 
               className="cai-action-btn" 
               onClick={() => onCopy(msg.id, msg.text)}
               title="Copy text"
+              aria-label="Copy text to clipboard"
             >
-              {copiedId === msg.id ? <Check size={15} color="#23a55a" /> : <Copy size={15} />}
+              {copiedId === msg.id ? <Check size={16} color="#23a55a" /> : <Copy size={16} />}
             </button>
 
             <button 
               className="cai-action-btn"
               onClick={onRegenerateResponse}
               title="Regenerate response"
+              aria-label="Regenerate response"
             >
-              <RotateCcw size={15} />
+              <RotateCcw size={16} />
             </button>
           </div>
         )}
@@ -128,6 +131,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -203,14 +207,43 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     }
   };
 
+  if (isMinimized) {
+    return (
+      <button 
+        type="button"
+        className="chat-toggle-fab glass-panel fade-in"
+        onClick={() => setIsMinimized(false)}
+        aria-label={`Open chat with ${currentPersona.name}`}
+      >
+        <div className="fab-avatar-badge">
+          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="fab-avatar-img" />
+          <span className="fab-pulse-dot" />
+        </div>
+        <span className="fab-text">Chat with {currentPersona.name}</span>
+        <MessageCircle size={18} className="fab-icon" />
+      </button>
+    );
+  }
+
   return (
     <div className="chat-overlay-container glass-panel fade-in">
       <div className="chat-header-banner">
-        <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="banner-avatar" />
-        <div className="banner-details">
-          <h2 className="banner-name">{currentPersona.name}</h2>
-          <p className="banner-tagline">{currentPersona.tagline}</p>
+        <div className="banner-left">
+          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="banner-avatar" />
+          <div className="banner-details">
+            <h2 className="banner-name">{currentPersona.name}</h2>
+            <p className="banner-tagline">{currentPersona.tagline}</p>
+          </div>
         </div>
+        <button 
+          type="button"
+          className="chat-collapse-btn" 
+          onClick={() => setIsMinimized(true)}
+          title="Minimize Chat"
+          aria-label="Minimize Chat Overlay"
+        >
+          <ChevronDown size={20} />
+        </button>
       </div>
 
       <div className="chat-messages-feed">
@@ -260,14 +293,18 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
 
       <div className="cai-quick-prompts">
         <button 
+          type="button"
           className="prompt-chip"
           onClick={() => setInputText('*waves enthusiastically* What are you working on right now?')}
+          aria-label="Ask what character is doing"
         >
           <Sparkles size={13} /> *waves enthusiastically* What are you doing?
         </button>
         <button 
+          type="button"
           className="prompt-chip"
           onClick={() => setInputText('Can you tell me a secret story about yourself?')}
+          aria-label="Ask character to tell a secret story"
         >
           <Smile size={13} /> Tell me a secret story!
         </button>
@@ -279,6 +316,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
           className={`mic-btn ${isRecording ? 'recording' : ''}`}
           onClick={toggleRecording}
           title={isRecording ? "Listening... Click to stop" : "Voice Speech Input"}
+          aria-label={isRecording ? "Stop recording voice" : "Start voice speech input"}
         >
           {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
         </button>
@@ -290,6 +328,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
           placeholder={`Message ${currentPersona.name}...`}
           className="cai-text-input"
           disabled={isLoading}
+          aria-label={`Message input for ${currentPersona.name}`}
         />
 
         <button 
@@ -297,6 +336,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
           disabled={!inputText.trim() || isLoading}
           className="send-btn"
           title="Send message"
+          aria-label="Send message"
         >
           <Send size={18} />
         </button>

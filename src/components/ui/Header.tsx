@@ -82,17 +82,32 @@ export const Header: React.FC<HeaderProps> = ({
 
 
         {/* 1. Conversation History Icon (Left of Settings) */}
-        <button className="icon-btn history-btn" onClick={onOpenHistory} title="Conversations History">
+        <button 
+          className="icon-btn history-btn" 
+          onClick={onOpenHistory} 
+          title="Conversations History"
+          aria-label="Open Conversations History"
+        >
           <MessageSquare size={18} />
         </button>
 
         {/* 2. Settings Icon */}
-        <button className="icon-btn settings-btn" onClick={onOpenSettings} title="Settings & API">
+        <button 
+          className="icon-btn settings-btn" 
+          onClick={onOpenSettings} 
+          title="Settings & API"
+          aria-label="Open Settings and API Configuration"
+        >
           <Settings size={18} />
         </button>
 
         {/* 3. User Profile Avatar Icon (Right of Settings) */}
-        <button className="icon-btn profile-avatar-btn" onClick={onOpenProfile} title="Profile & Account">
+        <button 
+          className="icon-btn profile-avatar-btn" 
+          onClick={onOpenProfile} 
+          title="Profile & Account"
+          aria-label="Open Profile and Account"
+        >
           {userProfile?.picture ? (
             <img src={userProfile.picture} alt={userProfile.nickname || 'Profile'} className="header-user-avatar" />
           ) : (

@@ -95,3 +95,13 @@ body {
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-glass);
 }
+
+/* Accessible Focus States */
+button:focus-visible, 
+input:focus-visible, 
+select:focus-visible, 
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-blurple) !important;
+  outline-offset: 2px !important;
+}

@@ -42,16 +42,48 @@
   background: rgba(22, 23, 26, 0.85);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   width: 145px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.testing-label {
-  font-size: 0.7rem;
+.testing-label-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
-  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.18s ease;
+  min-height: 28px;
+}
+
+.testing-label-toggle:hover {
+  color: var(--text-normal);
+}
+
+.toggle-arrow {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-muted);
+}
+
+.toggle-arrow.open {
+  transform: rotate(180deg);
+  color: var(--accent-blurple);
+}
+
+.testing-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
@@ -61,10 +93,11 @@
 .testing-emotions-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   max-height: calc(100vh - 230px);
   overflow-y: auto;
   padding-right: 2px;
+  margin-top: 6px;
 }
 
 .testing-emotions-list::-webkit-scrollbar {
@@ -85,13 +118,16 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: var(--text-muted);
-  font-size: 0.78rem;
-  padding: 5px 10px;
-  border-radius: 6px;
+  font-size: 0.82rem;
+  padding: 8px 12px;
+  min-height: 36px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
   transition: all 0.18s ease;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
 }
 
 .emotion-test-btn:hover {
@@ -314,33 +350,138 @@
 .chat-header-banner {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
   background: rgba(30, 31, 34, 0.85);
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
 .banner-avatar {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--accent-blurple);
 }
 
+.banner-details {
+  min-width: 0;
+  flex: 1;
+}
+
 .banner-name {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .banner-tagline {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 340px;
+  max-width: 280px;
+}
+
+.chat-collapse-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.chat-collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-normal);
+  border-color: var(--border-glass);
+}
+
+/* Floating Action Button (FAB) when Chat is Minimized */
+.chat-toggle-fab {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px 8px 10px;
+  border-radius: 32px;
+  background: rgba(30, 31, 34, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 16px rgba(88, 101, 242, 0.35);
+  cursor: pointer;
+  color: var(--text-normal);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chat-toggle-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(88, 101, 242, 0.55);
+  border-color: rgba(88, 101, 242, 0.6);
+}
+
+.fab-avatar-badge {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fab-avatar-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent-blurple);
+}
+
+.fab-pulse-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  border: 2px solid var(--bg-tertiary);
+}
+
+.fab-text {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.fab-icon {
+  color: var(--accent-blurple);
 }
 
 /* Chat Messages Feed */
@@ -494,7 +635,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 8px;
   margin-top: 6px;
   padding-top: 2px;
 }
@@ -503,14 +644,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.2s ease;
 }
 
@@ -605,8 +748,10 @@
 }
 
 .mic-btn, .send-btn {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: none;
   display: flex;
@@ -1330,7 +1475,11 @@
   background: transparent;
   border: none;
   color: var(--text-muted);
-  padding: 6px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
@@ -1906,6 +2055,247 @@
   color: var(--accent-green);
 }
 
+/* ==========================================================================
+   RESPONSIVE DESIGN & MOBILE LAYOUT BREAKPOINTS
+   ========================================================================== */
 
+/* 1. Medium Tablets & Small Desktops (<= 1024px) */
+@media (max-width: 1024px) {
+  .chat-overlay-container {
+    width: 400px;
+    top: 86px;
+    right: 12px;
+    bottom: 12px;
+  }
 
+  .header-container {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+}
 
+/* 2. Tablets & Smartphones (<= 768px) */
+@media (max-width: 768px) {
+  .header-container {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    height: 52px;
+    padding: 0 12px;
+    gap: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .brand-badge {
+    font-size: 1.1rem;
+    gap: 6px;
+  }
+
+  .divider-v {
+    display: none;
+  }
+
+  .single-persona-chip {
+    padding: 3px 8px 3px 4px;
+    gap: 6px;
+  }
+
+  .chip-avatar {
+    width: 26px;
+    height: 26px;
+  }
+
+  .chip-name {
+    font-size: 0.8rem;
+  }
+
+  .chip-category {
+    display: none;
+  }
+
+  .provider-pill {
+    padding: 6px;
+    border-radius: 50%;
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .provider-pill .provider-name {
+    display: none;
+  }
+
+  .provider-dot {
+    margin: 0;
+  }
+
+  .icon-btn {
+    padding: 8px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  /* 3D Scene Status & Expression Toolbar on Mobile */
+  .scene-status-overlay {
+    top: 68px;
+    left: 8px;
+    gap: 6px;
+    max-width: calc(100vw - 16px);
+    z-index: 6;
+  }
+
+  .live-vrm-badge, .current-emotion-badge {
+    font-size: 0.72rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  .testing-emotions-bar {
+    width: auto;
+    min-width: 130px;
+    padding: 6px 8px;
+  }
+
+  /* Chat Overlay in Mobile: Bottom Sheet with backdrop */
+  .chat-overlay-container {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    height: 60vh;
+    max-height: calc(100vh - 72px);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  }
+
+  .chat-toggle-fab {
+    bottom: 16px;
+    right: 16px;
+    padding: 8px 16px 8px 8px;
+    font-size: 0.84rem;
+  }
+
+  .cai-welcome-card {
+    padding: 16px 12px;
+  }
+
+  .cai-large-avatar {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 8px;
+  }
+
+  .cai-welcome-title {
+    font-size: 1.15rem;
+  }
+
+  .cai-greeting-bubble {
+    font-size: 0.88rem;
+    padding: 10px 14px;
+  }
+
+  /* Modals on Mobile */
+  .modal-container {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 88vh !important;
+    border-radius: var(--radius-lg);
+  }
+
+  .persona-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .settings-form {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .provider-selector-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 3. Small Mobile Devices (<= 480px) */
+@media (max-width: 480px) {
+  .chat-overlay-container {
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    height: 65vh;
+    max-height: calc(100vh - 64px);
+  }
+
+  .cai-quick-prompts {
+    padding: 0 10px 6px 10px;
+    gap: 6px;
+  }
+
+  .prompt-chip {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+  }
+
+  .cai-input-form {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .cai-text-input {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+
+  .mic-btn, .send-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .banner-avatar {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .banner-name {
+    font-size: 0.95rem;
+  }
+
+  .banner-tagline {
+    max-width: 180px;
+    font-size: 0.72rem;
+  }
+}
+
+/* 4. Touchscreen Interaction Ergonomics (No Hover Capability) */
+@media (hover: none) {
+  .hover-actions-group {
+    opacity: 0.9 !important;
+  }
+
+  .card-action-btn {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* 5. Accessibility Motion Safety (Prefers-Reduced-Motion) */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .pulseGlow, .speaking-active, .cai-dots-loader span {
+    animation: none !important;
+  }
+}
