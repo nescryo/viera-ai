@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, Persona } from '../../types';
 import { 
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
-  Mic, MicOff, Sparkles, Smile, ChevronDown, MessageCircle
+  Mic, MicOff, ChevronDown, MessageCircle
 } from 'lucide-react';
 import { soundService } from '../../services/soundService';
 
@@ -298,25 +298,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
         )}
 
         <div ref={messagesEndRef} />
-      </div>
-
-      <div className="cai-quick-prompts">
-        <button 
-          type="button"
-          className="prompt-chip"
-          onClick={() => setInputText('*waves enthusiastically* What are you working on right now?')}
-          aria-label="Ask what character is doing"
-        >
-          <Sparkles size={13} /> *waves enthusiastically* What are you doing?
-        </button>
-        <button 
-          type="button"
-          className="prompt-chip"
-          onClick={() => setInputText('Can you tell me a secret story about yourself?')}
-          aria-label="Ask character to tell a secret story"
-        >
-          <Smile size={13} /> Tell me a secret story!
-        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="cai-input-form">
