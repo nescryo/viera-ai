@@ -4,6 +4,7 @@ import {
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
   Mic, MicOff, Sparkles, Smile, ChevronDown, MessageCircle
 } from 'lucide-react';
+import { soundService } from '../../services/soundService';
 
 interface ChatOverlayProps {
   messages: ChatMessage[];
@@ -15,6 +16,7 @@ interface ChatOverlayProps {
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   isLoading: boolean;
+  onErrorToast?: (title: string, message: string) => void;
 }
 
 function escapeHtml(str: string): string {
@@ -126,7 +128,8 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   onStopSpeaking,
   isSpeaking,
   activeSpeakingId,
-  isLoading
+  isLoading,
+  onErrorToast
 }) => {
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
+    soundService.playSend();
     onSendMessage(inputText);
     setInputText('');
   };
@@ -158,7 +162,12 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Browser Anda belum mendukung Speech Recognition. Gunakan Google Chrome atau Edge.");
+      if (onErrorToast) {
+        onErrorToast(
+          "Speech Recognition Unavailable",
+          "Speech Recognition is not supported by your current browser. Please use Google Chrome or Microsoft Edge."
+        );
+      }
       return;
     }
 

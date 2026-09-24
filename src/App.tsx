@@ -13,7 +13,10 @@ import { LoginModal } from './components/ui/LoginModal';
 import { SetupOnboardingModal } from './components/ui/SetupOnboardingModal';
 import { ConversationHistoryModal } from './components/ui/ConversationHistoryModal';
 import { UserProfileModal } from './components/ui/UserProfileModal';
+import { ToastContainer } from './components/ui/Toast';
+import type { ToastMessage } from './components/ui/Toast';
 import { Scene } from './components/3d/Scene';
+import { soundService } from './services/soundService';
 
 import './App.css';
 
@@ -34,6 +37,43 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+
+  // In-App Toast Notifications State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = useCallback((type: 'info' | 'success' | 'warning' | 'error', title: string, message: string) => {
+    const newToast: ToastMessage = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+      type,
+      title,
+      message
+    };
+    setToasts((prev) => [...prev.slice(-3), newToast]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Global Keyboard Shortcuts (Esc to close modal, Ctrl+K / Cmd+K for conversations)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSettings) { setShowSettings(false); return; }
+        if (showHistory) { setShowHistory(false); return; }
+        if (showProfile) { setShowProfile(false); return; }
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (userProfile && userProfile.isSetupComplete) {
+          setShowHistory((prev) => !prev);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSettings, showHistory, showProfile, userProfile]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -123,6 +163,7 @@ export function App() {
   const handleSaveConfig = (newConfig: ApiConfig) => {
     setApiConfig(newConfig);
     localStorage.setItem('viera_api_config', JSON.stringify(newConfig));
+    addToast('success', 'Configuration Saved', 'AI model and voice synthesis preferences updated successfully.');
   };
 
   // Google OAuth Handlers
@@ -307,6 +348,7 @@ export function App() {
           return next;
         });
 
+        soundService.playReceive();
         speakMessage(finalMsg);
       },
       (err) => {
@@ -316,6 +358,7 @@ export function App() {
         }
         console.error("Streaming error:", err);
         setIsLoading(false);
+        addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
       },
       userProfile
     );
@@ -448,6 +491,7 @@ export function App() {
           return next;
         });
 
+        soundService.playReceive();
         speakMessage(finalMsg);
       },
       (err) => {
@@ -457,6 +501,7 @@ export function App() {
         }
         console.error("Streaming error:", err);
         setIsLoading(false);
+        addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
       },
       userProfile
     );
@@ -495,6 +540,7 @@ export function App() {
         isSpeaking={isSpeaking}
         activeSpeakingId={activeSpeakingId}
         isLoading={isLoading}
+        onErrorToast={(title, msg) => addToast('warning', title, msg)}
       />
 
       {/* 1. Google OAuth Auth Gate Modal */}
@@ -542,6 +588,9 @@ export function App() {
           onClose={() => setShowProfile(false)}
         />
       )}
+
+      {/* 7. In-App Glass Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </div>
   );
 }

@@ -99,7 +99,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="settings-form">
-          <div className="form-group">
+          <div className="settings-modal-body">
+            <div className="form-group">
             <label className="form-label">1. Select AI Text Provider</label>
             <div className="provider-selector-grid">
               <button
@@ -404,11 +405,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           )}
+          </div>
 
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-save">
-              <Save size={16} /> Save Settings
+            <button
+              type="button"
+              className="btn-cancel"
+              onClick={onClose}
+              aria-label="Cancel and discard changes"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-save"
+              aria-label="Save and apply configuration settings"
+            >
+              <Save size={16} />
+              <span>Save Settings</span>
             </button>
           </div>
         </form>

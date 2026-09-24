@@ -1,0 +1,23 @@
+{
+  "name": "Viera 3D Companion",
+  "short_name": "Viera",
+  "description": "3D Interactive Anime AI Companion with Real-Time Voice Synthesis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1322",
+  "theme_color": "#1e1f22",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/firefly-icon.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
