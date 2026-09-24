@@ -79,7 +79,7 @@ export async function validateApiKeyAndFetchModels(
       return { 
         success: true, 
         models: [], 
-        error: 'API Key terhubung, tetapi endpoint tidak mengembalikan daftar model.' 
+        error: 'Connected to endpoint, but no models were returned.' 
       };
     }
 
@@ -93,9 +93,9 @@ export async function validateApiKeyAndFetchModels(
   } catch (err: any) {
     clearTimeout(timeoutId);
     if (err?.name === 'AbortError') {
-      return { success: false, models: [], error: 'Koneksi timeout (server tidak merespons dalam 8 detik)' };
+      return { success: false, models: [], error: 'Connection timeout (server did not respond within 8 seconds)' };
     }
-    return { success: false, models: [], error: err?.message || 'Gagal terhubung ke endpoint server' };
+    return { success: false, models: [], error: err?.message || 'Failed to connect to endpoint server' };
   }
 }
 

@@ -183,7 +183,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.lang = 'id-ID';
+      recognition.lang = 'en-US';
 
       recognition.onstart = () => {
         setIsRecording(true);

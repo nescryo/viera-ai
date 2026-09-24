@@ -83,7 +83,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     } else {
       setValidationStatus('invalid');
-      setValidationError(result.error || 'Validasi API Key gagal.');
+      setValidationError(result.error || 'API Key validation failed.');
     }
   }, [model]);
 
@@ -286,7 +286,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           rel="noreferrer" 
                           style={{ fontSize: '0.75rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
                         >
-                          Dapatkan Key <ExternalLink size={11} />
+                          Get API Key <ExternalLink size={11} />
                         </a>
                       )}
                       <button
@@ -305,7 +305,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }}
                       >
                         <RefreshCw size={12} className={validationStatus === 'validating' ? 'spin' : ''} />
-                        {validationStatus === 'validating' ? 'Memeriksa...' : 'Check Key'}
+                        {validationStatus === 'validating' ? 'Verifying...' : 'Check Key'}
                       </button>
                     </div>
                   </div>
@@ -323,25 +323,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {validationStatus === 'valid' && (
                     <div style={{ color: '#3b82f6', fontSize: '0.78rem', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CheckCircle size={14} color="#3b82f6" />
-                      <span>API Key Valid! Ditemukan {availableModels.length} model aktif.</span>
+                      <span>Valid API Key! Discovered {availableModels.length} active models.</span>
                     </div>
                   )}
                   {validationStatus === 'invalid' && (
                     <div style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <AlertCircle size={14} color="#ef4444" />
-                      <span>{validationError || 'API Key tidak valid atau server tidak merespons.'}</span>
+                      <span>{validationError || 'Invalid API Key or server endpoint is unreachable.'}</span>
                     </div>
                   )}
                   {validationStatus === 'validating' && (
                     <div style={{ color: '#eab308', fontSize: '0.78rem', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <RefreshCw size={14} className="spin" />
-                      <span>Memverifikasi API Key & menarik daftar model...</span>
+                      <span>Verifying API Key & fetching models...</span>
                     </div>
                   )}
                 </div>
               ) : (
                 <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.8rem', color: '#93c5fd' }}>
-                  ℹ️ {activeProvider.name} berjalan di komputer lokal (localhost). Tidak memerlukan API Key.
+                  ℹ️ {activeProvider.name} runs on your local machine (localhost). No API Key required.
                 </div>
               )}
 
@@ -355,7 +355,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClick={() => setShowAdvancedUrl(!showAdvancedUrl)}
                       style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.72rem', cursor: 'pointer' }}
                     >
-                      {showAdvancedUrl ? 'Sembunyikan URL' : 'Ubah URL (Advanced)'}
+                      {showAdvancedUrl ? 'Hide URL' : 'Edit Endpoint URL (Advanced)'}
                     </button>
                   )}
                 </div>
@@ -374,9 +374,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* STEP 3: DYNAMIC MODEL SELECTION */}
               <div style={{ marginBottom: '4px' }}>
                 <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span>Pilih Model LLM ({availableModels.length > 0 ? `${availableModels.length} model tersedia` : 'Model Default'})</span>
+                  <span>Select LLM Model ({availableModels.length > 0 ? `${availableModels.length} models available` : 'Default Model'})</span>
                   {availableModels.length > 0 && (
-                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Ditarik dinamis dari provider</span>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Discovered dynamically from provider</span>
                   )}
                 </label>
 
@@ -389,7 +389,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="text"
                           value={modelSearchQuery}
                           onChange={(e) => setModelSearchQuery(e.target.value)}
-                          placeholder="Cari model..."
+                          placeholder="Search models (e.g. claude, deepseek, llama, gpt)..."
                           className="form-input"
                           style={{ paddingLeft: '32px', fontSize: '0.82rem' }}
                         />
@@ -408,7 +408,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       ))}
                       {filteredModels.length === 0 && (
                         <option value={model} disabled>
-                          Tidak ada model yang cocok dengan pencarian
+                          No models match your search query
                         </option>
                       )}
                     </select>
