@@ -1,4 +1,4 @@
-import type { ApiProvider, ChatMessage, ChatSession } from '../types';
+import type { ChatMessage, ChatSession } from '../types';
 
 function getSessionsKey(userId: string): string {
   return `viera_sessions_${userId}`;
@@ -47,7 +47,7 @@ export function setActiveSessionId(userId: string, sessionId: string): void {
   localStorage.setItem(getActiveSessionKey(userId), sessionId);
 }
 
-export function createSession(userId: string, characterId: string = 'firefly', provider: ApiProvider = 'deepseek'): ChatSession {
+export function createSession(userId: string, characterId: string = 'firefly', provider: string = 'universal'): ChatSession {
   const newSession: ChatSession = {
     id: Date.now().toString(),
     title: 'New conversation',

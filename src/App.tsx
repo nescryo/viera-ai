@@ -90,30 +90,38 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const resolvedApiKey = parsed.apiKey || parsed.openRouterApiKey || parsed.deepseekApiKey || envOpenRouterKey || envDeepseekKey;
+        const resolvedBaseUrl = parsed.baseUrl || (parsed.provider === 'deepseek' ? 'https://api.deepseek.com' : parsed.provider === 'lmstudio' ? 'http://localhost:1234/v1' : 'https://openrouter.ai/api/v1');
+        const resolvedModel = parsed.model || parsed.deepseekModel || parsed.lmStudioModel || 'deepseek/deepseek-chat';
+
         return {
           ...parsed,
-          provider: parsed.provider || 'deepseek',
-          deepseekModel: parsed.deepseekModel || 'deepseek-chat',
-          deepseekApiKey: parsed.deepseekApiKey || envDeepseekKey,
-          openRouterApiKey: parsed.openRouterApiKey || envOpenRouterKey,
-          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
-          ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio')
+          baseUrl: resolvedBaseUrl,
+          apiKey: resolvedApiKey,
+          model: resolvedModel,
+          provider: parsed.provider || 'openrouter',
+          ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio'),
+          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey
         };
       } catch (e) {
         console.warn("Failed to parse saved apiConfig:", e);
       }
     }
+
+    const defaultKey = envOpenRouterKey || envDeepseekKey;
+    const defaultUrl = envOpenRouterKey ? 'https://openrouter.ai/api/v1' : envDeepseekKey ? 'https://api.deepseek.com' : 'https://openrouter.ai/api/v1';
+    const defaultModel = envDeepseekKey && !envOpenRouterKey ? 'deepseek-chat' : 'deepseek/deepseek-chat';
+
     return {
-      provider: 'deepseek',
-      lmStudioUrl: 'http://localhost:1234/v1',
-      lmStudioModel: 'local-model',
-      deepseekApiKey: envDeepseekKey,
-      deepseekModel: 'deepseek-chat',
-      openRouterApiKey: envOpenRouterKey,
-      openRouterModel: '',
+      provider: envDeepseekKey && !envOpenRouterKey ? 'deepseek' : 'openrouter',
+      baseUrl: defaultUrl,
+      apiKey: defaultKey,
+      model: defaultModel,
+      availableModels: [],
       ttsProvider: 'fish-audio',
       fishAudioApiKey: envFishAudioKey,
-      fishAudioReferenceId: '',
+      fishAudioReferenceId: '7f92f8afb8ec43bf81429cc1c9199cb1',
+      fishAudioModel: 's2.1-pro-free',
       customTtsUrl: '',
       customTtsApiKey: '',
       customTtsModel: '',

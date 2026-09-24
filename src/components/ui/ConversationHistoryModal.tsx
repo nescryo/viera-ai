@@ -132,7 +132,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
 
                   <div className="card-right-actions">
                     <span className="provider-badge">
-                      {s.provider === 'deepseek' ? 'CLOUD' : s.provider === 'lmstudio' ? 'LOCAL' : 'DEMO'}
+                      {(s.provider || 'AI').toUpperCase()}
                     </span>
 
                     {!isEditing && (
