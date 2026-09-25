@@ -49,17 +49,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [ttsMode, setTtsMode] = useState<TtsMode>(apiConfig.ttsMode || 'follow-chat');
 
   // Normal (Chat Language) TTS Configuration
-  const [normalTtsProvider, setNormalTtsProvider] = useState<TtsNormalProvider>(apiConfig.normalTtsProvider || 'universal');
+  const [normalTtsProvider, setNormalTtsProvider] = useState<TtsNormalProvider>(
+    apiConfig.normalTtsProvider || (apiConfig.ttsProvider as TtsNormalProvider) || 'fish-audio'
+  );
   const [normalTtsUrl, setNormalTtsUrl] = useState(apiConfig.normalTtsUrl || apiConfig.customTtsUrl || '');
-  const [normalTtsApiKey, setNormalTtsApiKey] = useState(apiConfig.normalTtsApiKey || apiConfig.customTtsApiKey || '');
-  const [normalTtsModel, setNormalTtsModel] = useState(apiConfig.normalTtsModel || apiConfig.customTtsModel || 'tts-1');
+  const [normalTtsApiKey, setNormalTtsApiKey] = useState(
+    apiConfig.normalTtsApiKey ||
+    (apiConfig.normalTtsProvider === 'fish-audio' || !apiConfig.normalTtsProvider ? apiConfig.fishAudioApiKey : apiConfig.customTtsApiKey) ||
+    apiConfig.fishAudioApiKey ||
+    apiConfig.customTtsApiKey ||
+    ''
+  );
+  const [normalTtsModel, setNormalTtsModel] = useState(() => {
+    if (apiConfig.normalTtsModel) return apiConfig.normalTtsModel;
+    const initialProvider = apiConfig.normalTtsProvider || (apiConfig.ttsProvider as TtsNormalProvider) || 'fish-audio';
+    if (initialProvider === 'fish-audio') return apiConfig.fishAudioModel || 's2.1-pro-free';
+    return apiConfig.customTtsModel || 'tts-1';
+  });
   const [normalTtsVoice, setNormalTtsVoice] = useState(apiConfig.normalTtsVoice || apiConfig.customTtsVoiceId || 'nova');
-  const [normalTtsReferenceId, setNormalTtsReferenceId] = useState(apiConfig.normalTtsReferenceId || '');
+  const [normalTtsReferenceId, setNormalTtsReferenceId] = useState(
+    apiConfig.normalTtsReferenceId || (apiConfig.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (apiConfig.fishAudioReferenceId || ''))
+  );
 
   // Japanese Dubbing (JP) TTS Configuration
   const [jpTtsProvider, setJpTtsProvider] = useState<TtsJpProvider>(apiConfig.jpTtsProvider || 'fish-audio');
   const [jpTtsModel, setJpTtsModel] = useState(apiConfig.jpTtsModel || apiConfig.fishAudioModel || 's2.1-pro-free');
-  const [jpTtsReferenceId, setJpTtsReferenceId] = useState(apiConfig.jpTtsReferenceId || apiConfig.fishAudioReferenceId || '');
+  const [jpTtsReferenceId, setJpTtsReferenceId] = useState(
+    apiConfig.jpTtsReferenceId || (apiConfig.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (apiConfig.fishAudioReferenceId || ''))
+  );
   const [jpTtsApiKey, setJpTtsApiKey] = useState(apiConfig.jpTtsApiKey || apiConfig.fishAudioApiKey || '');
   const [jpTtsUrl, setJpTtsUrl] = useState(apiConfig.jpTtsUrl || '');
   const [jpTtsVoice, setJpTtsVoice] = useState(apiConfig.jpTtsVoice || '');
@@ -180,13 +197,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       // Map to active test provider
       ttsProvider: tab === 'jp' ? jpTtsProvider : normalTtsProvider,
-      fishAudioApiKey: tab === 'jp' ? jpTtsApiKey.trim() : normalTtsApiKey.trim(),
+      fishAudioApiKey: tab === 'jp' ? jpTtsApiKey.trim() : (normalTtsApiKey.trim() || apiConfig.fishAudioApiKey || ''),
       fishAudioReferenceId: tab === 'jp' ? jpTtsReferenceId.trim() : normalTtsReferenceId.trim(),
-      fishAudioModel: tab === 'jp' ? jpTtsModel.trim() : normalTtsModel.trim(),
+      fishAudioModel: tab === 'jp' ? jpTtsModel.trim() : (normalTtsProvider === 'fish-audio' && (!normalTtsModel || normalTtsModel === 'tts-1') ? 's2.1-pro-free' : normalTtsModel.trim()),
       customTtsUrl: tab === 'jp' ? jpTtsUrl.trim() : normalTtsUrl.trim(),
       customTtsApiKey: tab === 'jp' ? jpTtsApiKey.trim() : normalTtsApiKey.trim(),
       customTtsModel: tab === 'jp' ? jpTtsModel.trim() : normalTtsModel.trim(),
-      customTtsVoiceId: tab === 'jp' ? jpTtsVoice.trim() : normalTtsVoice.trim(),
+      customTtsVoiceId: tab === 'jp' ? jpTtsVoice.trim() : (normalTtsVoice.trim() || 'nova'),
     };
 
     const testPersona = {
@@ -202,7 +219,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     const testText = tab === 'jp'
       ? "こんにちは！日本語の音声エンジンは正常に動作しています。"
-      : "Hello Trailblazer! Normal chat voice synthesis is configured and active.";
+      : "Hello! Normal chat voice synthesis is configured and active.";
 
     try {
       await ttsService.speak(
@@ -247,13 +264,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       // Backward compatibility mappings
       ttsProvider: ttsMode === 'japanese-dub' ? jpTtsProvider : normalTtsProvider,
-      fishAudioApiKey: (ttsMode === 'japanese-dub' ? jpTtsApiKey : (normalTtsProvider === 'fish-audio' ? normalTtsApiKey : jpTtsApiKey)).trim(),
+      fishAudioApiKey: (ttsMode === 'japanese-dub' ? jpTtsApiKey : (normalTtsProvider === 'fish-audio' ? (normalTtsApiKey || apiConfig.fishAudioApiKey || '') : jpTtsApiKey)).trim(),
       fishAudioReferenceId: (ttsMode === 'japanese-dub' ? jpTtsReferenceId : (normalTtsProvider === 'fish-audio' ? normalTtsReferenceId : jpTtsReferenceId)).trim(),
-      fishAudioModel: (ttsMode === 'japanese-dub' ? jpTtsModel : (normalTtsProvider === 'fish-audio' ? normalTtsModel : jpTtsModel)).trim(),
-      customTtsUrl: normalTtsUrl.trim(),
-      customTtsApiKey: normalTtsApiKey.trim(),
-      customTtsModel: normalTtsModel.trim(),
-      customTtsVoiceId: normalTtsVoice.trim(),
+      fishAudioModel: (ttsMode === 'japanese-dub' ? jpTtsModel : (normalTtsProvider === 'fish-audio' ? (normalTtsModel === 'tts-1' ? 's2.1-pro-free' : normalTtsModel) : jpTtsModel)).trim(),
+      customTtsUrl: (ttsMode === 'japanese-dub' ? jpTtsUrl : normalTtsUrl).trim(),
+      customTtsApiKey: (ttsMode === 'japanese-dub' ? jpTtsApiKey : normalTtsApiKey).trim(),
+      customTtsModel: (ttsMode === 'japanese-dub' ? jpTtsModel : normalTtsModel).trim(),
+      customTtsVoiceId: (ttsMode === 'japanese-dub' ? jpTtsVoice : normalTtsVoice).trim(),
     });
     onClose();
   };
@@ -604,7 +621,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         className={`provider-card ${normalTtsProvider === 'fish-audio' ? 'active' : ''}`}
-                        onClick={() => setNormalTtsProvider('fish-audio')}
+                        onClick={() => {
+                          setNormalTtsProvider('fish-audio');
+                          if (!normalTtsModel.startsWith('s2.1') && !normalTtsModel.includes('fish-audio')) {
+                            setNormalTtsModel('s2.1-pro-free');
+                          }
+                          if (!normalTtsApiKey && apiConfig.fishAudioApiKey) {
+                            setNormalTtsApiKey(apiConfig.fishAudioApiKey);
+                          }
+                        }}
                       >
                         <Sparkles size={22} style={{ color: '#60a5fa' }} />
                         <div className="provider-card-info">
@@ -617,7 +642,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         className={`provider-card ${normalTtsProvider === 'universal' ? 'active' : ''}`}
-                        onClick={() => setNormalTtsProvider('universal')}
+                        onClick={() => {
+                          setNormalTtsProvider('universal');
+                          if (normalTtsModel.startsWith('s2.1') || normalTtsModel.includes('fish-audio')) {
+                            setNormalTtsModel('tts-1');
+                          }
+                          if (!normalTtsVoice) {
+                            setNormalTtsVoice('nova');
+                          }
+                        }}
                       >
                         <Globe size={22} style={{ color: '#60a5fa' }} />
                         <div className="provider-card-info">
@@ -643,7 +676,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         className={`provider-card ${normalTtsProvider === 'custom' ? 'active' : ''}`}
-                        onClick={() => setNormalTtsProvider('custom')}
+                        onClick={() => {
+                          setNormalTtsProvider('custom');
+                          if (normalTtsModel.startsWith('s2.1') || normalTtsModel.includes('fish-audio')) {
+                            setNormalTtsModel('tts-1');
+                          }
+                        }}
                       >
                         <Sliders size={22} style={{ color: '#a78bfa' }} />
                         <div className="provider-card-info">
@@ -660,7 +698,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div className="form-group">
                         <label className="form-label">Fish Audio Model Version</label>
                         <select
-                          value={normalTtsModel}
+                          value={normalTtsModel.startsWith('s2.1') || normalTtsModel.includes('fish-audio') ? normalTtsModel : 's2.1-pro-free'}
                           onChange={(e) => setNormalTtsModel(e.target.value)}
                           className="form-input"
                         >

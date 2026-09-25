@@ -94,6 +94,8 @@ export function App() {
         const resolvedBaseUrl = parsed.baseUrl || (parsed.provider === 'deepseek' ? 'https://api.deepseek.com' : parsed.provider === 'lmstudio' ? 'http://localhost:1234/v1' : 'https://openrouter.ai/api/v1');
         const resolvedModel = parsed.model || parsed.deepseekModel || parsed.lmStudioModel || 'deepseek/deepseek-chat';
 
+        const resolvedFishRefId = parsed.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (parsed.fishAudioReferenceId || '');
+
         return {
           ...parsed,
           baseUrl: resolvedBaseUrl,
@@ -101,7 +103,8 @@ export function App() {
           model: resolvedModel,
           provider: parsed.provider || 'openrouter',
           ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio'),
-          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey
+          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
+          fishAudioReferenceId: resolvedFishRefId
         };
       } catch (e) {
         console.warn("Failed to parse saved apiConfig:", e);
@@ -120,7 +123,7 @@ export function App() {
       availableModels: [],
       ttsProvider: 'fish-audio',
       fishAudioApiKey: envFishAudioKey,
-      fishAudioReferenceId: '7f92f8afb8ec43bf81429cc1c9199cb1',
+      fishAudioReferenceId: '',
       fishAudioModel: 's2.1-pro-free',
       customTtsUrl: '',
       customTtsApiKey: '',

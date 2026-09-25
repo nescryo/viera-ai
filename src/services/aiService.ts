@@ -200,18 +200,21 @@ export async function sendStreamingChatMessage(
   const apiKey = (apiConfig.apiKey || apiConfig.deepseekApiKey || apiConfig.openRouterApiKey || '').trim();
   const model = apiConfig.model || apiConfig.deepseekModel || apiConfig.lmStudioModel || 'deepseek/deepseek-chat';
 
-  const formattedUserName = getUserFormattedName(userProfile);
+  const userName = getUserFormattedName(userProfile);
 
   const formattedHistory = messages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
     content: m.text
   }));
 
+  let systemPrompt = `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are kind, expressive, and engaging.\nKeep responses conversational, sweet, and lively.`;
+  if (userName) {
+    systemPrompt += `\nThe user's name is ${userName}.`;
+  }
+
   const systemMessage = {
     role: 'system',
-    content: `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are kind, expressive, and engaging.
-You are conversing with ${formattedUserName}. Address the user warmly as ${formattedUserName}.
-Keep responses conversational, sweet, and lively.`
+    content: systemPrompt
   };
 
   const controller = new AbortController();
@@ -276,17 +279,5 @@ export function parseDualOutputResponse(text: string): ParsedDualOutput {
 }
 
 export function getUserFormattedName(userProfile?: Partial<UserProfile> | null): string {
-  const rawName = userProfile?.nickname?.trim() || userProfile?.username?.replace(/^@/, '').trim();
-  const baseName = rawName && rawName.length > 0 ? rawName : 'Trailblazer';
-  const gender = userProfile?.gender || 'unspecified';
-
-  if (gender === 'female') {
-    return `${baseName}-chan`;
-  }
-  return `${baseName}-san`;
-}
-
-export function getPersonaGreeting(persona: Persona, userProfile?: Partial<UserProfile> | null): string {
-  const formattedName = getUserFormattedName(userProfile);
-  return persona.greeting.replace(/Trailblazer/g, formattedName);
+  return userProfile?.nickname?.trim() || userProfile?.username?.replace(/^@/, '').trim() || '';
 }

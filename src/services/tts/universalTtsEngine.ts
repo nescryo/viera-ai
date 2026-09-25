@@ -25,7 +25,8 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
     const refId = (apiConfig?.fishAudioReferenceId || '').trim();
 
     const isOpenRouter = !directApiKey && Boolean(openRouterKey);
-    const selectedModel = apiConfig?.fishAudioModel || 's2.1-pro-free';
+    const rawSelectedModel = (apiConfig?.fishAudioModel || '').trim();
+    const selectedModel = (!rawSelectedModel || rawSelectedModel === 'tts-1') ? 's2.1-pro-free' : rawSelectedModel;
     const headerModel = selectedModel.replace(/^fish-audio\//, '');
 
     const endpoint = isOpenRouter ? 'https://openrouter.ai/api/v1/audio/speech' : '/fish_audio_api/v1/tts';
@@ -107,8 +108,8 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
     ''
   ).trim();
 
-  const model = (apiConfig?.customTtsModel || 'tts-1').trim();
-  const voice = (apiConfig?.customTtsVoiceId || '').trim();
+  const model = (apiConfig?.customTtsModel || 'tts-1').trim() || 'tts-1';
+  const voice = (apiConfig?.customTtsVoiceId || '').trim() || 'nova';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -121,12 +122,9 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
   const payload: Record<string, any> = {
     model,
     input: text,
-    response_format: 'mp3'
+    response_format: 'mp3',
+    voice
   };
-
-  if (voice) {
-    payload.voice = voice;
-  }
 
   const response = await fetch(targetEndpoint, {
     method: 'POST',
