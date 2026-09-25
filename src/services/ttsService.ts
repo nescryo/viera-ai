@@ -1,91 +1,59 @@
 import type { Persona, ApiConfig } from '../types';
+import { TtsChunker, sanitizeTextForSpeech } from './tts/ttsChunker';
+import { PlaybackQueue } from './tts/playbackQueue';
+import { synthesizeUniversalAudio, speakWebSpeechFallback } from './tts/universalTtsEngine';
+import type { TtsChunk, TtsStreamSession, TTSBoundaryEvent } from './tts/ttsTypes';
 
-export interface TTSBoundaryEvent {
-  name: string;
-  charIndex: number;
-  charLength?: number;
-  word?: string;
-}
+export type { TTSBoundaryEvent } from './tts/ttsTypes';
 
 /**
- * Modern TTS Service (Clean Slate Foundation)
+ * Universal Modular TTS Service
  * 
- * Legacy monolithic dictionary, translation API (mymemory), and fake wrappers have been dismantled.
- * Ready for the AIRI-inspired modular streaming chunker and ordered playback queue.
+ * Powered by:
+ * - AIRI-inspired Sentence Chunker with Early Boost (sub-second audio playback)
+ * - Sample-Exact Ordered Web Audio Playback Queue with Studio DSP Reverb & Warmth EQ
+ * - Universal OpenAI-Compatible Audio Gateway (/v1/audio/speech) with Web Speech fallback
  */
 class TTSService {
-  private audioCtx: AudioContext | null = null;
-  private currentBufferSource: AudioBufferSourceNode | null = null;
-  private isPlaying: boolean = false;
-  private currentSpeechSessionId: number = 0;
+  private playbackQueue = new PlaybackQueue();
+  private activeAbortController: AbortController | null = null;
+  private isFallbackSpeaking = false;
 
-  constructor() {
-    // AudioContext is initialized lazily upon user interaction to comply with browser autoplay policies.
-  }
+  constructor() {}
 
   /**
-   * Lazily initializes and returns the shared Web Audio API AudioContext.
-   */
-  public getAudioContext(): AudioContext {
-    if (!this.audioCtx) {
-      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioCtxClass();
-    }
-    if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
-    }
-    return this.audioCtx;
-  }
-
-  /**
-   * Generates a soft studio room impulse response for natural vocal acoustics.
-   */
-  public createImpulseResponse(ctx: AudioContext, duration: number = 0.22, decay: number = 2.2): AudioBuffer {
-    const sampleRate = ctx.sampleRate;
-    const length = Math.floor(sampleRate * duration);
-    const impulse = ctx.createBuffer(2, length, sampleRate);
-    const left = impulse.getChannelData(0);
-    const right = impulse.getChannelData(1);
-
-    for (let i = 0; i < length; i++) {
-      const n = length - i;
-      const dec = Math.pow(n / length, decay);
-      left[i] = (Math.random() * 2 - 1) * dec * 0.12;
-      right[i] = (Math.random() * 2 - 1) * dec * 0.12;
-    }
-    return impulse;
-  }
-
-  /**
-   * Prepares and sanitizes text for speech synthesis:
-   * - Strips XML/HTML tags (e.g. <ja>, <think>)
-   * - Strips markdown asterisks, stage directions (*sighs*), and emotion brackets ([happy])
-   * - Strips emojis and excess symbol markers
+   * Cleans and prepares raw text for speech synthesis
    */
   public prepareTextForSpeech(text: string): string {
-    if (!text) return '';
-    return text
-      .replace(/<[^>]+>/g, '')
-      .replace(/\*.*?\*/g, '')
-      .replace(/\[.*?\]/g, '')
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-      .replace(/[`#~_>]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return sanitizeTextForSpeech(text);
   }
 
   /**
-   * Synthesizes and plays speech.
-   * Clean-slate stub: guarantees immediate zero-crash fallback while the modular engine is being assembled.
+   * Shared Web Audio API context
    */
-  public speak(
-    text: string, 
-    _persona: Persona, 
-    onStart?: () => void, 
+  public getAudioContext(): AudioContext {
+    return this.playbackQueue.getAudioContext();
+  }
+
+  /**
+   * Live vocal volume (0.0 to 1.0) for 3D avatar mouth lip sync
+   */
+  public getAverageVolume(): number {
+    return this.playbackQueue.getAverageVolume();
+  }
+
+  /**
+   * Synthesize and speak a full text message.
+   * Chunks text with Early Boost pacing and streams ordered audio.
+   */
+  public async speak(
+    text: string,
+    persona: Persona,
+    onStart?: () => void,
     onEnd?: () => void,
     _onBoundary?: (event: TTSBoundaryEvent) => void,
-    _apiConfig?: ApiConfig
-  ): void {
+    apiConfig?: ApiConfig
+  ): Promise<void> {
     this.stop();
 
     const targetText = this.prepareTextForSpeech(text);
@@ -94,42 +62,193 @@ class TTSService {
       return;
     }
 
-    const sessionId = ++this.currentSpeechSessionId;
-    this.isPlaying = true;
-    if (onStart) onStart();
+    const sessionToken = this.playbackQueue.startSession(
+      () => { if (onStart) onStart(); },
+      () => { if (onEnd) onEnd(); }
+    );
 
-    // Clean placeholder until modular pipeline is hooked up
-    setTimeout(() => {
-      if (sessionId === this.currentSpeechSessionId) {
-        this.isPlaying = false;
-        if (onEnd) onEnd();
+    const controller = new AbortController();
+    this.activeAbortController = controller;
+
+    // Check if network credentials exist for audio synthesis
+    const hasNetworkKey = Boolean(
+      apiConfig?.fishAudioApiKey?.trim() ||
+      apiConfig?.customTtsApiKey?.trim() ||
+      apiConfig?.apiKey?.trim() ||
+      apiConfig?.openRouterApiKey?.trim()
+    );
+
+    const isExplicitWebSpeech = apiConfig?.ttsProvider === 'edge' || apiConfig?.ttsProvider === 'webspeech';
+
+    // If user explicitly chose Edge/WebSpeech or no network API key is provided, use Web Speech API
+    if (isExplicitWebSpeech || !hasNetworkKey) {
+      this.isFallbackSpeaking = true;
+      const started = speakWebSpeechFallback(
+        targetText,
+        persona,
+        () => {
+          this.isFallbackSpeaking = true;
+          if (onStart) onStart();
+        },
+        () => {
+          this.isFallbackSpeaking = false;
+          if (onEnd) onEnd();
+        }
+      );
+      if (!started && onEnd) onEnd();
+      return;
+    }
+
+    // Split text into chunks with Early Boost
+    const chunks = TtsChunker.chunkText(targetText);
+    if (chunks.length === 0) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    try {
+      const ctx = this.playbackQueue.getAudioContext();
+
+      // Dispatch audio synthesis concurrently with concurrency limit of 3
+      const MAX_CONCURRENT = 3;
+      let activeRequests = 0;
+      let chunkIdx = 0;
+
+      const processNextChunk = async () => {
+        if (chunkIdx >= chunks.length || controller.signal.aborted) return;
+        const currentChunk = chunks[chunkIdx++];
+        activeRequests++;
+
+        try {
+          const rawBuffer = await synthesizeUniversalAudio({
+            text: currentChunk.text,
+            persona,
+            apiConfig,
+            signal: controller.signal
+          });
+
+          if (!controller.signal.aborted) {
+            const audioBuffer = await ctx.decodeAudioData(rawBuffer.slice(0));
+            this.playbackQueue.enqueue(currentChunk.sequence, audioBuffer, sessionToken, currentChunk.text);
+          }
+        } catch (err: any) {
+          if (controller.signal.aborted) return;
+          console.warn(`[Viera TTS] Error synthesizing chunk #${currentChunk.sequence}:`, err?.message || err);
+          // Fallback to Web Speech if the first chunk fails due to invalid key or endpoint
+          if (currentChunk.sequence === 0 && !this.playbackQueue.isSpeaking()) {
+            this.stop();
+            this.isFallbackSpeaking = true;
+            speakWebSpeechFallback(targetText, persona, onStart, onEnd);
+            return;
+          }
+        } finally {
+          activeRequests--;
+          if (chunkIdx < chunks.length && !controller.signal.aborted) {
+            await processNextChunk();
+          }
+        }
+      };
+
+      const initialBatch = Math.min(MAX_CONCURRENT, chunks.length);
+      const initialPromises: Promise<void>[] = [];
+      for (let i = 0; i < initialBatch; i++) {
+        initialPromises.push(processNextChunk());
       }
-    }, 300);
-  }
 
-  /**
-   * Immediately stops any active audio playback and clears ongoing sessions.
-   */
-  public stop(): void {
-    this.currentSpeechSessionId++;
-    this.isPlaying = false;
-
-    if (this.currentBufferSource) {
-      try {
-        this.currentBufferSource.onended = null;
-        this.currentBufferSource.stop();
-      } catch {
-        // ignore already stopped source
+      await Promise.all(initialPromises);
+      this.playbackQueue.markFlushed(sessionToken);
+    } catch (err: any) {
+      if (!controller.signal.aborted) {
+        console.warn('[Viera TTS] Universal speech synthesis error, using fallback:', err?.message || err);
+        this.stop();
+        this.isFallbackSpeaking = true;
+        speakWebSpeechFallback(targetText, persona, onStart, onEnd);
       }
-      this.currentBufferSource = null;
     }
   }
 
   /**
-   * Returns whether audio is actively synthesizing or playing.
+   * Creates an ultra low-latency Streaming TTS session.
+   * Feeds raw LLM tokens into the chunker and starts audio playback in <600ms!
+   */
+  public createStreamSession(
+    persona: Persona,
+    apiConfig?: ApiConfig,
+    onStart?: () => void,
+    onEnd?: () => void
+  ): TtsStreamSession {
+    this.stop();
+
+    const sessionToken = this.playbackQueue.startSession(onStart, onEnd);
+    const controller = new AbortController();
+    this.activeAbortController = controller;
+
+    const chunker = new TtsChunker({ boost: 2, minimumWords: 3, maximumWords: 14 });
+    const ctx = this.playbackQueue.getAudioContext();
+
+    const handleChunkEmitted = async (chunk: TtsChunk) => {
+      if (controller.signal.aborted) return;
+      try {
+        const rawBuffer = await synthesizeUniversalAudio({
+          text: chunk.text,
+          persona,
+          apiConfig,
+          signal: controller.signal
+        });
+
+        if (!controller.signal.aborted) {
+          const audioBuffer = await ctx.decodeAudioData(rawBuffer.slice(0));
+          this.playbackQueue.enqueue(chunk.sequence, audioBuffer, sessionToken, chunk.text);
+        }
+      } catch (err: any) {
+        if (!controller.signal.aborted) {
+          console.warn(`[Viera TTS] Stream chunk #${chunk.sequence} synthesis error:`, err?.message || err);
+        }
+      }
+    };
+
+    return {
+      pushToken: (token: string) => {
+        if (controller.signal.aborted) return;
+        chunker.pushToken(token, (chunk) => {
+          handleChunkEmitted(chunk);
+        });
+      },
+      finish: () => {
+        if (controller.signal.aborted) return;
+        chunker.flush((chunk) => {
+          handleChunkEmitted(chunk);
+        });
+        this.playbackQueue.markFlushed(sessionToken);
+      },
+      cancel: () => {
+        controller.abort();
+        this.playbackQueue.stop();
+      }
+    };
+  }
+
+  /**
+   * Immediately stops any speech output and clears queues
+   */
+  public stop(): void {
+    if (this.activeAbortController) {
+      this.activeAbortController.abort();
+      this.activeAbortController = null;
+    }
+    this.playbackQueue.stop();
+    if (this.isFallbackSpeaking && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      this.isFallbackSpeaking = false;
+    }
+  }
+
+  /**
+   * Returns whether TTS is actively synthesizing or playing audio
    */
   public isSpeaking(): boolean {
-    return this.isPlaying || this.currentBufferSource !== null;
+    const isWebSpeechSpeaking = typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking;
+    return this.playbackQueue.isSpeaking() || this.isFallbackSpeaking || isWebSpeechSpeaking;
   }
 }
 

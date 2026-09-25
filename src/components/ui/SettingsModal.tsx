@@ -1,11 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
-import type { ApiConfig, TtsProvider } from '../../types';
+import type { ApiConfig, TtsMode, TtsNormalProvider, TtsJpProvider } from '../../types';
 import { 
   X, Save, Server, CheckCircle, Volume2, Sparkles, Key, Globe,
-  RefreshCw, AlertCircle, Search, ExternalLink, Check
+  RefreshCw, AlertCircle, Search, ExternalLink, Check,
+  Languages, Sliders, Play, Info, Square
 } from 'lucide-react';
 import { validateApiKeyAndFetchModels } from '../../services/aiService';
 import { AI_PROVIDERS, type AiProviderInfo, getProviderById } from '../../data/aiProviders';
+import { ttsService } from '../../services/ttsService';
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
@@ -43,15 +45,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [validationStatus, setValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // TTS State
-  const [ttsProvider, setTtsProvider] = useState<TtsProvider>(apiConfig.ttsProvider || 'fish-audio');
-  const [fishAudioApiKey, setFishAudioApiKey] = useState(apiConfig.fishAudioApiKey || '');
-  const [fishAudioReferenceId, setFishAudioReferenceId] = useState(apiConfig.fishAudioReferenceId || '7f92f8afb8ec43bf81429cc1c9199cb1');
-  const [fishAudioModel, setFishAudioModel] = useState(apiConfig.fishAudioModel || 's2.1-pro-free');
-  const [customTtsUrl, setCustomTtsUrl] = useState(apiConfig.customTtsUrl || '');
-  const [customTtsApiKey, setCustomTtsApiKey] = useState(apiConfig.customTtsApiKey || '');
-  const [customTtsModel, setCustomTtsModel] = useState(apiConfig.customTtsModel || '');
-  const [customTtsVoiceId, setCustomTtsVoiceId] = useState(apiConfig.customTtsVoiceId || '');
+  // Split TTS States (Normal vs Japanese JP)
+  const [ttsMode, setTtsMode] = useState<TtsMode>(apiConfig.ttsMode || 'follow-chat');
+
+  // Normal (Chat Language) TTS Configuration
+  const [normalTtsProvider, setNormalTtsProvider] = useState<TtsNormalProvider>(apiConfig.normalTtsProvider || 'universal');
+  const [normalTtsUrl, setNormalTtsUrl] = useState(apiConfig.normalTtsUrl || apiConfig.customTtsUrl || '');
+  const [normalTtsApiKey, setNormalTtsApiKey] = useState(apiConfig.normalTtsApiKey || apiConfig.customTtsApiKey || '');
+  const [normalTtsModel, setNormalTtsModel] = useState(apiConfig.normalTtsModel || apiConfig.customTtsModel || 'tts-1');
+  const [normalTtsVoice, setNormalTtsVoice] = useState(apiConfig.normalTtsVoice || apiConfig.customTtsVoiceId || 'nova');
+  const [normalTtsReferenceId, setNormalTtsReferenceId] = useState(apiConfig.normalTtsReferenceId || '');
+
+  // Japanese Dubbing (JP) TTS Configuration
+  const [jpTtsProvider, setJpTtsProvider] = useState<TtsJpProvider>(apiConfig.jpTtsProvider || 'fish-audio');
+  const [jpTtsModel, setJpTtsModel] = useState(apiConfig.jpTtsModel || apiConfig.fishAudioModel || 's2.1-pro-free');
+  const [jpTtsReferenceId, setJpTtsReferenceId] = useState(apiConfig.jpTtsReferenceId || apiConfig.fishAudioReferenceId || '');
+  const [jpTtsApiKey, setJpTtsApiKey] = useState(apiConfig.jpTtsApiKey || apiConfig.fishAudioApiKey || '');
+  const [jpTtsUrl, setJpTtsUrl] = useState(apiConfig.jpTtsUrl || '');
+  const [jpTtsVoice, setJpTtsVoice] = useState(apiConfig.jpTtsVoice || '');
+
+  // Audio Testing State
+  const [isTestingAudio, setIsTestingAudio] = useState<'normal' | 'jp' | null>(null);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,6 +152,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     m.toLowerCase().includes(modelSearchQuery.toLowerCase())
   );
 
+  const handleTestVoice = async (tab: 'normal' | 'jp') => {
+    if (isTestingAudio) {
+      ttsService.stop();
+      setIsTestingAudio(null);
+      return;
+    }
+
+    setIsTestingAudio(tab);
+
+    const testConfig: ApiConfig = {
+      ...apiConfig,
+      ttsMode,
+      normalTtsProvider,
+      normalTtsUrl: normalTtsUrl.trim(),
+      normalTtsApiKey: normalTtsApiKey.trim(),
+      normalTtsModel: normalTtsModel.trim(),
+      normalTtsVoice: normalTtsVoice.trim(),
+      normalTtsReferenceId: normalTtsReferenceId.trim(),
+
+      jpTtsProvider,
+      jpTtsModel: jpTtsModel.trim(),
+      jpTtsReferenceId: jpTtsReferenceId.trim(),
+      jpTtsApiKey: jpTtsApiKey.trim(),
+      jpTtsUrl: jpTtsUrl.trim(),
+      jpTtsVoice: jpTtsVoice.trim(),
+
+      // Map to active test provider
+      ttsProvider: tab === 'jp' ? jpTtsProvider : normalTtsProvider,
+      fishAudioApiKey: tab === 'jp' ? jpTtsApiKey.trim() : normalTtsApiKey.trim(),
+      fishAudioReferenceId: tab === 'jp' ? jpTtsReferenceId.trim() : normalTtsReferenceId.trim(),
+      fishAudioModel: tab === 'jp' ? jpTtsModel.trim() : normalTtsModel.trim(),
+      customTtsUrl: tab === 'jp' ? jpTtsUrl.trim() : normalTtsUrl.trim(),
+      customTtsApiKey: tab === 'jp' ? jpTtsApiKey.trim() : normalTtsApiKey.trim(),
+      customTtsModel: tab === 'jp' ? jpTtsModel.trim() : normalTtsModel.trim(),
+      customTtsVoiceId: tab === 'jp' ? jpTtsVoice.trim() : normalTtsVoice.trim(),
+    };
+
+    const testPersona = {
+      id: 'firefly',
+      name: 'Firefly',
+      tagline: '',
+      greeting: '',
+      systemPrompt: '',
+      avatarUrl: '',
+      voice: { pitch: 1.15, rate: 0.98, lang: tab === 'jp' ? 'ja-JP' : 'en-US' },
+      category: 'Honkai: Star Rail' as const
+    };
+
+    const testText = tab === 'jp'
+      ? "こんにちは！日本語の音声エンジンは正常に動作しています。"
+      : "Hello Trailblazer! Normal chat voice synthesis is configured and active.";
+
+    try {
+      await ttsService.speak(
+        testText,
+        testPersona,
+        () => {},
+        () => setIsTestingAudio(null),
+        undefined,
+        testConfig
+      );
+    } catch (err) {
+      console.warn('[Viera Settings] Test audio failed:', err);
+      setIsTestingAudio(null);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveConfig({
@@ -147,14 +228,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       apiKey: apiKey.trim(),
       model: model.trim() || activeProvider.defaultModel,
       availableModels,
-      ttsProvider,
-      fishAudioApiKey,
-      fishAudioReferenceId,
-      fishAudioModel,
-      customTtsUrl,
-      customTtsApiKey,
-      customTtsModel,
-      customTtsVoiceId
+
+      // Modern Split TTS
+      ttsMode,
+      normalTtsProvider,
+      normalTtsUrl: normalTtsUrl.trim(),
+      normalTtsApiKey: normalTtsApiKey.trim(),
+      normalTtsModel: normalTtsModel.trim(),
+      normalTtsVoice: normalTtsVoice.trim(),
+      normalTtsReferenceId: normalTtsReferenceId.trim(),
+
+      jpTtsProvider,
+      jpTtsModel: jpTtsModel.trim(),
+      jpTtsReferenceId: jpTtsReferenceId.trim(),
+      jpTtsApiKey: jpTtsApiKey.trim(),
+      jpTtsUrl: jpTtsUrl.trim(),
+      jpTtsVoice: jpTtsVoice.trim(),
+
+      // Backward compatibility mappings
+      ttsProvider: ttsMode === 'japanese-dub' ? jpTtsProvider : normalTtsProvider,
+      fishAudioApiKey: (ttsMode === 'japanese-dub' ? jpTtsApiKey : (normalTtsProvider === 'fish-audio' ? normalTtsApiKey : jpTtsApiKey)).trim(),
+      fishAudioReferenceId: (ttsMode === 'japanese-dub' ? jpTtsReferenceId : (normalTtsProvider === 'fish-audio' ? normalTtsReferenceId : jpTtsReferenceId)).trim(),
+      fishAudioModel: (ttsMode === 'japanese-dub' ? jpTtsModel : (normalTtsProvider === 'fish-audio' ? normalTtsModel : jpTtsModel)).trim(),
+      customTtsUrl: normalTtsUrl.trim(),
+      customTtsApiKey: normalTtsApiKey.trim(),
+      customTtsModel: normalTtsModel.trim(),
+      customTtsVoiceId: normalTtsVoice.trim(),
     });
     onClose();
   };
@@ -425,152 +524,443 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* SECTION 2: TTS VOICE ENGINE */}
-            <div className="form-group" style={{ marginTop: '1.4rem' }}>
-              <label className="form-label" style={{ fontSize: '0.92rem', marginBottom: '8px' }}>2. Select TTS Voice Engine</label>
-              <div className="provider-selector-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-                <button
-                  type="button"
-                  className={`provider-card ${ttsProvider === 'fish-audio' ? 'active' : ''}`}
-                  onClick={() => setTtsProvider('fish-audio')}
-                >
-                  <Sparkles size={24} />
-                  <div className="provider-card-info">
-                    <span className="p-title">Fish Audio S2.1 Pro</span>
-                    <span className="p-desc">Zero-Shot Neural Model • Anime Voice</span>
-                  </div>
-                  {ttsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" />}
-                </button>
-
-                <button
-                  type="button"
-                  className={`provider-card ${ttsProvider === 'edge' ? 'active' : ''}`}
-                  onClick={() => setTtsProvider('edge')}
-                >
-                  <Volume2 size={24} />
-                  <div className="provider-card-info">
-                    <span className="p-title">Edge-TTS Neural Voice</span>
-                    <span className="p-desc">Real-Time Cloud Neural Voice</span>
-                  </div>
-                  {ttsProvider === 'edge' && <CheckCircle size={18} className="p-check" />}
-                </button>
-
-                <button
-                  type="button"
-                  className={`provider-card ${ttsProvider === 'custom' ? 'active' : ''}`}
-                  onClick={() => setTtsProvider('custom')}
-                >
-                  <Globe size={24} />
-                  <div className="provider-card-info">
-                    <span className="p-title">Other / Custom TTS</span>
-                    <span className="p-desc">OpenAI Audio API / ElevenLabs</span>
-                  </div>
-                  {ttsProvider === 'custom' && <CheckCircle size={18} className="p-check" />}
-                </button>
+            {/* SECTION 2: SPEECH OUTPUT & SPLIT TTS ARCHITECTURE */}
+            <div className="tts-split-container">
+              <div>
+                <label className="form-label" style={{ fontSize: '0.98rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Volume2 size={18} style={{ color: '#60a5fa' }} />
+                  <span>2. Speech Synthesis Engines (Normal vs Japanese JP)</span>
+                </label>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block' }}>
+                  Separate voice engines for primary chat language vs authentic Japanese dubbing to prevent accent contamination.
+                </span>
               </div>
+
+              {/* A. Active Voice Output Mode Selection */}
+              <div className="form-group">
+                <label className="form-label" style={{ fontSize: '0.84rem', color: '#cbd5e1', marginBottom: '8px' }}>
+                  Active Voice Output Mode:
+                </label>
+                <div className="tts-mode-card-grid">
+                  <button
+                    type="button"
+                    className={`tts-mode-card ${ttsMode === 'follow-chat' ? 'active' : ''}`}
+                    onClick={() => setTtsMode('follow-chat')}
+                  >
+                    <div className="mode-icon-box">
+                      <Languages size={20} />
+                    </div>
+                    <div className="tts-mode-card-info">
+                      <div className="tts-mode-title">
+                        <span>Follow Chat Language</span>
+                        {ttsMode === 'follow-chat' && <span className="tts-mode-badge">Active</span>}
+                      </div>
+                      <span className="tts-mode-desc">
+                        Speaks in whatever language the companion writes using your Normal TTS engine.
+                      </span>
+                    </div>
+                    {ttsMode === 'follow-chat' && <CheckCircle size={18} className="p-check" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`tts-mode-card ${ttsMode === 'japanese-dub' ? 'active' : ''}`}
+                    onClick={() => setTtsMode('japanese-dub')}
+                  >
+                    <div className="mode-icon-box" style={{ color: '#f472b6' }}>
+                      <Sparkles size={20} />
+                    </div>
+                    <div className="tts-mode-card-info">
+                      <div className="tts-mode-title">
+                        <span>Japanese Dubbing Mode</span>
+                        {ttsMode === 'japanese-dub' && (
+                          <span className="tts-mode-badge" style={{ background: 'rgba(236,72,153,0.2)', color: '#fbcfe8' }}>
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <span className="tts-mode-desc">
+                        Speaks with dedicated Japanese anime voice references regardless of input language.
+                      </span>
+                    </div>
+                    {ttsMode === 'japanese-dub' && <CheckCircle size={18} className="p-check" style={{ color: '#ec4899' }} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* NORMAL TTS CONFIGURATION (Active when Follow Chat Language is selected) */}
+              {ttsMode === 'follow-chat' && (
+                <div className="provider-details-box fade-in" style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                  <div className="tts-info-callout">
+                    <Info size={18} style={{ color: '#60a5fa', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong>Normal / Chat Language Voice</strong>: Used when conversing in English, Indonesian, or the AI's primary language. Configured independently to ensure natural pronunciation without anime voice distortions.
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label className="form-label">Normal Voice Engine Provider</label>
+                    <div className="provider-selector-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+                      <button
+                        type="button"
+                        className={`provider-card ${normalTtsProvider === 'fish-audio' ? 'active' : ''}`}
+                        onClick={() => setNormalTtsProvider('fish-audio')}
+                      >
+                        <Sparkles size={22} style={{ color: '#60a5fa' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Fish Audio S2.1 Pro</span>
+                          <span className="p-desc">Zero-Shot Cloning (Multilingual)</span>
+                        </div>
+                        {normalTtsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${normalTtsProvider === 'universal' ? 'active' : ''}`}
+                        onClick={() => setNormalTtsProvider('universal')}
+                      >
+                        <Globe size={22} style={{ color: '#60a5fa' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">OpenAI / OpenRouter</span>
+                          <span className="p-desc">Industry /v1/audio/speech</span>
+                        </div>
+                        {normalTtsProvider === 'universal' && <CheckCircle size={18} className="p-check" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${normalTtsProvider === 'edge' ? 'active' : ''}`}
+                        onClick={() => setNormalTtsProvider('edge')}
+                      >
+                        <Volume2 size={22} style={{ color: '#38bdf8' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Edge / Web Speech</span>
+                          <span className="p-desc">Free Neural Voice (Zero Config)</span>
+                        </div>
+                        {normalTtsProvider === 'edge' && <CheckCircle size={18} className="p-check" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${normalTtsProvider === 'custom' ? 'active' : ''}`}
+                        onClick={() => setNormalTtsProvider('custom')}
+                      >
+                        <Sliders size={22} style={{ color: '#a78bfa' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Custom Endpoint</span>
+                          <span className="p-desc">Local / ElevenLabs / Gateway</span>
+                        </div>
+                        {normalTtsProvider === 'custom' && <CheckCircle size={18} className="p-check" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {normalTtsProvider === 'fish-audio' && (
+                    <div className="fade-in" style={{ marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Fish Audio Model Version</label>
+                        <select
+                          value={normalTtsModel}
+                          onChange={(e) => setNormalTtsModel(e.target.value)}
+                          className="form-input"
+                        >
+                          <option value="s2.1-pro-free">s2.1-pro-free (Official Free Developer Tier)</option>
+                          <option value="s2.1-pro">s2.1-pro (Standard Production Tier)</option>
+                          <option value="fish-audio/s2.1-pro-free">fish-audio/s2.1-pro-free (OpenRouter Gateway)</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Voice Reference ID</label>
+                        <input
+                          type="text"
+                          value={normalTtsReferenceId}
+                          onChange={(e) => setNormalTtsReferenceId(e.target.value)}
+                          placeholder="Reference ID from fish.audio/models (leave empty for default voice)"
+                          className="form-input"
+                        />
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>Browse voice model IDs freely at</span>
+                          <a
+                            href="https://fish.audio/models"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#60a5fa', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            <span>fish.audio/models</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        </span>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Fish Audio API Key</label>
+                        <input
+                          type="password"
+                          value={normalTtsApiKey}
+                          onChange={(e) => setNormalTtsApiKey(e.target.value)}
+                          placeholder="Enter your Fish Audio API Key"
+                          className="form-input"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(normalTtsProvider === 'universal' || normalTtsProvider === 'custom') && (
+                    <div className="fade-in" style={{ marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Normal Audio Gateway URL</label>
+                        <input
+                          type="text"
+                          value={normalTtsUrl}
+                          onChange={(e) => setNormalTtsUrl(e.target.value)}
+                          placeholder="https://api.openai.com/v1/audio/speech or https://openrouter.ai/api/v1/audio/speech"
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Audio API Key</label>
+                        <input
+                          type="password"
+                          value={normalTtsApiKey}
+                          onChange={(e) => setNormalTtsApiKey(e.target.value)}
+                          placeholder="Enter your Audio Gateway API Key"
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '0.8rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Voice ID / Name</label>
+                          <input
+                            type="text"
+                            value={normalTtsVoice}
+                            onChange={(e) => setNormalTtsVoice(e.target.value)}
+                            placeholder="e.g. nova, alloy, shimmer, echo"
+                            className="form-input"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Model Name</label>
+                          <input
+                            type="text"
+                            value={normalTtsModel}
+                            onChange={(e) => setNormalTtsModel(e.target.value)}
+                            placeholder="e.g. tts-1, tts-1-hd, eleven_multilingual_v2"
+                            className="form-input"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Voice Preview Bar */}
+                  <div className="tts-test-preview-bar">
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                      Test your normal speech acoustic configuration:
+                    </span>
+                    <button
+                      type="button"
+                      className={`tts-test-btn ${isTestingAudio === 'normal' ? 'testing' : ''}`}
+                      onClick={() => handleTestVoice('normal')}
+                    >
+                      {isTestingAudio === 'normal' ? <Square size={14} /> : <Play size={14} />}
+                      <span>{isTestingAudio === 'normal' ? 'Stop Test' : 'Test Normal Voice'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* JAPANESE DUB (JP) TTS CONFIGURATION (Active when Japanese Dubbing Mode is selected) */}
+              {ttsMode === 'japanese-dub' && (
+                <div className="provider-details-box fade-in" style={{ borderColor: 'rgba(236, 72, 153, 0.3)' }}>
+                  <div className="tts-info-callout" style={{ borderColor: 'rgba(236, 72, 153, 0.15)' }}>
+                    <Sparkles size={18} style={{ color: '#f472b6', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong>Japanese Dubbing Engine</strong>: Dedicated Japanese anime vocal pipeline. Optimized for zero-shot voice cloning, pitch inflection, and anime dialogue cadence without English accent contamination.
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label className="form-label">Japanese Voice Engine Provider</label>
+                    <div className="provider-selector-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+                      <button
+                        type="button"
+                        className={`provider-card ${jpTtsProvider === 'fish-audio' ? 'active' : ''}`}
+                        onClick={() => setJpTtsProvider('fish-audio')}
+                        style={{ borderColor: jpTtsProvider === 'fish-audio' ? '#ec4899' : undefined }}
+                      >
+                        <Sparkles size={22} style={{ color: '#f472b6' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Fish Audio S2.1 Pro</span>
+                          <span className="p-desc">Zero-Shot Anime Voice Cloning</span>
+                        </div>
+                        {jpTtsProvider === 'fish-audio' && <CheckCircle size={18} className="p-check" style={{ color: '#ec4899' }} />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${jpTtsProvider === 'universal' ? 'active' : ''}`}
+                        onClick={() => setJpTtsProvider('universal')}
+                        style={{ borderColor: jpTtsProvider === 'universal' ? '#ec4899' : undefined }}
+                      >
+                        <Globe size={22} style={{ color: '#60a5fa' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">OpenRouter / OpenAI JP</span>
+                          <span className="p-desc">OpenRouter Fish Audio or OpenAI</span>
+                        </div>
+                        {jpTtsProvider === 'universal' && <CheckCircle size={18} className="p-check" style={{ color: '#ec4899' }} />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${jpTtsProvider === 'edge' ? 'active' : ''}`}
+                        onClick={() => setJpTtsProvider('edge')}
+                        style={{ borderColor: jpTtsProvider === 'edge' ? '#ec4899' : undefined }}
+                      >
+                        <Volume2 size={22} style={{ color: '#38bdf8' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Edge-TTS Japanese</span>
+                          <span className="p-desc">Nanami / Keita Neural Voice</span>
+                        </div>
+                        {jpTtsProvider === 'edge' && <CheckCircle size={18} className="p-check" style={{ color: '#ec4899' }} />}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`provider-card ${jpTtsProvider === 'custom' ? 'active' : ''}`}
+                        onClick={() => setJpTtsProvider('custom')}
+                        style={{ borderColor: jpTtsProvider === 'custom' ? '#ec4899' : undefined }}
+                      >
+                        <Sliders size={22} style={{ color: '#a78bfa' }} />
+                        <div className="provider-card-info">
+                          <span className="p-title">Custom Endpoint</span>
+                          <span className="p-desc">Local (Kokoro / CosyVoice)</span>
+                        </div>
+                        {jpTtsProvider === 'custom' && <CheckCircle size={18} className="p-check" style={{ color: '#ec4899' }} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {jpTtsProvider === 'fish-audio' && (
+                    <div className="fade-in" style={{ marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Fish Audio Model Version</label>
+                        <select
+                          value={jpTtsModel}
+                          onChange={(e) => setJpTtsModel(e.target.value)}
+                          className="form-input"
+                        >
+                          <option value="s2.1-pro-free">s2.1-pro-free (Official Free Developer Tier)</option>
+                          <option value="s2.1-pro">s2.1-pro (Standard Production Tier)</option>
+                          <option value="fish-audio/s2.1-pro-free">fish-audio/s2.1-pro-free (OpenRouter Gateway)</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Japanese Voice Reference ID</label>
+                        <input
+                          type="text"
+                          value={jpTtsReferenceId}
+                          onChange={(e) => setJpTtsReferenceId(e.target.value)}
+                          placeholder="Paste Reference ID from fish.audio/models (leave empty for default voice)"
+                          className="form-input"
+                        />
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>Find anime character voice IDs freely at</span>
+                          <a
+                            href="https://fish.audio/models"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#f472b6', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                          >
+                            <span>fish.audio/models</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        </span>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Fish Audio API Key</label>
+                        <input
+                          type="password"
+                          value={jpTtsApiKey}
+                          onChange={(e) => setJpTtsApiKey(e.target.value)}
+                          placeholder="Enter your Fish Audio API Key"
+                          className="form-input"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(jpTtsProvider === 'universal' || jpTtsProvider === 'custom') && (
+                    <div className="fade-in" style={{ marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Japanese Audio Gateway URL</label>
+                        <input
+                          type="text"
+                          value={jpTtsUrl}
+                          onChange={(e) => setJpTtsUrl(e.target.value)}
+                          placeholder="https://openrouter.ai/api/v1/audio/speech or custom endpoint"
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '0.8rem' }}>
+                        <label className="form-label">Japanese API Key</label>
+                        <input
+                          type="password"
+                          value={jpTtsApiKey}
+                          onChange={(e) => setJpTtsApiKey(e.target.value)}
+                          placeholder="sk-or-... or custom audio API key"
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '0.8rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Voice / Reference ID</label>
+                          <input
+                            type="text"
+                            value={jpTtsVoice}
+                            onChange={(e) => setJpTtsVoice(e.target.value)}
+                            placeholder="e.g. voice id or nova"
+                            className="form-input"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Model</label>
+                          <input
+                            type="text"
+                            value={jpTtsModel}
+                            onChange={(e) => setJpTtsModel(e.target.value)}
+                            placeholder="e.g. fish-audio/s2.1-pro-free, tts-1"
+                            className="form-input"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Voice Preview Bar */}
+                  <div className="tts-test-preview-bar">
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                      Test your Japanese anime voice synthesis:
+                    </span>
+                    <button
+                      type="button"
+                      className={`tts-test-btn ${isTestingAudio === 'jp' ? 'testing' : ''}`}
+                      onClick={() => handleTestVoice('jp')}
+                      style={{ borderColor: isTestingAudio === 'jp' ? '#ec4899' : undefined, color: isTestingAudio === 'jp' ? '#fbcfe8' : undefined }}
+                    >
+                      {isTestingAudio === 'jp' ? <Square size={14} /> : <Play size={14} />}
+                      <span>{isTestingAudio === 'jp' ? 'Stop Test' : 'Test Japanese Voice'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {ttsProvider === 'fish-audio' && (
-              <div className="provider-details-box fade-in">
-                <div className="form-group">
-                  <label className="form-label">Fish Audio Model Version</label>
-                  <select
-                    value={fishAudioModel}
-                    onChange={(e) => setFishAudioModel(e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="s2.1-pro-free">s2.1-pro-free (Official Free Developer API Tier)</option>
-                    <option value="s2.1-pro">s2.1-pro (Paid / Standard Production Tier)</option>
-                    <option value="fish-audio/s2.1-pro-free">fish-audio/s2.1-pro-free (OpenRouter Gateway)</option>
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginTop: '0.8rem' }}>
-                  <label className="form-label">Voice Model Preset</label>
-                  <select
-                    value={fishAudioReferenceId}
-                    onChange={(e) => setFishAudioReferenceId(e.target.value)}
-                    className="form-input"
-                  >
-                    <option value="">Default System Voice (Fish Audio Built-in)</option>
-                    <option value="0d4d2a579d6146debf509b79eb83e7de">Firefly / ホタル (Honkai: Star Rail JP Dub)</option>
-                    <option value="custom">Custom Reference ID (Manual Input)</option>
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginTop: '0.8rem' }}>
-                  <label className="form-label">Voice Reference ID</label>
-                  <input
-                    type="text"
-                    value={fishAudioReferenceId}
-                    onChange={(e) => setFishAudioReferenceId(e.target.value)}
-                    placeholder="Paste Reference ID from fish.audio catalog"
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginTop: '0.8rem' }}>
-                  <label className="form-label">Fish Audio API Key (Optional)</label>
-                  <input
-                    type="password"
-                    value={fishAudioApiKey}
-                    onChange={(e) => setFishAudioApiKey(e.target.value)}
-                    placeholder="Optional: Enter Fish Audio API Key"
-                    className="form-input"
-                  />
-                </div>
-              </div>
-            )}
-
-            {ttsProvider === 'custom' && (
-              <div className="provider-details-box fade-in">
-                <div className="form-group">
-                  <label className="form-label">Endpoint URL</label>
-                  <input
-                    type="text"
-                    value={customTtsUrl}
-                    onChange={(e) => setCustomTtsUrl(e.target.value)}
-                    placeholder="https://api.service.com/v1/audio/speech"
-                    className="form-input"
-                    required
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginTop: '0.8rem' }}>
-                  <label className="form-label">API Key</label>
-                  <input
-                    type="password"
-                    value={customTtsApiKey}
-                    onChange={(e) => setCustomTtsApiKey(e.target.value)}
-                    placeholder="sk-... or xi-api-key (optional)"
-                    className="form-input"
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '0.8rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Voice ID</label>
-                    <input
-                      type="text"
-                      value={customTtsVoiceId}
-                      onChange={(e) => setCustomTtsVoiceId(e.target.value)}
-                      placeholder="e.g. 21m00Tcm4TlvDq8ikWAM, nova"
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Model Name</label>
-                    <input
-                      type="text"
-                      value={customTtsModel}
-                      onChange={(e) => setCustomTtsModel(e.target.value)}
-                      placeholder="e.g. eleven_multilingual_v2, tts-1"
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="modal-footer">

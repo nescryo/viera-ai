@@ -27,7 +27,11 @@ export interface Persona {
   category: 'Honkai: Star Rail' | 'Anime & Gaming' | 'Original';
 }
 
-export type TtsProvider = 'fish-audio' | 'edge' | 'custom' | 'webspeech';
+export type TtsMode = 'follow-chat' | 'japanese-dub';
+export type TtsEngineProvider = 'fish-audio' | 'universal' | 'edge' | 'custom';
+export type TtsNormalProvider = TtsEngineProvider;
+export type TtsJpProvider = TtsEngineProvider;
+export type TtsProvider = 'fish-audio' | 'edge' | 'custom' | 'webspeech' | 'universal';
 
 export interface ApiConfig {
   // Universal OpenAI-Compatible Gateway
@@ -45,7 +49,26 @@ export interface ApiConfig {
   openRouterApiKey?: string;
   openRouterModel?: string;
 
-  // TTS Voice Synthesis
+  // Speech Output Mode
+  ttsMode?: TtsMode;
+
+  // Normal (Chat Language) TTS Configuration
+  normalTtsProvider?: TtsNormalProvider;
+  normalTtsUrl?: string;
+  normalTtsApiKey?: string;
+  normalTtsModel?: string;
+  normalTtsVoice?: string;
+  normalTtsReferenceId?: string;
+
+  // Japanese Dubbing (JP) TTS Configuration
+  jpTtsProvider?: TtsJpProvider;
+  jpTtsUrl?: string;
+  jpTtsApiKey?: string;
+  jpTtsModel?: string;
+  jpTtsVoice?: string;
+  jpTtsReferenceId?: string;
+
+  // Legacy TTS fields for seamless backward compatibility
   ttsProvider?: TtsProvider;
   fishAudioApiKey?: string;
   fishAudioReferenceId?: string;
