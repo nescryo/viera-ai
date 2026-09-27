@@ -204,12 +204,18 @@ export async function sendStreamingChatMessage(
 
   const formattedHistory = messages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
-    content: m.text
+    content: m.rawText || m.text
   }));
 
-  let systemPrompt = `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are kind, expressive, and engaging.\nKeep responses conversational, sweet, and lively.`;
+  let systemPrompt = persona.systemPrompt?.trim()
+    ? persona.systemPrompt
+    : `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are kind, expressive, and engaging.\nKeep responses conversational, sweet, and lively.`;
+
   if (userName) {
     systemPrompt += `\nThe user's name is ${userName}.`;
+  }
+  if (userProfile?.bio?.trim()) {
+    systemPrompt += `\nAbout the user: ${userProfile.bio.trim()}`;
   }
 
   const systemMessage = {
@@ -226,6 +232,10 @@ export async function sendStreamingChatMessage(
     };
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    if (normalizedBaseUrl.includes('openrouter.ai')) {
+      headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://viera.app';
+      headers['X-Title'] = 'Viera AI Companion';
     }
 
     const response = await fetch(`${normalizedBaseUrl}/chat/completions`, {

@@ -311,17 +311,13 @@ export function App() {
             const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
             const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
             const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
-            setMessages((prev) => {
-              const next = prev.map((msg) =>
+            setMessages((prev) =>
+              prev.map((msg) =>
                 msg.id === aiMsgId
                   ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
                   : msg
-              );
-              if (userProfile && activeSessionId) {
-                historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-              }
-              return next;
-            });
+              )
+            );
           });
         }
       },
@@ -454,17 +450,13 @@ export function App() {
             const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
             const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
             const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
-            setMessages((prev) => {
-              const next = prev.map((msg) =>
+            setMessages((prev) =>
+              prev.map((msg) =>
                 msg.id === aiMsgId
                   ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
                   : msg
-              );
-              if (userProfile && activeSessionId) {
-                historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-              }
-              return next;
-            });
+              )
+            );
           });
         }
       },
