@@ -12,7 +12,7 @@ export interface ParsedDualOutput {
  */
 export function normalizeBaseUrl(url: string): string {
   let trimmed = (url || '').trim();
-  if (!trimmed) return 'https://openrouter.ai/api/v1';
+  if (!trimmed) return '';
   // Ensure http:// or https://
   if (!/^https?:\/\//i.test(trimmed)) {
     trimmed = `https://${trimmed}`;
@@ -104,6 +104,7 @@ export async function validateApiKeyAndFetchModels(
  */
 export async function checkEndpointOnline(baseUrl: string): Promise<boolean> {
   const normalized = normalizeBaseUrl(baseUrl);
+  if (!normalized) return false;
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
@@ -194,15 +195,27 @@ export async function sendStreamingChatMessage(
   onToken: (token: string, fullTextSoFar: string) => void,
   onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
   onError: (err: any) => void,
-  userProfile?: UserProfile | null
+  userProfile?: UserProfile | null,
+  sessionSummary?: string
 ): Promise<void> {
-  const normalizedBaseUrl = normalizeBaseUrl(apiConfig.baseUrl || apiConfig.lmStudioUrl || 'https://openrouter.ai/api/v1');
-  const apiKey = (apiConfig.apiKey || apiConfig.deepseekApiKey || apiConfig.openRouterApiKey || '').trim();
-  const model = apiConfig.model || apiConfig.deepseekModel || apiConfig.lmStudioModel || 'deepseek/deepseek-chat';
+  const normalizedBaseUrl = normalizeBaseUrl(apiConfig.baseUrl);
+  const apiKey = (apiConfig.apiKey || '').trim();
+  const model = (apiConfig.model || '').trim();
+
+  if (!normalizedBaseUrl || !model) {
+    throw new Error('API Gateway Error: Base URL or model name is not configured. Please check your AI Settings.');
+  }
 
   const userName = getUserFormattedName(userProfile);
 
-  const formattedHistory = messages.map(m => ({
+  // Sliding context window: send the most recent 50 messages to keep inference fast.
+  // Older messages remain in UI history and are remembered by the AI via sessionSummary.
+  const MAX_ACTIVE_CONTEXT = 50;
+  const activeMessages = messages.length > MAX_ACTIVE_CONTEXT
+    ? messages.slice(-MAX_ACTIVE_CONTEXT)
+    : messages;
+
+  const formattedHistory = activeMessages.map(m => ({
     role: m.sender === 'user' ? 'user' : 'assistant',
     content: m.rawText || m.text
   }));
@@ -217,6 +230,11 @@ export async function sendStreamingChatMessage(
   if (userProfile?.bio?.trim()) {
     systemPrompt += `\nAbout the user: ${userProfile.bio.trim()}`;
   }
+  if (sessionSummary?.trim()) {
+    systemPrompt += `\n\n[YOUR MEMORIES & SHARED EXPERIENCES WITH ${userName || 'THE USER'}]:\n${sessionSummary.trim()}\n(Naturally weave these shared memories, inside jokes, and mutual moments into your responses when relevant.)`;
+  }
+
+  systemPrompt += `\n\n[CONVERSATION STYLE]:\n- Express emotion and personality naturally through words, tone, and dialogue rather than relying on emoji decorations.\n- Use emojis sparingly and with restraint. Do not include emojis in every message or sentence; use them only occasionally when truly fitting, or omit them entirely.`;
 
   const systemMessage = {
     role: 'system',
@@ -231,7 +249,7 @@ export async function sendStreamingChatMessage(
       'Content-Type': 'application/json'
     };
     if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
+      headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
     }
     if (normalizedBaseUrl.includes('openrouter.ai')) {
       headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://viera.app';
@@ -245,6 +263,7 @@ export async function sendStreamingChatMessage(
         model,
         messages: [systemMessage, ...formattedHistory],
         temperature: 0.7,
+        max_tokens: 800,
         stream: true
       }),
       signal: controller.signal
@@ -291,3 +310,91 @@ export function parseDualOutputResponse(text: string): ParsedDualOutput {
 export function getUserFormattedName(userProfile?: Partial<UserProfile> | null): string {
   return userProfile?.nickname?.trim() || userProfile?.username?.replace(/^@/, '').trim() || '';
 }
+
+/**
+ * Generates an organic first-person episodic memory reflection of the conversation.
+ * Designed to prevent memory drift, resist hallucinations, and filter trivial details.
+ */
+export async function generateEpisodicMemory(
+  messages: ChatMessage[],
+  persona: Persona,
+  apiConfig: ApiConfig,
+  previousSummary?: string,
+  userProfile?: UserProfile | null
+): Promise<string> {
+  const normalizedBaseUrl = normalizeBaseUrl(apiConfig.baseUrl);
+  const apiKey = (apiConfig.apiKey || '').trim();
+  const model = (apiConfig.model || '').trim();
+  const userName = getUserFormattedName(userProfile) || 'the user';
+
+  if (!normalizedBaseUrl || !model) {
+    console.warn('[Viera Memory] Missing baseUrl or model for episodic memory generation.');
+    return previousSummary || '';
+  }
+
+  const systemPrompt = `You are ${persona.name}. Reflect on your recent conversation with ${userName}.
+
+Write a brief personal memory from your own perspective about what stood out to you.
+
+* Remember specific topics, opinions, jokes, stories, or details the user shared that are likely to matter later.
+* Remember meaningful moments in your relationship, including recurring jokes, playful banter, emotional moments, or changes in mood.
+* Remember promises, plans, goals, or things you agreed to do together.
+* Prefer memorable and relationship-relevant details over generic conversation summaries.
+* Do not invent, assume, or embellish facts that were not established in the conversation.
+* Preserve existing memories when they remain true. Only update or remove an existing detail when the recent conversation clearly provides evidence that it has changed.
+* Avoid storing trivial one-off details that are unlikely to matter in future conversations.
+
+${previousSummary?.trim() ? `Here is the existing memory. Preserve its valid information and update it only when the new conversation provides evidence that something has changed:\n"${previousSummary.trim()}"` : ''}
+
+Write 2–4 concise sentences in your own voice. Make it feel like a genuine memory of our relationship, not a database summary.`;
+
+  const conversationTranscript = messages
+    .map(m => `${m.sender === 'user' ? userName : persona.name}: ${m.rawText || m.text}`)
+    .join('\n');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    if (normalizedBaseUrl.includes('openrouter.ai')) {
+      headers['HTTP-Referer'] = typeof window !== 'undefined' ? window.location.origin : 'https://viera.app';
+      headers['X-Title'] = 'Viera AI Companion';
+    }
+
+    const response = await fetch(`${normalizedBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Here is our recent conversation transcript:\n\n${conversationTranscript}\n\nWrite your personal memory reflection now:` }
+        ],
+        temperature: 0.3,
+        max_tokens: 300,
+        stream: false
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Memory reflection HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reflection = data.choices?.[0]?.message?.content?.trim() || '';
+    return reflection || previousSummary || '';
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.warn('[Viera Memory] Failed to generate episodic memory reflection:', err);
+    return previousSummary || '';
+  }
+}
+

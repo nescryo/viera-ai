@@ -110,6 +110,41 @@ export function updateSessionTitle(userId: string, sessionId: string, newTitle: 
   saveSessions(userId, updated);
 }
 
+export function updateSessionSummary(
+  userId: string,
+  sessionId: string,
+  summary: string,
+  lastSummarizedIndex: number
+): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  let updatedSession: ChatSession | null = null;
+
+  const newSessions = sessions.map((s) => {
+    if (s.id === sessionId) {
+      updatedSession = {
+        ...s,
+        summary,
+        lastSummarizedIndex,
+        updatedAt: Date.now()
+      };
+      return updatedSession;
+    }
+    return s;
+  });
+
+  if (updatedSession) {
+    saveSessions(userId, newSessions);
+  }
+  return updatedSession;
+}
+
+export function getSession(userId: string, sessionId: string): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  return sessions.find((s) => s.id === sessionId) || null;
+}
+
 export function deleteSession(userId: string, sessionId: string): ChatSession[] {
   if (!userId || !sessionId) return [];
   const sessions = getSessions(userId);

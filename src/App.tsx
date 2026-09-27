@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
-import { sendStreamingChatMessage, parseResponseText, parseDualOutputResponse } from './services/aiService';
+import { sendStreamingChatMessage, parseResponseText, parseDualOutputResponse, generateEpisodicMemory } from './services/aiService';
+import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
 import { ttsService } from './services/ttsService';
 import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
 import * as historyService from './services/historyService';
@@ -90,18 +91,19 @@ export function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const resolvedApiKey = parsed.apiKey || parsed.openRouterApiKey || parsed.deepseekApiKey || envOpenRouterKey || envDeepseekKey;
-        const resolvedBaseUrl = parsed.baseUrl || (parsed.provider === 'deepseek' ? 'https://api.deepseek.com' : parsed.provider === 'lmstudio' ? 'http://localhost:1234/v1' : 'https://openrouter.ai/api/v1');
-        const resolvedModel = parsed.model || parsed.deepseekModel || parsed.lmStudioModel || 'deepseek/deepseek-chat';
+        const providerInfo = getProviderById(parsed.provider || 'openrouter');
+        const resolvedApiKey = (parsed.apiKey || parsed.deepseekApiKey || parsed.openRouterApiKey || envDeepseekKey || envOpenRouterKey || '').trim();
+        const resolvedBaseUrl = (parsed.baseUrl || providerInfo.defaultBaseUrl || '').trim();
+        const resolvedModel = (parsed.model || providerInfo.defaultModel || '').trim();
 
         const resolvedFishRefId = parsed.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (parsed.fishAudioReferenceId || '');
 
         return {
           ...parsed,
+          provider: parsed.provider || providerInfo.id,
           baseUrl: resolvedBaseUrl,
           apiKey: resolvedApiKey,
           model: resolvedModel,
-          provider: parsed.provider || 'openrouter',
           ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio'),
           fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
           fishAudioReferenceId: resolvedFishRefId
@@ -111,15 +113,12 @@ export function App() {
       }
     }
 
-    const defaultKey = envOpenRouterKey || envDeepseekKey;
-    const defaultUrl = envOpenRouterKey ? 'https://openrouter.ai/api/v1' : envDeepseekKey ? 'https://api.deepseek.com' : 'https://openrouter.ai/api/v1';
-    const defaultModel = envDeepseekKey && !envOpenRouterKey ? 'deepseek-chat' : 'deepseek/deepseek-chat';
-
+    const initialProvider = envDeepseekKey ? getProviderById('deepseek') : AI_PROVIDERS[0];
     return {
-      provider: envDeepseekKey && !envOpenRouterKey ? 'deepseek' : 'openrouter',
-      baseUrl: defaultUrl,
-      apiKey: defaultKey,
-      model: defaultModel,
+      provider: initialProvider.id,
+      baseUrl: initialProvider.defaultBaseUrl,
+      apiKey: envDeepseekKey || envOpenRouterKey || '',
+      model: initialProvider.defaultModel,
       availableModels: [],
       ttsProvider: 'fish-audio',
       fishAudioApiKey: envFishAudioKey,
@@ -291,6 +290,9 @@ export function App() {
     let updateFrameId: number | null = null;
     let latestText = '';
 
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    const sessionSummary = currentSession?.summary;
+
     sendStreamingChatMessage(
       updatedMessages,
       currentPersona,
@@ -357,6 +359,32 @@ export function App() {
 
         soundService.playReceive();
         speakMessage(finalMsg);
+
+        // Background Episodic Memory Trigger (consolidates every 50 messages)
+        const allMessagesCount = updatedMessages.length + 1;
+        const lastIdx = currentSession?.lastSummarizedIndex ?? 0;
+        if (userProfile && activeSessionId && allMessagesCount - lastIdx >= 50) {
+          const messagesToConsolidate = [...updatedMessages, finalMsg];
+          generateEpisodicMemory(
+            messagesToConsolidate,
+            currentPersona,
+            apiConfig,
+            currentSession?.summary,
+            userProfile
+          ).then((newReflection) => {
+            if (newReflection && newReflection.trim()) {
+              const updatedSess = historyService.updateSessionSummary(
+                userProfile.id,
+                activeSessionId,
+                newReflection.trim(),
+                messagesToConsolidate.length
+              );
+              if (updatedSess) {
+                setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
+              }
+            }
+          });
+        }
       },
       (err) => {
         if (updateFrameId) {
@@ -367,7 +395,8 @@ export function App() {
         setIsLoading(false);
         addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
       },
-      userProfile
+      userProfile,
+      sessionSummary
     );
   };
 
@@ -429,6 +458,9 @@ export function App() {
 
     let updateFrameId: number | null = null;
     let latestText = '';
+
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    const sessionSummary = currentSession?.summary;
 
     sendStreamingChatMessage(
       trimmedHistory,
@@ -496,6 +528,32 @@ export function App() {
 
         soundService.playReceive();
         speakMessage(finalMsg);
+
+        // Background Episodic Memory Trigger (consolidates every 50 messages)
+        const allMessagesCount = trimmedHistory.length + 1;
+        const lastIdx = currentSession?.lastSummarizedIndex ?? 0;
+        if (userProfile && activeSessionId && allMessagesCount - lastIdx >= 50) {
+          const messagesToConsolidate = [...trimmedHistory, finalMsg];
+          generateEpisodicMemory(
+            messagesToConsolidate,
+            currentPersona,
+            apiConfig,
+            currentSession?.summary,
+            userProfile
+          ).then((newReflection) => {
+            if (newReflection && newReflection.trim()) {
+              const updatedSess = historyService.updateSessionSummary(
+                userProfile.id,
+                activeSessionId,
+                newReflection.trim(),
+                messagesToConsolidate.length
+              );
+              if (updatedSess) {
+                setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
+              }
+            }
+          });
+        }
       },
       (err) => {
         if (updateFrameId) {
@@ -506,7 +564,8 @@ export function App() {
         setIsLoading(false);
         addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
       },
-      userProfile
+      userProfile,
+      sessionSummary
     );
   };
 

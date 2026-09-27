@@ -99,6 +99,8 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  summary?: string;         // Episodic personal memory reflection
+  lastSummarizedIndex?: number; // Last message index consolidated into summary
 }
 
 
