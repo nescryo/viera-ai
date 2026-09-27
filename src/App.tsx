@@ -15,6 +15,7 @@ import { LoginModal } from './components/ui/LoginModal';
 import { SetupOnboardingModal } from './components/ui/SetupOnboardingModal';
 import { ConversationHistoryModal } from './components/ui/ConversationHistoryModal';
 import { UserProfileModal } from './components/ui/UserProfileModal';
+import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ToastContainer } from './components/ui/Toast';
 import type { ToastMessage } from './components/ui/Toast';
 import { Scene } from './components/3d/Scene';
@@ -23,8 +24,14 @@ import { soundService } from './services/soundService';
 import './App.css';
 
 export function App() {
-  // Single dedicated 3D Roleplay Character: Firefly
-  const [currentPersona] = useState<Persona>(FIREFLY_PERSONA);
+  // Single dedicated 3D Roleplay Character: Firefly with persistent custom lore
+  const [currentPersona, setCurrentPersona] = useState<Persona>(() => {
+    const savedLore = localStorage.getItem(`viera_custom_lore_${FIREFLY_PERSONA.id}`);
+    if (savedLore) {
+      return { ...FIREFLY_PERSONA, customLore: savedLore };
+    }
+    return FIREFLY_PERSONA;
+  });
   
   // User Authentication & Profile State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getCurrentUser());
@@ -39,6 +46,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showAlternativeMemory, setShowAlternativeMemory] = useState(false);
 
   // In-App Toast Notifications State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -64,6 +72,7 @@ export function App() {
         if (showSettings) { setShowSettings(false); return; }
         if (showHistory) { setShowHistory(false); return; }
         if (showProfile) { setShowProfile(false); return; }
+        if (showAlternativeMemory) { setShowAlternativeMemory(false); return; }
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
@@ -75,7 +84,7 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSettings, showHistory, showProfile, userProfile]);
+  }, [showSettings, showHistory, showProfile, showAlternativeMemory, userProfile]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -468,6 +477,26 @@ export function App() {
     executeStreamingChat(trimmedHistory);
   };
 
+  const handleUpdateCustomLore = (newLore: string) => {
+    const trimmed = newLore.trim();
+    if (trimmed) {
+      localStorage.setItem(`viera_custom_lore_${currentPersona.id}`, trimmed);
+    } else {
+      localStorage.removeItem(`viera_custom_lore_${currentPersona.id}`);
+    }
+    setCurrentPersona((prev) => ({
+      ...prev,
+      customLore: trimmed || undefined
+    }));
+    addToast(
+      'success',
+      'Lorebook Updated',
+      trimmed
+        ? 'Firefly has updated her lorebook with your background details.'
+        : 'Custom lorebook cleared. Firefly is operating strictly on pure canon lore.'
+    );
+  };
+
   const handleSelectEmotion = useCallback((emotion: string) => {
     setCurrentEmotion(emotion);
     if (userProfile && activeSessionId) {
@@ -493,6 +522,7 @@ export function App() {
         onOpenSettings={() => setShowSettings(true)}
         onOpenHistory={() => setShowHistory(true)}
         onOpenProfile={() => setShowProfile(true)}
+        onOpenAlternativeMemory={() => setShowAlternativeMemory(true)}
         apiConfig={apiConfig}
         userProfile={userProfile}
       />
@@ -504,6 +534,7 @@ export function App() {
         onRegenerateResponse={handleRegenerateResponse}
         onSpeakMessage={speakMessage}
         onStopSpeaking={stopSpeaking}
+        onOpenLorebook={() => setShowAlternativeMemory(true)}
         isSpeaking={isSpeaking}
         activeSpeakingId={activeSpeakingId}
         isLoading={isLoading}
@@ -529,6 +560,15 @@ export function App() {
           apiConfig={apiConfig}
           onSaveConfig={handleSaveConfig}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* 4. Alternative Memory & Custom Lore Modal */}
+      {showAlternativeMemory && (
+        <AlternativeMemoryModal
+          persona={currentPersona}
+          onSaveCustomLore={handleUpdateCustomLore}
+          onClose={() => setShowAlternativeMemory(false)}
         />
       )}
 

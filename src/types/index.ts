@@ -18,6 +18,7 @@ export interface Persona {
   tagline: string;
   greeting: string;
   systemPrompt: string;
+  customLore?: string; // User-defined alternative memory / custom scenario
   avatarUrl: string;
   voice: {
     pitch: number;

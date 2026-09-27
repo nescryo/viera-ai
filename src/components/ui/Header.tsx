@@ -8,6 +8,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenHistory: () => void;
   onOpenProfile: () => void;
+  onOpenAlternativeMemory?: () => void;
   apiConfig: ApiConfig;
   userProfile: UserProfile | null;
 }
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenHistory,
   onOpenProfile,
+  onOpenAlternativeMemory,
   apiConfig,
   userProfile
 }) => {
@@ -52,14 +54,22 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="divider-v" />
 
-        <div className="single-persona-chip">
+        <div 
+          className="single-persona-chip clickable-chip"
+          onClick={onOpenAlternativeMemory}
+          title="Click to view & edit character Lorebook"
+          role="button"
+          tabIndex={0}
+        >
           <div className="avatar-wrapper">
             <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="chip-avatar" />
             <Circle className="status-online" size={10} />
           </div>
           <div className="chip-info">
             <span className="chip-name">{currentPersona.name}</span>
-            <span className="chip-category">Active 3D Avatar</span>
+            <span className="chip-category">
+              {currentPersona.customLore?.trim() ? '✦ Lorebook Active' : 'Active 3D Avatar'}
+            </span>
           </div>
         </div>
       </div>

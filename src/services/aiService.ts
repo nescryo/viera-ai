@@ -227,6 +227,10 @@ export async function sendStreamingChatMessage(
     ? persona.systemPrompt
     : `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are engaging, expressive, and conversational.\nRespond naturally in character with warmth and genuine personality.`;
 
+  if (persona.customLore?.trim()) {
+    systemPrompt += `\n\n[USER-DEFINED LOREBOOK & BACKGROUND]:\n${persona.customLore.trim()}\n(Naturally weave these background details and shared history with the user into your roleplay while maintaining your core identity as ${persona.name}.)`;
+  }
+
   if (userName) {
     systemPrompt += `\nThe user's name is ${userName}.`;
   }

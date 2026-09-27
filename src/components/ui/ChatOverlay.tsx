@@ -13,6 +13,7 @@ interface ChatOverlayProps {
   onRegenerateResponse: () => void;
   onSpeakMessage: (msg: ChatMessage) => void;
   onStopSpeaking: () => void;
+  onOpenLorebook?: () => void;
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   isLoading: boolean;
@@ -126,6 +127,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   onRegenerateResponse,
   onSpeakMessage,
   onStopSpeaking,
+  onOpenLorebook,
   isSpeaking,
   activeSpeakingId,
   isLoading,
@@ -237,7 +239,13 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   return (
     <div className="chat-overlay-container glass-panel fade-in">
       <div className="chat-header-banner">
-        <div className="banner-left">
+        <div 
+          className="banner-left clickable-banner"
+          onClick={onOpenLorebook}
+          title="Click to view & edit character Lorebook"
+          role="button"
+          tabIndex={0}
+        >
           <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="banner-avatar" />
           <div className="banner-details">
             <h2 className="banner-name">{currentPersona.name}</h2>
@@ -257,7 +265,15 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
 
       <div className="chat-messages-feed">
         <div className="cai-welcome-card">
-          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-large-avatar" />
+          <img 
+            src={currentPersona.avatarUrl} 
+            alt={currentPersona.name} 
+            className="cai-large-avatar clickable-avatar" 
+            onClick={onOpenLorebook}
+            title="Click to view & edit character Lorebook"
+            role="button"
+            tabIndex={0}
+          />
           <h3 className="cai-welcome-title">{currentPersona.name}</h3>
           <p className="cai-welcome-tagline">{currentPersona.tagline}</p>
           <div className="cai-greeting-bubble">
