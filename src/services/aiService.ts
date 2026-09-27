@@ -1,4 +1,6 @@
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
+import { generatePromptEmotionRoster } from '../data/emotionRegistry';
+import { extractAndValidateExpression } from './expressionValidator';
 
 export interface ParsedDualOutput {
   emotions: string[];
@@ -196,7 +198,8 @@ export async function sendStreamingChatMessage(
   onComplete: (fullText: string, emotions: string[], actions: string[]) => void,
   onError: (err: any) => void,
   userProfile?: UserProfile | null,
-  sessionSummary?: string
+  sessionSummary?: string,
+  currentEmotion?: string
 ): Promise<void> {
   const normalizedBaseUrl = normalizeBaseUrl(apiConfig.baseUrl);
   const apiKey = (apiConfig.apiKey || '').trim();
@@ -222,7 +225,7 @@ export async function sendStreamingChatMessage(
 
   let systemPrompt = persona.systemPrompt?.trim()
     ? persona.systemPrompt
-    : `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are kind, expressive, and engaging.\nKeep responses conversational, sweet, and lively.`;
+    : `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are engaging, expressive, and conversational.\nRespond naturally in character with warmth and genuine personality.`;
 
   if (userName) {
     systemPrompt += `\nThe user's name is ${userName}.`;
@@ -234,7 +237,21 @@ export async function sendStreamingChatMessage(
     systemPrompt += `\n\n[YOUR MEMORIES & SHARED EXPERIENCES WITH ${userName || 'THE USER'}]:\n${sessionSummary.trim()}\n(Naturally weave these shared memories, inside jokes, and mutual moments into your responses when relevant.)`;
   }
 
-  systemPrompt += `\n\n[CONVERSATION STYLE]:\n- Express emotion and personality naturally through words, tone, and dialogue rather than relying on emoji decorations.\n- Use emojis sparingly and with restraint. Do not include emojis in every message or sentence; use them only occasionally when truly fitting, or omit them entirely.`;
+  const activeEmotion = currentEmotion?.trim() || 'relaxed';
+  const emotionRoster = generatePromptEmotionRoster();
+
+  systemPrompt += `\n\n[3D VISUAL EMOTIONS & EXPRESSION SYSTEM]:
+Your 3D avatar actively reflects your emotional reactions in real-time.
+Current mood: "${activeEmotion}".
+
+Whenever your feelings naturally change in reaction to the conversation—such as feeling happy, playful, shy, flustered, sulking, or startled—begin your response with the matching tag to animate your avatar:
+${emotionRoster}
+
+(If your current mood remains unchanged, simply reply directly without an emotion tag.)`;
+
+  systemPrompt += `\n\n[CONVERSATION STYLE]:
+- Express emotion and nuance organically through dialogue, tone, and character voice rather than heavy emoji decoration.
+- Emojis may be used occasionally when they genuinely fit the moment, but prioritize natural spoken dialogue.`;
 
   const systemMessage = {
     role: 'system',
@@ -292,18 +309,30 @@ export async function sendStreamingChatMessage(
 }
 
 /**
- * Temporary clean token parsers for UI rendering
+ * Robust token parser utilizing the canonical emotion registry validator
  */
-export function parseResponseText(_text: string): { emotions: string[]; actions: string[] } {
-  return { emotions: ['happy'], actions: [] };
+export function parseResponseText(text: string): { emotions: string[]; actions: string[]; cleanText: string } {
+  const { emotion, cleanText } = extractAndValidateExpression(text);
+  const actionRegex = /\*(.*?)\*/g;
+  const actions: string[] = [];
+  let match;
+  while ((match = actionRegex.exec(cleanText)) !== null) {
+    actions.push(match[1]);
+  }
+  return {
+    emotions: emotion ? [emotion] : [],
+    actions,
+    cleanText
+  };
 }
 
 export function parseDualOutputResponse(text: string): ParsedDualOutput {
+  const { emotions, actions, cleanText } = parseResponseText(text);
   return {
-    emotions: ['happy'],
-    actions: [],
-    jaText: text,
-    enText: text
+    emotions,
+    actions,
+    jaText: cleanText,
+    enText: cleanText
   };
 }
 

@@ -139,6 +139,33 @@ export function updateSessionSummary(
   return updatedSession;
 }
 
+export function updateSessionEmotion(
+  userId: string,
+  sessionId: string,
+  currentEmotion: string
+): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  let updatedSession: ChatSession | null = null;
+
+  const newSessions = sessions.map((s) => {
+    if (s.id === sessionId) {
+      updatedSession = {
+        ...s,
+        currentEmotion,
+        updatedAt: Date.now()
+      };
+      return updatedSession;
+    }
+    return s;
+  });
+
+  if (updatedSession) {
+    saveSessions(userId, newSessions);
+  }
+  return updatedSession;
+}
+
 export function getSession(userId: string, sessionId: string): ChatSession | null {
   if (!userId || !sessionId) return null;
   const sessions = getSessions(userId);

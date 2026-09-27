@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
 import { FIREFLY_PERSONA } from './data/personas';
-import { sendStreamingChatMessage, parseResponseText, parseDualOutputResponse, generateEpisodicMemory } from './services/aiService';
+import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
+import { DEFAULT_EMOTION_ID } from './data/emotionRegistry';
 import { ttsService } from './services/ttsService';
 import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
 import * as historyService from './services/historyService';
@@ -79,7 +80,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<string>('relaxed');
+  const [currentEmotion, setCurrentEmotion] = useState<string>(DEFAULT_EMOTION_ID);
 
   // API Configuration (Auto-detects keys from .env or localStorage)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
@@ -151,6 +152,9 @@ export function App() {
         setActiveSessionId(currentActiveId);
         const activeSess = userSessions.find((s) => s.id === currentActiveId);
         setMessages(activeSess ? activeSess.messages : []);
+        if (activeSess?.currentEmotion) {
+          setCurrentEmotion(activeSess.currentEmotion);
+        }
       }
     } else {
       setSessions([]);
@@ -215,6 +219,9 @@ export function App() {
 
     const target = sessions.find((s) => s.id === sessionId);
     setMessages(target ? target.messages : []);
+    if (target?.currentEmotion) {
+      setCurrentEmotion(target.currentEmotion);
+    }
     setShowHistory(false); // Auto-close history modal on selection!
   };
 
@@ -225,6 +232,7 @@ export function App() {
     setSessions(updatedSessions);
     setActiveSessionId(newSess.id);
     setMessages([]);
+    setCurrentEmotion(DEFAULT_EMOTION_ID);
     setShowHistory(false); // Auto-close history modal!
   };
 
@@ -244,10 +252,12 @@ export function App() {
       setSessions([newSess]);
       setActiveSessionId(newSess.id);
       setMessages([]);
+      setCurrentEmotion(DEFAULT_EMOTION_ID);
     } else if (activeSessionId === sessionId) {
       const nextActive = remaining[0];
       setActiveSessionId(nextActive.id);
       setMessages(nextActive.messages);
+      setCurrentEmotion(nextActive.currentEmotion || DEFAULT_EMOTION_ID);
     }
   };
 
@@ -258,19 +268,10 @@ export function App() {
     setSessions([newSess]);
     setActiveSessionId(newSess.id);
     setMessages([]);
+    setCurrentEmotion(DEFAULT_EMOTION_ID);
   };
 
-  const handleSendMessage = async (text: string) => {
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      sender: 'user',
-      characterId: currentPersona.id,
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    const updatedMessages = [...messages, userMsg];
-    syncMessagesToSession(updatedMessages);
+  const executeStreamingChat = (contextMessages: ChatMessage[]) => {
     setIsLoading(true);
 
     const aiMsgId = (Date.now() + 1).toString();
@@ -284,7 +285,7 @@ export function App() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    const messagesWithPlaceholder = [...updatedMessages, placeholderAiMsg];
+    const messagesWithPlaceholder = [...contextMessages, placeholderAiMsg];
     syncMessagesToSession(messagesWithPlaceholder);
 
     let updateFrameId: number | null = null;
@@ -292,15 +293,16 @@ export function App() {
 
     const currentSession = sessions.find((s) => s.id === activeSessionId);
     const sessionSummary = currentSession?.summary;
+    const sessionEmotion = currentSession?.currentEmotion || currentEmotion;
 
     sendStreamingChatMessage(
-      updatedMessages,
+      contextMessages,
       currentPersona,
       apiConfig,
       (_token, fullTextSoFar) => {
         latestText = fullTextSoFar;
         const { emotions } = parseResponseText(fullTextSoFar);
-        
+
         if (emotions.length > 0) {
           const activeEmotion = emotions[emotions.length - 1];
           setCurrentEmotion(activeEmotion);
@@ -309,14 +311,17 @@ export function App() {
         if (!updateFrameId) {
           updateFrameId = requestAnimationFrame(() => {
             updateFrameId = null;
-            const { emotions: currEmotions, actions: currActions, enText, jaText } = parseDualOutputResponse(latestText);
-            const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
-            const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
-            const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
+            const parsed = parseResponseText(latestText);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === aiMsgId
-                  ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
+                  ? {
+                      ...msg,
+                      text: parsed.cleanText,
+                      originalText: parsed.cleanText,
+                      emotions: parsed.emotions,
+                      actions: parsed.actions
+                    }
                   : msg
               )
             );
@@ -329,22 +334,27 @@ export function App() {
           updateFrameId = null;
         }
         setIsLoading(false);
-        const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
-        const activeEmotion = emotions.length > 0 ? emotions[emotions.length - 1] : 'happy';
-        setCurrentEmotion(activeEmotion);
-
-        const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';
-        const actionHeader = actions.length > 0 ? `*${actions[0]}* ` : '';
-        const uiDisplayText = `${emotionHeader}${actionHeader}${enText}`;
+        const { emotions, actions, cleanText } = parseResponseText(fullText);
+        let finalEmotion = currentEmotion;
+        if (emotions.length > 0) {
+          finalEmotion = emotions[emotions.length - 1];
+          setCurrentEmotion(finalEmotion);
+          if (userProfile && activeSessionId) {
+            historyService.updateSessionEmotion(userProfile.id, activeSessionId, finalEmotion);
+            setSessions((prev) =>
+              prev.map((s) => (s.id === activeSessionId ? { ...s, currentEmotion: finalEmotion } : s))
+            );
+          }
+        }
 
         const finalMsg: ChatMessage = {
           id: aiMsgId,
           sender: 'ai',
           characterId: currentPersona.id,
-          text: uiDisplayText,
-          originalText: jaText,
+          text: cleanText || fullText,
+          originalText: cleanText || fullText,
           rawText: fullText,
-          emotions,
+          emotions: emotions.length > 0 ? emotions : [finalEmotion],
           actions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
@@ -361,10 +371,10 @@ export function App() {
         speakMessage(finalMsg);
 
         // Background Episodic Memory Trigger (consolidates every 50 messages)
-        const allMessagesCount = updatedMessages.length + 1;
+        const allMessagesCount = contextMessages.length + 1;
         const lastIdx = currentSession?.lastSummarizedIndex ?? 0;
         if (userProfile && activeSessionId && allMessagesCount - lastIdx >= 50) {
-          const messagesToConsolidate = [...updatedMessages, finalMsg];
+          const messagesToConsolidate = [...contextMessages, finalMsg];
           generateEpisodicMemory(
             messagesToConsolidate,
             currentPersona,
@@ -396,8 +406,24 @@ export function App() {
         addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
       },
       userProfile,
-      sessionSummary
+      sessionSummary,
+      sessionEmotion
     );
+  };
+
+  const handleSendMessage = (text: string) => {
+    if (!text.trim() || isLoading) return;
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      characterId: currentPersona.id,
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    const updatedMessages = [...messages, userMsg];
+    executeStreamingChat(updatedMessages);
   };
 
   const speakMessage = (msg: ChatMessage) => {
@@ -427,7 +453,7 @@ export function App() {
 
   const handleRegenerateResponse = () => {
     if (messages.length === 0 || isLoading) return;
-    
+
     let lastUserIndex = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].sender === 'user') {
@@ -439,139 +465,18 @@ export function App() {
     if (lastUserIndex === -1) return;
 
     const trimmedHistory = messages.slice(0, lastUserIndex + 1);
-    syncMessagesToSession(trimmedHistory);
-    setIsLoading(true);
-
-    const aiMsgId = (Date.now() + 1).toString();
-    const placeholderAiMsg: ChatMessage = {
-      id: aiMsgId,
-      sender: 'ai',
-      characterId: currentPersona.id,
-      text: '',
-      emotions: [],
-      actions: [],
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    const messagesWithPlaceholder = [...trimmedHistory, placeholderAiMsg];
-    syncMessagesToSession(messagesWithPlaceholder);
-
-    let updateFrameId: number | null = null;
-    let latestText = '';
-
-    const currentSession = sessions.find((s) => s.id === activeSessionId);
-    const sessionSummary = currentSession?.summary;
-
-    sendStreamingChatMessage(
-      trimmedHistory,
-      currentPersona,
-      apiConfig,
-      (_token, fullTextSoFar) => {
-        latestText = fullTextSoFar;
-        const { emotions } = parseResponseText(fullTextSoFar);
-        
-        if (emotions.length > 0) {
-          const activeEmotion = emotions[emotions.length - 1];
-          setCurrentEmotion(activeEmotion);
-        }
-
-        if (!updateFrameId) {
-          updateFrameId = requestAnimationFrame(() => {
-            updateFrameId = null;
-            const { emotions: currEmotions, actions: currActions, enText, jaText } = parseDualOutputResponse(latestText);
-            const emotionHeader = currEmotions.length > 0 ? `[${currEmotions[0]}] ` : '';
-            const actionHeader = currActions.length > 0 ? `*${currActions[0]}* ` : '';
-            const displayText = `${emotionHeader}${actionHeader}${enText || latestText}`;
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiMsgId
-                  ? { ...msg, text: displayText, originalText: jaText || latestText, emotions: currEmotions, actions: currActions }
-                  : msg
-              )
-            );
-          });
-        }
-      },
-      (fullText) => {
-        if (updateFrameId) {
-          cancelAnimationFrame(updateFrameId);
-          updateFrameId = null;
-        }
-        setIsLoading(false);
-        const { emotions, actions, jaText, enText } = parseDualOutputResponse(fullText);
-        const activeEmotion = emotions.length > 0 ? emotions[emotions.length - 1] : 'happy';
-        setCurrentEmotion(activeEmotion);
-
-        const emotionHeader = emotions.length > 0 ? `[${emotions[0]}] ` : '';
-        const actionHeader = actions.length > 0 ? `*${actions[0]}* ` : '';
-        const uiDisplayText = `${emotionHeader}${actionHeader}${enText}`;
-
-        const finalMsg: ChatMessage = {
-          id: aiMsgId,
-          sender: 'ai',
-          characterId: currentPersona.id,
-          text: uiDisplayText,
-          originalText: jaText,
-          rawText: fullText,
-          emotions,
-          actions,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-
-        setMessages((prev) => {
-          const next = prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg));
-          if (userProfile && activeSessionId) {
-            historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-          }
-          return next;
-        });
-
-        soundService.playReceive();
-        speakMessage(finalMsg);
-
-        // Background Episodic Memory Trigger (consolidates every 50 messages)
-        const allMessagesCount = trimmedHistory.length + 1;
-        const lastIdx = currentSession?.lastSummarizedIndex ?? 0;
-        if (userProfile && activeSessionId && allMessagesCount - lastIdx >= 50) {
-          const messagesToConsolidate = [...trimmedHistory, finalMsg];
-          generateEpisodicMemory(
-            messagesToConsolidate,
-            currentPersona,
-            apiConfig,
-            currentSession?.summary,
-            userProfile
-          ).then((newReflection) => {
-            if (newReflection && newReflection.trim()) {
-              const updatedSess = historyService.updateSessionSummary(
-                userProfile.id,
-                activeSessionId,
-                newReflection.trim(),
-                messagesToConsolidate.length
-              );
-              if (updatedSess) {
-                setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
-              }
-            }
-          });
-        }
-      },
-      (err) => {
-        if (updateFrameId) {
-          cancelAnimationFrame(updateFrameId);
-          updateFrameId = null;
-        }
-        console.error("Streaming error:", err);
-        setIsLoading(false);
-        addToast('error', 'AI Gateway Error', 'Failed to retrieve response from AI engine. Please verify your connection or API key.');
-      },
-      userProfile,
-      sessionSummary
-    );
+    executeStreamingChat(trimmedHistory);
   };
 
   const handleSelectEmotion = useCallback((emotion: string) => {
     setCurrentEmotion(emotion);
-  }, []);
+    if (userProfile && activeSessionId) {
+      historyService.updateSessionEmotion(userProfile.id, activeSessionId, emotion);
+      setSessions((prev) =>
+        prev.map((s) => (s.id === activeSessionId ? { ...s, currentEmotion: emotion } : s))
+      );
+    }
+  }, [userProfile, activeSessionId]);
 
   return (
     <div className="app-container">

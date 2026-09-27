@@ -101,6 +101,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   summary?: string;         // Episodic personal memory reflection
   lastSummarizedIndex?: number; // Last message index consolidated into summary
+  currentEmotion?: string;  // Active persistent mood / emotional state
 }
 
 
