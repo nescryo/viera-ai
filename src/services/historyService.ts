@@ -1,4 +1,4 @@
-import type { ApiProvider, ChatMessage, ChatSession } from '../types';
+import type { ChatMessage, ChatSession } from '../types';
 
 function getSessionsKey(userId: string): string {
   return `viera_sessions_${userId}`;
@@ -47,7 +47,7 @@ export function setActiveSessionId(userId: string, sessionId: string): void {
   localStorage.setItem(getActiveSessionKey(userId), sessionId);
 }
 
-export function createSession(userId: string, characterId: string = 'firefly', provider: ApiProvider = 'deepseek'): ChatSession {
+export function createSession(userId: string, characterId: string = 'firefly', provider: string = 'universal'): ChatSession {
   const newSession: ChatSession = {
     id: Date.now().toString(),
     title: 'New conversation',
@@ -108,6 +108,68 @@ export function updateSessionTitle(userId: string, sessionId: string, newTitle: 
   const sessions = getSessions(userId);
   const updated = sessions.map((s) => (s.id === sessionId ? { ...s, title: newTitle, updatedAt: Date.now() } : s));
   saveSessions(userId, updated);
+}
+
+export function updateSessionSummary(
+  userId: string,
+  sessionId: string,
+  summary: string,
+  lastSummarizedIndex: number
+): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  let updatedSession: ChatSession | null = null;
+
+  const newSessions = sessions.map((s) => {
+    if (s.id === sessionId) {
+      updatedSession = {
+        ...s,
+        summary,
+        lastSummarizedIndex,
+        updatedAt: Date.now()
+      };
+      return updatedSession;
+    }
+    return s;
+  });
+
+  if (updatedSession) {
+    saveSessions(userId, newSessions);
+  }
+  return updatedSession;
+}
+
+export function updateSessionEmotion(
+  userId: string,
+  sessionId: string,
+  currentEmotion: string
+): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  let updatedSession: ChatSession | null = null;
+
+  const newSessions = sessions.map((s) => {
+    if (s.id === sessionId) {
+      updatedSession = {
+        ...s,
+        currentEmotion,
+        updatedAt: Date.now()
+      };
+      return updatedSession;
+    }
+    return s;
+  });
+
+  if (updatedSession) {
+    saveSessions(userId, newSessions);
+  }
+  return updatedSession;
+}
+
+export function getSession(userId: string, sessionId: string): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  return sessions.find((s) => s.id === sessionId) || null;
 }
 
 export function deleteSession(userId: string, sessionId: string): ChatSession[] {

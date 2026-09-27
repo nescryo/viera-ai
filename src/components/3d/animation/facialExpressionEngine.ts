@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BlinkState } from './types';
+import { getEmotionCapability } from '../../../data/emotionRegistry';
 
 /**
  * AIRI-inspired Facial Expression, Auto-Blink & Lip-Sync Engine
@@ -269,14 +270,15 @@ export class FacialExpressionEngine {
       }
     }
 
-    // 6. CHEEK BLUSH & FOREHEAD SHADOW OVERLAY MATERIALS
-    const targetCheekOpacity = emotion === 'blush-hardly' ? 0.38 : (emotion === 'blush' ? 0.24 : (emotion === 'pouting' ? 0.22 : (emotion === 'teasing' ? 0.12 : (emotion === 'happy' ? 0.06 : 0))));
+    // 6. CHEEK BLUSH & FOREHEAD SHADOW OVERLAY MATERIALS (Driven by Emotion Registry visualTraits)
+    const emotionCap = getEmotionCapability(emotion);
+    const targetCheekOpacity = emotionCap?.visualTraits?.blushIntensity ?? 0;
     cheekMaterials.forEach((mat) => {
       mat.opacity += (targetCheekOpacity - mat.opacity) * 0.15;
       mat.visible = mat.opacity > 0.01;
     });
 
-    const targetForeheadOpacity = emotion === 'terrified' ? 0.90 : 0;
+    const targetForeheadOpacity = emotionCap?.visualTraits?.foreheadShadow ? 0.90 : 0;
     if (foreheadMaterial) {
       foreheadMaterial.opacity += (targetForeheadOpacity - foreheadMaterial.opacity) * 0.15;
     }

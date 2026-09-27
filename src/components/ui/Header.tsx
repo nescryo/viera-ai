@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import type { Persona, ApiConfig, UserProfile } from '../../types';
 import { Settings, Sparkles, Circle, MessageSquare, User } from 'lucide-react';
-import { checkLmStudioConnection } from '../../services/aiService';
+import { checkEndpointOnline } from '../../services/aiService';
 
 interface HeaderProps {
   currentPersona: Persona;
   onOpenSettings: () => void;
   onOpenHistory: () => void;
   onOpenProfile: () => void;
+  onOpenAlternativeMemory?: () => void;
   apiConfig: ApiConfig;
   userProfile: UserProfile | null;
 }
@@ -17,29 +18,29 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenHistory,
   onOpenProfile,
+  onOpenAlternativeMemory,
   apiConfig,
   userProfile
 }) => {
-  const [isLmStudioOnline, setIsLmStudioOnline] = useState<boolean>(false);
+  const [isEndpointOnline, setIsEndpointOnline] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
     const checkConnection = async () => {
-      if (apiConfig.provider === 'lmstudio') {
-        const online = await checkLmStudioConnection(apiConfig.lmStudioUrl);
-        if (isMounted) setIsLmStudioOnline(online);
-      } else {
-        if (isMounted) setIsLmStudioOnline(false);
-      }
+      const url = apiConfig.baseUrl || apiConfig.lmStudioUrl || 'https://openrouter.ai/api/v1';
+      const online = await checkEndpointOnline(url);
+      if (isMounted) setIsEndpointOnline(online);
     };
 
     checkConnection();
-    const interval = setInterval(checkConnection, 5000);
+    const interval = setInterval(checkConnection, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [apiConfig]);
+  }, [apiConfig.baseUrl, apiConfig.lmStudioUrl]);
+
+  const activeModelDisplay = apiConfig.model ? apiConfig.model.split('/').pop() : 'AI Model';
 
   return (
     <header className="header-container glass-panel">
@@ -53,30 +54,35 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="divider-v" />
 
-        <div className="single-persona-chip">
+        <div 
+          className="single-persona-chip clickable-chip"
+          onClick={onOpenAlternativeMemory}
+          title="Click to view & edit character Lorebook"
+          role="button"
+          tabIndex={0}
+        >
           <div className="avatar-wrapper">
             <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="chip-avatar" />
             <Circle className="status-online" size={10} />
           </div>
           <div className="chip-info">
             <span className="chip-name">{currentPersona.name}</span>
-            <span className="chip-category">Active 3D Avatar</span>
+            <span className="chip-category">
+              {currentPersona.customLore?.trim() ? '✦ Lorebook Active' : 'Active 3D Avatar'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Right: 3D Model Loader, History, Settings & Profile */}
       <div className="header-right">
-        <div className={`provider-pill ${apiConfig.provider === 'deepseek' ? 'online' : isLmStudioOnline ? 'online' : 'offline'}`}>
-          <span className={`provider-dot ${apiConfig.provider === 'deepseek' ? 'dot-online' : isLmStudioOnline ? 'dot-online' : 'dot-offline'}`} />
+        <div 
+          className={`provider-pill ${isEndpointOnline ? 'online' : 'offline'}`}
+          title={`Endpoint: ${apiConfig.baseUrl || 'https://openrouter.ai/api/v1'}\nModel: ${apiConfig.model || 'Default'}`}
+        >
+          <span className={`provider-dot ${isEndpointOnline ? 'dot-online' : 'dot-offline'}`} />
           <span className="provider-name">
-            {apiConfig.provider === 'deepseek'
-              ? 'DeepSeek AI (Cloud)'
-              : apiConfig.provider === 'lmstudio'
-              ? isLmStudioOnline
-                ? 'LM Studio (Connected :1234)'
-                : 'LM Studio (Offline • Mock Mode)'
-              : 'Demo RP Engine'}
+            {activeModelDisplay}
           </span>
         </div>
 

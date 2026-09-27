@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import type { ApiConfig, Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
+import { EMOTION_REGISTRY, isRegisteredEmotion, DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 
 if (typeof window !== 'undefined') {
   (window as any).MMDParser = MMDParser;
@@ -19,19 +20,7 @@ interface SceneProps {
   apiConfig?: ApiConfig;
 }
 
-const TESTING_EMOTIONS = [
-  { id: 'happy', label: 'Happy' },
-  { id: 'blush', label: 'Blush' },
-  { id: 'blush-hardly', label: 'Blush Hardly' },
-  { id: 'teasing', label: 'Teasing' },
-  { id: 'jealous', label: 'Jealous' },
-  { id: 'terrified', label: 'Terrified' },
-  { id: 'pouting', label: 'Pouting' },
-  { id: 'relaxed', label: 'Relaxed' },
-  { id: 'surprised', label: 'Surprised' },
-  { id: 'angry', label: 'Angry' },
-  { id: 'sad', label: 'Sad' }
-];
+const TESTING_EMOTIONS = EMOTION_REGISTRY;
 
 
 
@@ -826,19 +815,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       const delta = Math.min(clock.getDelta(), 0.05);
       const elapsedTime = clock.elapsedTime;
       
-      // Normalize & Map Emotion Tags cleanly
-      const rawEmo = (currentEmotionRef.current || 'relaxed').toLowerCase().trim();
-      let emo = rawEmo;
-      if (rawEmo === 'smirk' || rawEmo === 'excited') emo = 'happy';
-      else if (rawEmo === 'determined') emo = 'angry';
-      else if (rawEmo === 'shy' || rawEmo === 'embarrassed') emo = 'blush';
-      else if (rawEmo === 'flustered' || rawEmo === 'crimson' || rawEmo === 'blush_hardly' || rawEmo === 'hard_blush') emo = 'blush-hardly';
-      else if (rawEmo === 'playful' || rawEmo === 'tease' || rawEmo === 'proud' || rawEmo === 'smug') emo = 'teasing';
-      else if (rawEmo === 'envious') emo = 'jealous';
-      else if (rawEmo === 'panic' || rawEmo === 'scared') emo = 'terrified';
-      else if (rawEmo === 'sulk' || rawEmo === 'sulking') emo = 'pouting';
-      else if (rawEmo === 'calm' || rawEmo === 'peaceful' || rawEmo === 'neutral') emo = 'relaxed';
-      else if (rawEmo === 'shocked') emo = 'surprised';
+      // 3D Visual Emotion State (Strict Canonical ID from Registry)
+      const rawEmo = currentEmotionRef.current?.toLowerCase().trim();
+      const emo = isRegisteredEmotion(rawEmo) ? rawEmo : DEFAULT_EMOTION_ID;
 
       // Lightweight Hover Cursor Check (0.0001ms execution time)
       if (containerRef.current) {

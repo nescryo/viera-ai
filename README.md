@@ -90,4 +90,5 @@ npm run preview   # Preview the production build locally
 ## Disclaimer & License
 
 - The 3D character **Firefly** and *Honkai: Star Rail* are trademarks and intellectual property of **miHoYo / HoYoverse**. All related character assets are used strictly under non-commercial fan-creation fair use guidelines.
+- Heavily inspired by [AIRI (Moeru AI)](https://github.com/moeru-ai/airi)
 - The source code of this project is released under the [MIT License](LICENSE).

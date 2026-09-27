@@ -18,6 +18,7 @@ export interface Persona {
   tagline: string;
   greeting: string;
   systemPrompt: string;
+  customLore?: string; // User-defined alternative memory / custom scenario
   avatarUrl: string;
   voice: {
     pitch: number;
@@ -27,18 +28,48 @@ export interface Persona {
   category: 'Honkai: Star Rail' | 'Anime & Gaming' | 'Original';
 }
 
-export type ApiProvider = 'deepseek' | 'lmstudio' | 'gemini' | 'openrouter' | 'mock';
-
-export type TtsProvider = 'fish-audio' | 'edge' | 'custom' | 'webspeech';
+export type TtsMode = 'follow-chat' | 'japanese-dub';
+export type TtsEngineProvider = 'fish-audio' | 'universal' | 'edge' | 'custom';
+export type TtsNormalProvider = TtsEngineProvider;
+export type TtsJpProvider = TtsEngineProvider;
+export type TtsProvider = 'fish-audio' | 'edge' | 'custom' | 'webspeech' | 'universal';
 
 export interface ApiConfig {
-  provider: ApiProvider;
-  lmStudioUrl: string;
-  lmStudioModel: string;
+  // Universal OpenAI-Compatible Gateway
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  availableModels?: string[];
+
+  // Optional legacy fields for backward compatibility
+  provider?: string;
+  lmStudioUrl?: string;
+  lmStudioModel?: string;
   deepseekApiKey?: string;
   deepseekModel?: string;
-  openRouterApiKey: string;
-  openRouterModel: string;
+  openRouterApiKey?: string;
+  openRouterModel?: string;
+
+  // Speech Output Mode
+  ttsMode?: TtsMode;
+
+  // Normal (Chat Language) TTS Configuration
+  normalTtsProvider?: TtsNormalProvider;
+  normalTtsUrl?: string;
+  normalTtsApiKey?: string;
+  normalTtsModel?: string;
+  normalTtsVoice?: string;
+  normalTtsReferenceId?: string;
+
+  // Japanese Dubbing (JP) TTS Configuration
+  jpTtsProvider?: TtsJpProvider;
+  jpTtsUrl?: string;
+  jpTtsApiKey?: string;
+  jpTtsModel?: string;
+  jpTtsVoice?: string;
+  jpTtsReferenceId?: string;
+
+  // Legacy TTS fields for seamless backward compatibility
   ttsProvider?: TtsProvider;
   fishAudioApiKey?: string;
   fishAudioReferenceId?: string;
@@ -65,9 +96,13 @@ export interface ChatSession {
   id: string;               // Session UUID / Timestamp
   title: string;            // Conversation Title
   characterId: string;      // Character ID ('firefly')
-  provider: ApiProvider;    // Active LLM provider
+  provider?: string;        // Active model or provider tag
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  summary?: string;         // Episodic personal memory reflection
+  lastSummarizedIndex?: number; // Last message index consolidated into summary
+  currentEmotion?: string;  // Active persistent mood / emotional state
 }
+
 
