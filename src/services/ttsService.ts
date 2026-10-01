@@ -78,10 +78,11 @@ class TTSService {
       apiConfig?.openRouterApiKey?.trim()
     );
 
-    const isExplicitWebSpeech = apiConfig?.ttsProvider === 'edge' || apiConfig?.ttsProvider === 'webspeech';
+    const isExplicitWebSpeech = apiConfig?.ttsProvider === 'webspeech';
+    const isEdgeProvider = apiConfig?.ttsProvider === 'edge';
 
-    // If user explicitly chose Edge/WebSpeech or no network API key is provided, use Web Speech API
-    if (isExplicitWebSpeech || !hasNetworkKey) {
+    // If user explicitly chose WebSpeech or (no network API key is provided and not edge provider), use Web Speech API
+    if (isExplicitWebSpeech || (!hasNetworkKey && !isEdgeProvider)) {
       this.isFallbackSpeaking = true;
       const started = speakWebSpeechFallback(
         targetText,

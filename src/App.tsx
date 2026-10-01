@@ -328,6 +328,7 @@ export function App() {
                       ...msg,
                       text: parsed.cleanText,
                       originalText: parsed.cleanText,
+                      jaText: parsed.jaText,
                       emotions: parsed.emotions,
                       actions: parsed.actions
                     }
@@ -343,7 +344,7 @@ export function App() {
           updateFrameId = null;
         }
         setIsLoading(false);
-        const { emotions, actions, cleanText } = parseResponseText(fullText);
+        const { emotions, actions, cleanText, jaText } = parseResponseText(fullText);
         let finalEmotion = currentEmotion;
         if (emotions.length > 0) {
           finalEmotion = emotions[emotions.length - 1];
@@ -363,6 +364,7 @@ export function App() {
           text: cleanText || fullText,
           originalText: cleanText || fullText,
           rawText: fullText,
+          jaText,
           emotions: emotions.length > 0 ? emotions : [finalEmotion],
           actions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -439,8 +441,11 @@ export function App() {
     setActiveSpeakingId(msg.id);
     setIsSpeaking(true);
 
+    const isJapaneseMode = apiConfig.ttsMode === 'japanese-dub';
+    const textToSpeak = isJapaneseMode && msg.jaText ? msg.jaText : (msg.originalText || msg.text);
+
     ttsService.speak(
-      msg.originalText || msg.text,
+      textToSpeak,
       currentPersona,
       () => {
         setIsSpeaking(true);

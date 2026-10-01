@@ -7,6 +7,7 @@ export interface ChatMessage {
   text: string;
   originalText?: string;
   rawText?: string;
+  jaText?: string;
   emotions?: string[];
   actions?: string[];
   timestamp: string;
