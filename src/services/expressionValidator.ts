@@ -12,6 +12,8 @@ export interface ParsedExpressionResult {
   hasTag: boolean;
   /** Raw tag string if detected */
   rawTag: string | null;
+  /** True if an opening bracket is actively streaming without having emitted a closing bracket */
+  isStreamingTag?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ export interface ParsedExpressionResult {
  */
 export function extractAndValidateExpression(rawText: string): ParsedExpressionResult {
   if (!rawText) {
-    return { emotion: null, cleanText: '', hasTag: false, rawTag: null };
+    return { emotion: null, cleanText: '', hasTag: false, rawTag: null, isStreamingTag: false };
   }
 
   // Handle optional reasoning block from thinking models: <think>...</think>
@@ -36,7 +38,7 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
     workingText = workingText.slice(thinkMatch[0].length);
   } else if (/^\s*<think>/i.test(workingText)) {
     // Model is currently streaming internal reasoning; mask from dialogue UI
-    return { emotion: null, cleanText: '', hasTag: false, rawTag: null };
+    return { emotion: null, cleanText: '', hasTag: false, rawTag: null, isStreamingTag: true };
   }
 
   // Detect unclosed tag at front while streaming (e.g. "[", "[hap", "[emotion:blu")
@@ -45,8 +47,9 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
     return {
       emotion: null,
       cleanText: '',
-      hasTag: false,
-      rawTag: null
+      hasTag: true,
+      rawTag: null,
+      isStreamingTag: true
     };
   }
 
@@ -66,6 +69,17 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
   const rawCandidate = match[1];
   const normalizedCandidate = rawCandidate.toLowerCase().replace(/_/g, '-');
   const cleanText = workingText.slice(match[0].length);
+
+  // If candidate is a dubbing tag ([ja] or [ja: ...]), do not strip it as an invalid emotion!
+  // Leave untouched so dubbingValidator can process it
+  if (normalizedCandidate === 'ja' || normalizedCandidate.startsWith('ja:')) {
+    return {
+      emotion: null,
+      cleanText: workingText.trimStart(),
+      hasTag: false,
+      rawTag: null
+    };
+  }
 
   if (isRegisteredEmotion(normalizedCandidate)) {
     return {
