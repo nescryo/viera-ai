@@ -10,7 +10,23 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
   const provider = apiConfig?.ttsProvider || 'fish-audio';
 
   // ==========================================
-  // PATH 1: FISH AUDIO S2.1 PRO
+  // Local VITS / Edge-TTS Server (for offline testing)
+  // ==========================================
+  if (provider === 'edge') {
+    const character = encodeURIComponent(options.persona?.name || 'Character');
+    const encodedText = encodeURIComponent(text);
+    const localUrl = `http://localhost:5000/tts?text=${encodedText}&character=${character}`;
+
+    const res = await fetch(localUrl, { signal });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Local VITS / Edge-TTS Server HTTP ${res.status}: ${errText || res.statusText}`);
+    }
+    return res.arrayBuffer();
+  }
+
+  // ==========================================
+  // FISH AUDIO
   // ==========================================
   if (provider === 'fish-audio') {
     const directApiKey = (apiConfig?.fishAudioApiKey || '').trim();
@@ -89,7 +105,7 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
   }
 
   // ==========================================
-  // PATH 2: UNIVERSAL OPENAI-COMPATIBLE /v1/audio/speech
+  // UNIVERSAL OPENAI-COMPATIBLE /v1/audio/speech
   // ==========================================
   const rawBaseUrl = (
     apiConfig?.customTtsUrl || 
@@ -157,14 +173,17 @@ export function speakWebSpeechFallback(
   try {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.pitch = persona.voice?.pitch || 1.15;
+
+    const hasJapaneseChars = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text);
+    const targetLang = hasJapaneseChars ? 'ja-JP' : (persona.voice?.lang || 'en-US');
+    utterance.lang = targetLang;
+    utterance.pitch = hasJapaneseChars ? 1.22 : (persona.voice?.pitch || 1.15);
     utterance.rate = persona.voice?.rate || 0.98;
-    utterance.lang = persona.voice?.lang || 'en-US';
 
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
-      const preferred = voices.find(v => v.lang.startsWith(utterance.lang) && (v.name.includes('Natural') || v.name.includes('Female') || v.name.includes('Google')))
-        || voices.find(v => v.lang.startsWith(utterance.lang))
+      const preferred = voices.find(v => v.lang.startsWith(targetLang) && (v.name.includes('Natural') || v.name.includes('Female') || v.name.includes('Google') || v.name.includes('Nanami') || v.name.includes('Ayumi') || v.name.includes('Haruka')))
+        || voices.find(v => v.lang.startsWith(targetLang))
         || voices[0];
       if (preferred) utterance.voice = preferred;
     }

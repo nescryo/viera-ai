@@ -41,61 +41,73 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
     return { emotion: null, cleanText: '', hasTag: false, rawTag: null, isStreamingTag: true };
   }
 
-  // Detect unclosed tag at front while streaming (e.g. "[", "[hap", "[emotion:blu")
-  // If the text starts with '[' and has not yet emitted ']', suppress from cleanText to prevent UI flicker
-  if (/^\s*\[[^\]]*$/.test(workingText)) {
-    return {
-      emotion: null,
-      cleanText: '',
-      hasTag: true,
-      rawTag: null,
-      isStreamingTag: true
-    };
+  // 2. Identify in-flight unclosed emotion tag at the tail of stream
+  // e.g. "Wait a second... <pout" or "[hap"
+  const inFlightTailRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)?|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)?)$/i;
+  const tailMatch = inFlightTailRegex.exec(workingText);
+
+  let cleanText = workingText;
+  let isStreamingTag = false;
+  let hasTag = false;
+  let rawTag: string | null = null;
+  let detectedEmotion: SupportedEmotion | null = null;
+
+  if (tailMatch && tailMatch[0].length > 0) {
+    const candidate = (tailMatch[1] ?? tailMatch[2] ?? '').toLowerCase();
+    // Do not intercept if it's the start of <ja> or [ja] dubbing tag
+    const isDubbingPrefix = /^j(?:a)?:?$/i.test(candidate) || (tailMatch[0].startsWith('<') && /^j?a?>?$/i.test(candidate));
+    if (!isDubbingPrefix) {
+      isStreamingTag = true;
+      hasTag = true;
+      cleanText = cleanText.slice(0, tailMatch.index);
+    }
   }
 
-  // Look for front-of-stream tag: [tag] or [emotion: tag]
-  const tagRegex = /^\s*\[(?:emotion:\s*)?([a-zA-Z0-9_-]+)\s*\]\s*/i;
-  const match = tagRegex.exec(workingText);
+  // 3. Match all complete emotion tags across the text:
+  // - Square brackets: [happy], [emotion: blush], [/happy], [dancing]
+  // - Angle brackets: <pouting>, </pouting>, <emotion: pouting>, <relaxed>
+  // Excludes <ja>, </ja>, [ja], [/ja], and <think> blocks!
+  const tagRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>)/gi;
 
-  if (!match) {
-    return {
-      emotion: null,
-      cleanText: workingText.trimStart(),
-      hasTag: false,
-      rawTag: null
-    };
-  }
+  cleanText = cleanText.replace(tagRegex, (fullMatch, sqCandidate, angleCandidate) => {
+    const rawCand = sqCandidate || angleCandidate;
+    const normalized = (rawCand || '').toLowerCase().replace(/_/g, '-');
 
-  const rawCandidate = match[1];
-  const normalizedCandidate = rawCandidate.toLowerCase().replace(/_/g, '-');
-  const cleanText = workingText.slice(match[0].length);
+    // Never strip dubbing tags or thinking blocks!
+    if (normalized === 'ja' || normalized === 'think') {
+      return fullMatch;
+    }
 
-  // If candidate is a dubbing tag ([ja] or [ja: ...]), do not strip it as an invalid emotion!
-  // Leave untouched so dubbingValidator can process it
-  if (normalizedCandidate === 'ja' || normalizedCandidate.startsWith('ja:')) {
-    return {
-      emotion: null,
-      cleanText: workingText.trimStart(),
-      hasTag: false,
-      rawTag: null
-    };
-  }
+    // For angle brackets, only strip if it's a registered emotion or explicitly prefixed with emotion:
+    if (angleCandidate) {
+      const isExplicitEmotion = /<emotion:/i.test(fullMatch);
+      if (!isRegisteredEmotion(normalized) && !isExplicitEmotion) {
+        // Keep standard HTML tags like <b>, <span>, etc.
+        return fullMatch;
+      }
+    }
 
-  if (isRegisteredEmotion(normalizedCandidate)) {
-    return {
-      emotion: normalizedCandidate,
-      cleanText,
-      hasTag: true,
-      rawTag: rawCandidate
-    };
-  }
+    hasTag = true;
+    rawTag = rawCand;
 
-  // Tag was present but not in registry: strip the hallucinated tag cleanly, return emotion: null
+    if (isRegisteredEmotion(normalized)) {
+      detectedEmotion = normalized;
+    }
+
+    return ' ';
+  });
+
+  cleanText = cleanText
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
+
   return {
-    emotion: null,
+    emotion: detectedEmotion,
     cleanText,
-    hasTag: true,
-    rawTag: rawCandidate
+    hasTag,
+    rawTag,
+    isStreamingTag
   };
 }
 

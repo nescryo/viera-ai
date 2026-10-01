@@ -89,55 +89,50 @@ export function extractAndValidateDubbing(rawText: string): ParsedDubbingResult 
     };
   }
 
-  // 2. Detect in-flight unclosed tags at start of dialogue.
-  // Must catch "<", "<j", "<ja", "<ja>..." while "</ja>" hasn't arrived yet!
-  const isPrefixOfAngleJa = /^\s*<j?a?>?$/i.test(workingText) || /^\s*<ja\b[^>]*$/i.test(workingText);
-  const isInsideAngleJa = /^\s*<ja(?:\s+[^>]*)?>[\s\S]*$/i.test(workingText) && !/<\/ja>/i.test(workingText);
+  // 2. Extract all closed dubbing tags anywhere in the dialogue:
+  // Supports <ja>...</ja>, [ja]...[/ja], and [JA: ...]
+  const closedTagRegex = /(?:<ja(?:\s+[^>]*)?>([\s\S]*?)<\/ja>|\[ja(?:\s+[^\]]*)?\]([\s\S]*?)\[\/ja\]|\[JA:\s*([\s\S]*?)\])/gi;
+  const jaSegments: string[] = [];
+  let closedMatch: RegExpExecArray | null;
 
-  // Also support square bracket in-flight streaming: "[", "[j", "[ja", "[ja:...", "[ja]..."
-  const isPrefixOfSquareJa = /^\s*\[j?a?:?$/i.test(workingText);
-  const isInsideSquareJa = /^\s*\[ja(?:\s+[^\]]*)?\][\s\S]*$/i.test(workingText) && !/\[\/ja\]/i.test(workingText);
-  const isInsideColonSquareJa = /^\s*\[ja:\s*[\s\S]*$/i.test(workingText) && !/\]/i.test(workingText);
-
-  if (isPrefixOfAngleJa || isInsideAngleJa || isPrefixOfSquareJa || isInsideSquareJa || isInsideColonSquareJa) {
-    return {
-      jaText: null,
-      cleanText: '',
-      isValidJapanese: false,
-      isStreamingJa: true,
-      hasTag: true,
-      hasLengthAnomaly: false
-    };
+  while ((closedMatch = closedTagRegex.exec(workingText)) !== null) {
+    const candidate = (closedMatch[1] ?? closedMatch[2] ?? closedMatch[3] ?? '').trim();
+    if (candidate) {
+      jaSegments.push(candidate);
+    }
   }
 
-  // 3. Extract closed dubbing tag: <ja>...</ja> or [ja]...[/ja] or [JA: ...]
-  const tagRegex = /^\s*(?:<ja>([\s\S]*?)<\/ja>|\[ja\]([\s\S]*?)\[\/ja\]|\[JA:\s*([\s\S]*?)\])\s*/i;
-  const match = tagRegex.exec(workingText);
+  // Strip all closed dubbing blocks from user-facing subtitle text
+  let cleanText = workingText.replace(closedTagRegex, ' ');
 
-  if (!match) {
-    return {
-      jaText: null,
-      cleanText: workingText.trimStart(),
-      isValidJapanese: false,
-      isStreamingJa: false,
-      hasTag: false,
-      hasLengthAnomaly: false
-    };
+  // 3. Detect in-flight unclosed dubbing tags at the end of the text
+  // e.g. trailing "<", "<j", "<ja", "<ja>...", "[", "[j", "[ja", "[ja]...", "[ja:..."
+  const inFlightTailRegex = /(?:<j?a?>?|<ja\b[^>]*|<ja(?:\s+[^>]*)?>[\s\S]*|\[j?a?:?|\[ja(?:\s+[^\]]*)?\][\s\S]*|\[ja:\s*[\s\S]*)$/i;
+  const inFlightMatch = inFlightTailRegex.exec(cleanText);
+
+  let isStreamingJa = false;
+  if (inFlightMatch && inFlightMatch[0].length > 0) {
+    isStreamingJa = true;
+    cleanText = cleanText.slice(0, inFlightMatch.index);
   }
 
-  const rawJaCandidate = (match[1] ?? match[2] ?? match[3] ?? '').trim();
-  const remainingText = workingText.slice(match[0].length).trimStart();
+  // Normalize whitespace in cleanText
+  cleanText = cleanText
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
 
-  // 4. Linguistic Verification: Must contain actual Kana/Kanji characters
-  const isValidJapanese = JAPANESE_CHARSET_REGEX.test(rawJaCandidate);
-  const hasLengthAnomaly = isValidJapanese ? checkLengthRatioAnomaly(rawJaCandidate, remainingText) : false;
+  const combinedJaText = jaSegments.length > 0 ? jaSegments.join(' ') : null;
+  const hasTag = jaSegments.length > 0 || isStreamingJa;
+  const isValidJapanese = combinedJaText ? JAPANESE_CHARSET_REGEX.test(combinedJaText) : false;
+  const hasLengthAnomaly = isValidJapanese ? checkLengthRatioAnomaly(combinedJaText!, cleanText) : false;
 
   return {
-    jaText: rawJaCandidate || null,
-    cleanText: remainingText,
+    jaText: combinedJaText,
+    cleanText,
     isValidJapanese,
-    isStreamingJa: false,
-    hasTag: true,
+    isStreamingJa,
+    hasTag,
     hasLengthAnomaly
   };
 }
@@ -169,18 +164,6 @@ export function extractAndValidateDialogue(rawText: string): UnifiedDialogueResu
   // Step 2: Extract and validate Japanese dubbing tag (e.g. <ja>...</ja>)
   const dubbing = extractAndValidateDubbing(textAfterEmotion);
 
-  // If dubbing tag is streaming and unclosed, dialogue is buffering BUT WE PRESERVE THE EMOTION!
-  if (dubbing.isStreamingJa) {
-    return {
-      emotion,
-      jaText: null,
-      cleanText: '',
-      actions: [],
-      isValidJapanese: false,
-      isStreaming: true
-    };
-  }
-
   // Step 3: Extract roleplay actions from the clean subtitle text (*smiles warmly*)
   const actionRegex = /\*(.*?)\*/g;
   const actions: string[] = [];
@@ -195,6 +178,6 @@ export function extractAndValidateDialogue(rawText: string): UnifiedDialogueResu
     cleanText: dubbing.cleanText,
     actions,
     isValidJapanese: dubbing.isValidJapanese,
-    isStreaming: false
+    isStreaming: dubbing.isStreamingJa
   };
 }

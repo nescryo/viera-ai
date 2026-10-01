@@ -1,6 +1,6 @@
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
 import { generatePromptEmotionRoster } from '../data/emotionRegistry';
-import { extractAndValidateExpression } from './expressionValidator';
+import { extractAndValidateDialogue } from './dubbingValidator';
 
 export interface ParsedDualOutput {
   emotions: string[];
@@ -257,6 +257,34 @@ ${emotionRoster}
 - Express emotion and nuance organically through dialogue, tone, and character voice rather than heavy emoji decoration.
 - Emojis may be used occasionally when they genuinely fit the moment, but prioritize natural spoken dialogue.`;
 
+  if (apiConfig.ttsMode === 'japanese-dub') {
+    const userAddressJa = userName ? `${userName}さん` : '';
+    const userAddressEn = userName || '';
+
+    systemPrompt += `\n\n[JAPANESE ANIME DUBBING & SUBTITLE SYNCHRONIZATION]:
+You are voiced in authentic Japanese anime dialogue.
+Whenever you respond, write your native spoken dialogue inside <ja>...</ja> tags first, followed immediately by your accurate conversational subtitle in English.
+Both tracks must convey the exact same conversational message and intent.
+
+Guidelines:
+- Maintain a polite, calm, efficient, and warm demeanor. Avoid verbose theatrical roleplay or exaggerated melodramatic murmurs, especially during practical or technical inquiries.
+- Address the user naturally by name if known (${userName ? `as "${userName}"` : 'politely'}), and never assume the user is any pre-existing fictional character unless explicitly told.
+- Keep the <ja>...</ja> block strictly for clean spoken Japanese audio, placing any optional physical stage directions in the English subtitle text.
+
+Response Structure:
+[optional-emotion] <ja>Spoken Japanese dialogue</ja> English subtitle translation.
+
+Few-Shot Demonstrations:
+User: "Hello! How are you doing today?"
+Assistant: [happy] <ja>こんにちは${userAddressJa ? `、${userAddressJa}` : ''}。今日も会えて嬉しいです。調子はいかがですか？</ja> Hello${userAddressEn ? ` ${userAddressEn}` : ''}. I'm glad to see you today. How is everything going with you?
+
+User: "Could you help me review this implementation for any issues?"
+Assistant: [relaxed] <ja>もちろんです、喜んでお手伝いしますね。早速内容を確認してみましょう。</ja> *nods gently* Of course, I'd be glad to help. Let's review the details together.
+
+User: "I've been working on this all day and feeling quite exhausted."
+Assistant: [relaxed] <ja>お疲れ様です。少し休憩を取って、無理をしないでくださいね。</ja> You've worked hard today. Please take a short break and don't push yourself too hard.`;
+  }
+
   const systemMessage = {
     role: 'system',
     content: systemPrompt
@@ -313,29 +341,24 @@ ${emotionRoster}
 }
 
 /**
- * Robust token parser utilizing the canonical emotion registry validator
+ * Robust token parser utilizing canonical dialogue and expression validators
  */
-export function parseResponseText(text: string): { emotions: string[]; actions: string[]; cleanText: string } {
-  const { emotion, cleanText } = extractAndValidateExpression(text);
-  const actionRegex = /\*(.*?)\*/g;
-  const actions: string[] = [];
-  let match;
-  while ((match = actionRegex.exec(cleanText)) !== null) {
-    actions.push(match[1]);
-  }
+export function parseResponseText(text: string): { emotions: string[]; actions: string[]; cleanText: string; jaText?: string } {
+  const { emotion, jaText, cleanText, actions } = extractAndValidateDialogue(text);
   return {
     emotions: emotion ? [emotion] : [],
     actions,
-    cleanText
+    cleanText,
+    jaText: jaText || undefined
   };
 }
 
 export function parseDualOutputResponse(text: string): ParsedDualOutput {
-  const { emotions, actions, cleanText } = parseResponseText(text);
+  const { emotion, jaText, cleanText, actions } = extractAndValidateDialogue(text);
   return {
-    emotions,
+    emotions: emotion ? [emotion] : [],
     actions,
-    jaText: cleanText,
+    jaText: jaText || cleanText,
     enText: cleanText
   };
 }
