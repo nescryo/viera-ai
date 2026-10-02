@@ -223,13 +223,17 @@ export async function sendStreamingChatMessage(
     content: m.rawText || m.text
   }));
 
-  let systemPrompt = persona.systemPrompt?.trim()
+  let systemPrompt = '';
+
+  if (persona.customLore?.trim()) {
+    systemPrompt += `[USER-DEFINED SCENARIO & LOREBOOK - HIGHEST PRIORITY]:\n${persona.customLore.trim()}\n\nPrecedence and Behavior Directives:\n- The details, relationship dynamics, memories, and setting established in this Lorebook represent the absolute ground truth for your interaction with ${userName || 'the user'}.\n- Whenever any detail in this Lorebook conflicts with your default backstory, relationship assumptions, or baseline behavior, this Lorebook strictly takes precedence.\n- Fully adopt the established dynamic while naturally expressing it through ${persona.name}'s distinctive vocal cadence, mannerisms, and speech style.\n\n---\n\n`;
+  }
+
+  const basePrompt = persona.systemPrompt?.trim()
     ? persona.systemPrompt
     : `You are ${persona.name} (${persona.tagline || 'anime companion'}). You are engaging, expressive, and conversational.\nRespond naturally in character with warmth and genuine personality.`;
 
-  if (persona.customLore?.trim()) {
-    systemPrompt += `\n\n[USER-DEFINED LOREBOOK & BACKGROUND]:\n${persona.customLore.trim()}\n(Naturally weave these background details and shared history with the user into your roleplay while maintaining your core identity as ${persona.name}.)`;
-  }
+  systemPrompt += `[CHARACTER BASELINE]:\n${basePrompt}`;
 
   if (userName) {
     systemPrompt += `\nThe user's name is ${userName}.`;

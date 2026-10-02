@@ -497,8 +497,8 @@ export function App() {
       'success',
       'Lorebook Updated',
       trimmed
-        ? 'Firefly has updated her lorebook with your background details.'
-        : 'Custom lorebook cleared. Firefly is operating strictly on pure canon lore.'
+        ? `${currentPersona.name} has updated their lorebook with your background details.`
+        : `Custom lorebook cleared. ${currentPersona.name} is operating strictly on pure canon lore.`
     );
   };
 
