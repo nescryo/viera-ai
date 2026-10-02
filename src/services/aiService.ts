@@ -312,7 +312,7 @@ Assistant: [relaxed] <ja>お疲れ様です。少し休憩を取って、無理�
         model,
         messages: [systemMessage, ...formattedHistory],
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 4096,
         stream: true
       }),
       signal: controller.signal
