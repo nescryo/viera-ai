@@ -261,6 +261,20 @@ ${emotionRoster}
 - Express emotion and nuance organically through dialogue, tone, and character voice rather than heavy emoji decoration.
 - Emojis may be used occasionally when they genuinely fit the moment, but prioritize natural spoken dialogue.`;
 
+  systemPrompt += `\n\n[OPTIONAL NARRATIVE EXPOSITION & PHYSICAL ACTIONS]:
+When conversing casually or acting as an assistant, simply speak directly without any narrative tags.
+However, whenever your response naturally includes physical actions, gestures, novelistic scene descriptions, or third-person exposition, wrap ONLY those narrative parts inside <narrative>...</narrative> tags so the voice engine can distinguish them from spoken dialogue.
+
+❌ BAD (Narrative prose and spoken dialogue mixed together without tags):
+"...Hello." She looks up from where she'd been sitting, hands loosely folded in her lap. "It's been quiet today."
+
+✅ GOOD (Clean separation between spoken dialogue and narrative exposition):
+"...Hello." <narrative>She looks up from where she'd been sitting, hands loosely folded in her lap.</narrative> "It's been quiet today."
+
+Guidelines:
+- Spoken dialogue must be written cleanly outside <narrative> tags.
+- Narrative tags are completely optional; never force them during direct answers, technical explanations, or casual dialogue.`;
+
   if (apiConfig.ttsMode === 'japanese-dub') {
     const userAddressJa = userName ? `${userName}さん` : '';
     const userAddressEn = userName || '';

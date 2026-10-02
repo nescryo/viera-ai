@@ -31,10 +31,22 @@ function escapeHtml(str: string): string {
 
 const renderFormattedText = (text: string) => {
   const safeText = escapeHtml(text);
-  const cleanText = safeText.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
-  const formatted = cleanText.replace(
-    /\*(.*?)\*/g, 
-    '<em class="cai-action-text">*$1*</em>'
+  const withEmotions = safeText.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
+  const withNarratives = withEmotions.replace(
+    /&lt;narrative&gt;([\s\S]*?)&lt;\/narrative&gt;/gi,
+    '<span class="cai-narrative-text">$1</span>'
+  );
+  const withBoldItalic = withNarratives.replace(
+    /\*\*\*(.*?)\*\*\*/g,
+    '<strong><em>$1</em></strong>'
+  );
+  const withBold = withBoldItalic.replace(
+    /\*\*(.*?)\*\*/g,
+    '<strong>$1</strong>'
+  );
+  const formatted = withBold.replace(
+    /\*(.*?)\*/g,
+    '<em>$1</em>'
   );
 
   return <div dangerouslySetInnerHTML={{ __html: formatted }} />;

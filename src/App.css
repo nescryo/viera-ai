@@ -655,11 +655,22 @@
   border-radius: 14px 4px 14px 14px;
 }
 
-/* Character.AI Formatting */
-.cai-action-text {
-  color: var(--text-action);
+/* Dialogue & Message Formatting */
+.cai-msg-bubble strong {
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.cai-msg-bubble em {
   font-style: italic;
-  font-weight: 500;
+  color: inherit;
+}
+
+.cai-narrative-text {
+  color: #94a3b8;
+  font-style: italic;
+  font-weight: 400;
+  margin: 0 0.25rem;
 }
 
 .emotion-tag {

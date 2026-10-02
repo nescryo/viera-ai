@@ -54,9 +54,10 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
 
   if (tailMatch && tailMatch[0].length > 0) {
     const candidate = (tailMatch[1] ?? tailMatch[2] ?? '').toLowerCase();
-    // Do not intercept if it's the start of <ja> or [ja] dubbing tag
+    // Do not intercept if it's the start of <ja> or [ja] dubbing tag, or <narrative> tag
     const isDubbingPrefix = /^j(?:a)?:?$/i.test(candidate) || (tailMatch[0].startsWith('<') && /^j?a?>?$/i.test(candidate));
-    if (!isDubbingPrefix) {
+    const isNarrativePrefix = tailMatch[0].startsWith('<') && /^n(?:a(?:r(?:r(?:a(?:t(?:i(?:v(?:e)?)?)?)?)?)?)?)?$/i.test(candidate);
+    if (!isDubbingPrefix && !isNarrativePrefix) {
       isStreamingTag = true;
       hasTag = true;
       cleanText = cleanText.slice(0, tailMatch.index);
@@ -66,15 +67,15 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
   // 3. Match all complete emotion tags across the text:
   // - Square brackets: [happy], [emotion: blush], [/happy], [dancing]
   // - Angle brackets: <pouting>, </pouting>, <emotion: pouting>, <relaxed>
-  // Excludes <ja>, </ja>, [ja], [/ja], and <think> blocks!
+  // Excludes <ja>, </ja>, [ja], [/ja], <think>, and <narrative> blocks!
   const tagRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>)/gi;
 
   cleanText = cleanText.replace(tagRegex, (fullMatch, sqCandidate, angleCandidate) => {
     const rawCand = sqCandidate || angleCandidate;
     const normalized = (rawCand || '').toLowerCase().replace(/_/g, '-');
 
-    // Never strip dubbing tags or thinking blocks!
-    if (normalized === 'ja' || normalized === 'think') {
+    // Never strip dubbing tags, thinking blocks, or narrative exposition tags!
+    if (normalized === 'ja' || normalized === 'think' || normalized === 'narrative') {
       return fullMatch;
     }
 

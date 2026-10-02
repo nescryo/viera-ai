@@ -14,11 +14,12 @@ const ANY_DIGIT = /\d/;
 export function sanitizeTextForSpeech(text: string): string {
   if (!text) return '';
   return text
+    .replace(/<narrative>[\s\S]*?<\/narrative>/gi, '') // Strip complete narrative exposition blocks from TTS
+    .replace(/<narrative[\s\S]*$/gi, '') // Strip in-flight unclosed narrative streaming tail
     .replace(/<[^>]+>/g, '') // XML / HTML tags like <ja>, <think>
-    .replace(/\*.*?\*/g, '') // Stage directions and roleplay actions (*sighs*, *smiles warmly*)
     .replace(/\[.*?\]/g, '') // Emotion indicators ([happy], [blush])
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // Emojis
-    .replace(/[`#_>]/g, '') // Markdown formatting symbols
+    .replace(/[*#_`>~]/g, '') // Markdown formatting symbols (*, **, _, `, #, >, ~)
     .replace(/\s+/g, ' ') // Collapse multiple spaces
     .trim();
 }
