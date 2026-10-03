@@ -519,7 +519,6 @@ export function App() {
         isSpeaking={isSpeaking}
         currentEmotion={currentEmotion}
         onSelectEmotion={handleSelectEmotion}
-        apiConfig={apiConfig}
       />
 
       <Header

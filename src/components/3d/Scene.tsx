@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { MMDLoader, OutlineEffect } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
 import { ChevronDown } from 'lucide-react';
-import type { ApiConfig, Persona } from '../../types';
+import type { Persona } from '../../types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
 import { EMOTION_REGISTRY, isRegisteredEmotion, DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
@@ -17,7 +17,6 @@ interface SceneProps {
   isSpeaking: boolean;
   currentEmotion: string;
   onSelectEmotion?: (emotion: string) => void;
-  apiConfig?: ApiConfig;
 }
 
 const TESTING_EMOTIONS = EMOTION_REGISTRY;
@@ -76,8 +75,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   isSpeaking,
   currentEmotion,
-  onSelectEmotion,
-  apiConfig
+  onSelectEmotion
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
@@ -97,11 +95,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
-
-  const apiConfigRef = useRef(apiConfig);
-  useEffect(() => {
-    apiConfigRef.current = apiConfig;
-  }, [apiConfig]);
 
   const onSelectEmotionRef = useRef(onSelectEmotion);
   useEffect(() => {
@@ -633,47 +626,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       }
     );
 
-    // 7. Raycaster 3D Touch & Sparkle Particles System
-    const raycaster = new THREE.Raycaster();
-    const mouseVector = new THREE.Vector2();
-    let headPatTiltTimer = 0;
-
-    // Sparkles particle geometry for head pats
-    const sparkleCount = 30;
-    const sparkleGeo = new THREE.BufferGeometry();
-    const sparklePos = new Float32Array(sparkleCount * 3);
-    const sparkleVel = new Float32Array(sparkleCount * 3);
-    const sparkleLife = new Float32Array(sparkleCount);
-
-    sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
-    const sparkleMat = new THREE.PointsMaterial({
-      color: 0xffd700,
-      size: 0.045,
-      transparent: true,
-      opacity: 0
-    });
-    const sparkleParticles = new THREE.Points(sparkleGeo, sparkleMat);
-    scene.add(sparkleParticles);
-
-    const triggerSparkles = (hitPoint: THREE.Vector3) => {
-      sparkleMat.opacity = 0.95;
-      const posAttr = sparkleGeo.attributes.position as THREE.BufferAttribute;
-      const positions = posAttr.array as Float32Array;
-
-      for (let i = 0; i < sparkleCount; i++) {
-        positions[i * 3] = hitPoint.x + (Math.random() - 0.5) * 0.3;
-        positions[i * 3 + 1] = hitPoint.y + (Math.random() - 0.5) * 0.3;
-        positions[i * 3 + 2] = hitPoint.z + (Math.random() - 0.5) * 0.3;
-
-        sparkleVel[i * 3] = (Math.random() - 0.5) * 0.015;
-        sparkleVel[i * 3 + 1] = Math.random() * 0.02 + 0.01;
-        sparkleVel[i * 3 + 2] = (Math.random() - 0.5) * 0.015;
-
-        sparkleLife[i] = 1.0;
-      }
-      posAttr.needsUpdate = true;
-    };
-
+    // 7. Gaze Tracking Pointer Listeners
     const updatePointerTracking = (clientX: number, clientY: number) => {
       if (isDisposed) return;
       const w = window.innerWidth;
@@ -686,104 +639,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       updatePointerTracking(clientX, clientY);
     };
 
-    let chestTouchCount = 0;
-    let chestTouchResetTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastInteractionTime = 0;
-
-    const handlePointerClick = (clientX: number, clientY: number) => {
-      if (isDisposed || !containerRef.current || !mmdMeshRef.current) return;
-
-      // Cooldown & Speaking Guard: Ignore click spam if Firefly is speaking or interacted within 1.2s
-      const now = Date.now();
-      if (isSpeakingRef.current || ttsService.isSpeaking() || now - lastInteractionTime < 1200) {
-        return;
-      }
-
-      updatePointerTracking(clientX, clientY);
-
-      const rect = containerRef.current.getBoundingClientRect();
-      mouseVector.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      mouseVector.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouseVector, camera);
-      const intersects = raycaster.intersectObject(mmdMeshRef.current, false);
-
-      if (intersects.length > 0) {
-        const hit = intersects[0];
-        const hitPoint = hit.point;
-        const relX = Math.abs(hitPoint.x - (-0.65)); // Relative X offset from Firefly model center (-0.65)
-
-        // Record interaction time to throttle click spam
-        lastInteractionTime = now;
-
-        // Strict Head Pat Zone ONLY (Top of Head & Hair: y >= 1.35 and relX < 0.28)
-        if (relX < 0.28 && hitPoint.y >= 1.35) {
-          chestTouchCount = 0; // Reset chest touch counter on head pat!
-          if (chestTouchResetTimer) clearTimeout(chestTouchResetTimer);
-
-          currentEmotionRef.current = 'blush';
-          onSelectEmotionRef.current?.('blush');
-          headPatTiltTimer = 1.0;
-          triggerSparkles(hitPoint);
-
-          const interjections = ["えーっと、なに…？", "んんっ…恥ずかしいよ…", "えっ、なになに…？"];
-          const pickedVoice = interjections[Math.floor(Math.random() * interjections.length)];
-
-          ttsService.speak(
-            pickedVoice,
-            currentPersona,
-            () => { isSpeakingRef.current = true; },
-            () => { isSpeakingRef.current = false; },
-            undefined,
-            apiConfigRef.current
-          );
-        } 
-        // Strict Chest Zone (1.08 <= y < 1.35 and relX < 0.18)
-        else if (relX < 0.18 && hitPoint.y >= 1.08 && hitPoint.y < 1.35) {
-          chestTouchCount += 1;
-
-          if (chestTouchResetTimer) clearTimeout(chestTouchResetTimer);
-          chestTouchResetTimer = setTimeout(() => {
-            chestTouchCount = 0;
-          }, 8000);
-
-          let targetEmotion = 'blush-hardly';
-          let voiceText = "ちょ、ちょっと…どこ触ってるの…？！";
-
-          if (chestTouchCount >= 6) {
-            // After 3 more touches (total 6+): Terrified (Japanese)
-            targetEmotion = 'terrified';
-            const lines = ["きゃあぁっ…！お、お願いだからやめてぇ…！", "う、うわぁぁん…！こわいよぉ…！", "た、助けてぇ…離れてぇ…！"];
-            voiceText = lines[Math.floor(Math.random() * lines.length)];
-          } else if (chestTouchCount >= 3) {
-            // After 3 consecutive touches: Pouting (Japanese)
-            targetEmotion = 'pouting';
-            const lines = ["むーっ！もう、いい加減にしてよっ！", "ふんっ！開拓者さんなんて、もう知らないっ！", "もうっ！おこるよっ…？！"];
-            voiceText = lines[Math.floor(Math.random() * lines.length)];
-          } else {
-            // Touches 1 - 2: Blush Hardly (Japanese)
-            targetEmotion = 'blush-hardly';
-            const lines = ["ちょ、ちょっと…どこ触ってるの…？！", "や、やだ…ダメだってば…！", "ひゃぁっ？！な、なにやってるの…？！"];
-            voiceText = lines[Math.floor(Math.random() * lines.length)];
-          }
-
-          currentEmotionRef.current = targetEmotion;
-          onSelectEmotionRef.current?.(targetEmotion);
-          triggerSparkles(hitPoint);
-
-          ttsService.speak(
-            voiceText,
-            currentPersona,
-            () => { isSpeakingRef.current = true; },
-            () => { isSpeakingRef.current = false; },
-            undefined,
-            apiConfigRef.current
-          );
-        }
-        // All other body parts (arms, shoulders, skirt, legs): ZERO reaction
-      }
-    };
-
     const onMouseMove = (e: MouseEvent) => {
       handlePointerMove(e.clientX, e.clientY);
     };
@@ -793,15 +648,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
-
-    const onClick = (e: MouseEvent) => {
-      handlePointerClick(e.clientX, e.clientY);
-    };
-
-    const containerEl = containerRef.current;
-    if (containerEl) {
-      containerEl.addEventListener('click', onClick);
-    }
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('touchmove', onTouchMove);
@@ -819,48 +665,16 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       const rawEmo = currentEmotionRef.current?.toLowerCase().trim();
       const emo = isRegisteredEmotion(rawEmo) ? rawEmo : DEFAULT_EMOTION_ID;
 
-      // Lightweight Hover Cursor Check (0.0001ms execution time)
-      if (containerRef.current) {
-        const px = pointerRef.current.targetX;
-        const py = pointerRef.current.targetY;
-        if (px >= -0.45 && px <= 0.45 && py >= 0.05 && py <= 0.85) {
-          containerRef.current.style.cursor = 'pointer';
-        } else {
-          containerRef.current.style.cursor = 'default';
-        }
-      }
-
       pointerRef.current.x += (pointerRef.current.targetX - pointerRef.current.x) * 0.05;
       pointerRef.current.y += (pointerRef.current.targetY - pointerRef.current.y) * 0.05;
 
       const pX = pointerRef.current.x;
       const pY = pointerRef.current.y;
 
-      // 1. Update Head Pat Timer
-      let headPatTiltTimerVal = 0;
-      if (headPatTiltTimer > 0) {
-        headPatTiltTimer -= 0.016;
-        headPatTiltTimerVal = headPatTiltTimer;
-      }
-
-      // 2. Update Sparkle Particles position & opacity
-      if (sparkleMat.opacity > 0) {
-        sparkleMat.opacity -= 0.018;
-        const posAttr = sparkleGeo.attributes.position as THREE.BufferAttribute;
-        const positions = posAttr.array as Float32Array;
-
-        for (let i = 0; i < sparkleCount; i++) {
-          positions[i * 3] += sparkleVel[i * 3];
-          positions[i * 3 + 1] += sparkleVel[i * 3 + 1];
-          positions[i * 3 + 2] += sparkleVel[i * 3 + 2];
-        }
-        posAttr.needsUpdate = true;
-      }
-
-      // 3. Ambient Particle Drift
+      // 1. Ambient Particle Drift
       particles.rotation.y = elapsedTime * 0.04;
 
-      // 4. AIRI Modular Animation Engine Update (Spring Head Roll, Figure-8 Sway, Saccades, Smile-Blink, LipSync)
+      // 2. AIRI Modular Animation Engine Update (Spring Head Roll, Figure-8 Sway, Saccades, Smile-Blink, LipSync)
       if (animationControllerRef.current && mmdMeshRef.current) {
         animationControllerRef.current.update({
           mesh: mmdMeshRef.current,
@@ -871,7 +685,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           pointerY: pY,
           emotion: emo,
           isSpeaking: isSpeakingRef.current || ttsService.isSpeaking(),
-          headPatTiltTimer: headPatTiltTimerVal,
           cheekMaterials: cheekMaterialsRef.current,
           foreheadMaterial: foreheadShadowMaterialRef.current
         });
@@ -897,9 +710,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     return () => {
       isDisposed = true;
       cancelAnimationFrame(animationFrameId);
-      if (containerEl) {
-        containerEl.removeEventListener('click', onClick);
-      }
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('resize', handleResize);

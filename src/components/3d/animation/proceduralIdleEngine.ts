@@ -35,8 +35,7 @@ export class ProceduralIdleEngine {
     targetTorsoPitch: number,
     targetHeadYaw: number,
     targetHeadPitch: number,
-    emotion: string,
-    headPatTiltTimer: number
+    emotion: string
   ): void {
     const t = elapsedTime;
     const clampedDelta = Math.min(delta, 0.05);
@@ -114,12 +113,6 @@ export class ProceduralIdleEngine {
     }
 
     // 5. NECK & HEAD ORIENTATION
-    let headPatAdd = 0;
-    if (headPatTiltTimer > 0) {
-      const progress = Math.max(0, headPatTiltTimer / 1.0);
-      headPatAdd = Math.sin(progress * Math.PI) * 0.12;
-    }
-
     if (bones.neck) {
       bones.neck.rotation.y += ((targetHeadYaw * 0.4) - bones.neck.rotation.y) * 0.12;
       bones.neck.rotation.x = (-breathHarmonic * 0.010) + (targetHeadPitch * 0.4);
@@ -143,7 +136,7 @@ export class ProceduralIdleEngine {
       }
 
       bones.head.rotation.y += (((targetHeadYaw * 0.65) + extraHeadYaw) - bones.head.rotation.y) * 0.14;
-      bones.head.rotation.x += (((targetHeadPitch * 0.65) + extraHeadPitch + headPatAdd) - bones.head.rotation.x) * 0.14;
+      bones.head.rotation.x += (((targetHeadPitch * 0.65) + extraHeadPitch) - bones.head.rotation.x) * 0.14;
       bones.head.rotation.z = headRollAngle;
     }
 

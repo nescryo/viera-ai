@@ -256,7 +256,6 @@ export class VieraAnimationController {
     pointerY,
     emotion,
     isSpeaking,
-    headPatTiltTimer,
     cheekMaterials,
     foreheadMaterial
   }: {
@@ -268,7 +267,6 @@ export class VieraAnimationController {
     pointerY: number;
     emotion: string;
     isSpeaking: boolean;
-    headPatTiltTimer: number;
     cheekMaterials: THREE.MeshBasicMaterial[];
     foreheadMaterial: THREE.MeshBasicMaterial | null;
   }): void {
@@ -288,8 +286,7 @@ export class VieraAnimationController {
       targetTorsoPitch,
       targetHeadYaw,
       targetHeadPitch,
-      emotion,
-      headPatTiltTimer
+      emotion
     );
 
     // 3. Gaze Tracking with Exponential Critical Damping and Micro-Saccades
