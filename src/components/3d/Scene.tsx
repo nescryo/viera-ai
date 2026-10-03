@@ -151,8 +151,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     scene.add(modelGroup);
 
     // 6. Load Character .pmx Model dynamically from Character Package
-    THREE.Cache.enabled = false;
-    const mmdLoader = new MMDLoader();
+    // Enable Three.js in-memory loader cache so re-mounts within the same
+    // session (StrictMode double-mount, persona switches) reuse already-fetched
+    // PMX/texture data instead of re-downloading and re-parsing it.
+    THREE.Cache.enabled = true;
+
+    // Shared loading manager: the MMDLoader and every texture created during
+    // material optimization register with this manager, so manager.onLoad only
+    // fires once ALL textures have finished decoding. We keep the model hidden
+    // until then to avoid materials popping in one-by-one.
+    const loadingManager = new THREE.LoadingManager();
+    const mmdLoader = new MMDLoader(loadingManager);
     mmdLoader.setResourcePath(charPkg.model.resourcePath);
 
     setLoadStatus(`Loading ${charPkg.name} 3D Model...`);
@@ -178,14 +187,39 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           mmdMesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         }
 
-        // Apply character package cel-shading & material optimizations
-        const matBindings = charPkg.optimizeMaterials(mmdMesh);
+        // Apply character package cel-shading & material optimizations.
+        // Pass the shared manager so textures created here (e.g. blush overlay)
+        // are tracked and awaited before the model is revealed.
+        const matBindings = charPkg.optimizeMaterials(mmdMesh, loadingManager);
         cheekMaterialsRef.current = matBindings.cheekMaterials;
         foreheadShadowMaterialRef.current = matBindings.foreheadMaterial;
 
+        // Keep the model hidden until every texture has finished decoding so it
+        // appears fully shaded at once instead of materials popping in.
+        mmdMesh.visible = false;
         modelGroup.add(mmdMesh);
-        setModelLoaded(true);
-        setLoadStatus(`${charPkg.name} 3D Active`);
+        setLoadStatus(`Finalizing ${charPkg.name} textures...`);
+
+        let revealed = false;
+        const revealModel = () => {
+          if (revealed || isDisposed) return;
+          revealed = true;
+          mmdMesh.visible = true;
+          setModelLoaded(true);
+          setLoadStatus(`${charPkg.name} 3D Active`);
+        };
+
+        // Reveal once ALL textures tracked by the manager have finished loading.
+        loadingManager.onLoad = revealModel;
+
+        // Safety net: if every texture was served synchronously from cache,
+        // the manager may already be idle and onLoad will not fire again.
+        // Reveal on the next frame in that case so the model never stays hidden.
+        requestAnimationFrame(() => {
+          if (!revealed && !isDisposed) {
+            revealModel();
+          }
+        });
       },
       (xhr: ProgressEvent) => {
         if (xhr.lengthComputable && !isDisposed) {

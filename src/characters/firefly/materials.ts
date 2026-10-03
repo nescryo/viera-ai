@@ -48,7 +48,10 @@ export function createAnimeForeheadShadowTexture(): THREE.CanvasTexture {
 /**
  * Cel-shading material optimizer and dynamic overlays for Firefly (Honkai: Star Rail)
  */
-export function optimizeFireflyMaterials(mmdMesh: THREE.SkinnedMesh): CharacterMaterialResult {
+export function optimizeFireflyMaterials(
+  mmdMesh: THREE.SkinnedMesh,
+  manager?: THREE.LoadingManager
+): CharacterMaterialResult {
   const cheekMaterials: THREE.MeshBasicMaterial[] = [];
   let foreheadMaterial: THREE.MeshBasicMaterial | null = null;
 
@@ -70,7 +73,7 @@ export function optimizeFireflyMaterials(mmdMesh: THREE.SkinnedMesh): CharacterM
           mapUrl.includes('颜赤') || mapUrl.includes('yan_chi');
 
         if (isBlushMat) {
-          const blushTex = new THREE.TextureLoader().load('/models/firefly/颜赤.png');
+          const blushTex = new THREE.TextureLoader(manager).load('/models/firefly/颜赤.png');
           blushTex.colorSpace = THREE.SRGBColorSpace;
           const blushMat = new THREE.MeshBasicMaterial({
             map: blushTex,

@@ -41,6 +41,12 @@ export interface CharacterMaterialResult {
 export interface CharacterPackage extends Persona {
   /** 3D model, viewport, and camera specs */
   model: CharacterModelConfig;
-  /** Custom cel-shading material traversal & overlay binding */
-  optimizeMaterials: (mesh: THREE.SkinnedMesh) => CharacterMaterialResult;
+  /**
+   * Custom cel-shading material traversal & overlay binding.
+   * @param mesh - The loaded MMD skinned mesh.
+   * @param manager - Optional loading manager so textures created here are
+   * tracked alongside the model's own textures (used to defer showing the
+   * model until every texture has finished decoding).
+   */
+  optimizeMaterials: (mesh: THREE.SkinnedMesh, manager?: THREE.LoadingManager) => CharacterMaterialResult;
 }
