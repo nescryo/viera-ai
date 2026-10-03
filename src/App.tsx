@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
+import type { ChatMessage, Persona, ApiConfig, UserProfile } from './types';
 import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
-import { DEFAULT_EMOTION_ID } from './data/emotionRegistry';
-import { ttsService } from './services/ttsService';
 import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
-import * as historyService from './services/historyService';
+import { soundService } from './services/soundService';
+
+import { useToasts } from './hooks/useToasts';
+import { useSpeechAudio } from './hooks/useSpeechAudio';
+import { useChatSessions } from './hooks/useChatSessions';
 
 import { Header } from './components/ui/Header';
 import { ChatOverlay } from './components/ui/ChatOverlay';
@@ -17,14 +19,14 @@ import { ConversationHistoryModal } from './components/ui/ConversationHistoryMod
 import { UserProfileModal } from './components/ui/UserProfileModal';
 import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ToastContainer } from './components/ui/Toast';
-import type { ToastMessage } from './components/ui/Toast';
 import { Scene } from './components/3d/Scene';
-import { soundService } from './services/soundService';
 
 import './App.css';
 
+type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | null;
+
 export function App() {
-  // Active 3D Roleplay Character Package with persistent custom lore
+  // 1. Active 3D Roleplay Character Package with persistent custom lore
   const [currentPersona, setCurrentPersona] = useState<Persona>(() => {
     const savedLore = localStorage.getItem(`viera_custom_lore_${DEFAULT_CHARACTER_PACKAGE.id}`);
     if (savedLore) {
@@ -32,66 +34,15 @@ export function App() {
     }
     return DEFAULT_CHARACTER_PACKAGE;
   });
-  
-  // User Authentication & Profile State
+
+  // 2. User Authentication & Profile State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getCurrentUser());
   const [pendingGooglePayload, setPendingGooglePayload] = useState<{ sub: string; email: string; name: string; picture: string } | null>(null);
 
-  // Multi-Session Chat History States
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 3. Consolidated Modal State (Replaces scattered boolean flags)
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
-  // Modals state
-  const [showSettings, setShowSettings] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showAlternativeMemory, setShowAlternativeMemory] = useState(false);
-
-  // In-App Toast Notifications State
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  const addToast = useCallback((type: 'info' | 'success' | 'warning' | 'error', title: string, message: string) => {
-    const newToast: ToastMessage = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
-      type,
-      title,
-      message
-    };
-    setToasts((prev) => [...prev.slice(-3), newToast]);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  // Global Keyboard Shortcuts (Esc to close modal, Ctrl+K / Cmd+K for conversations)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showSettings) { setShowSettings(false); return; }
-        if (showHistory) { setShowHistory(false); return; }
-        if (showProfile) { setShowProfile(false); return; }
-        if (showAlternativeMemory) { setShowAlternativeMemory(false); return; }
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault();
-        if (userProfile && userProfile.isSetupComplete) {
-          setShowHistory((prev) => !prev);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSettings, showHistory, showProfile, showAlternativeMemory, userProfile]);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<string>(DEFAULT_EMOTION_ID);
-
-  // API Configuration (Auto-detects keys from .env or localStorage)
+  // 4. API Gateway Configuration (Auto-detects keys from .env or localStorage)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
     const saved = localStorage.getItem('viera_api_config');
     const envDeepseekKey = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
@@ -105,7 +56,6 @@ export function App() {
         const resolvedApiKey = (parsed.apiKey || parsed.deepseekApiKey || parsed.openRouterApiKey || envDeepseekKey || envOpenRouterKey || '').trim();
         const resolvedBaseUrl = (parsed.baseUrl || providerInfo.defaultBaseUrl || '').trim();
         const resolvedModel = (parsed.model || providerInfo.defaultModel || '').trim();
-
         const resolvedFishRefId = parsed.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (parsed.fishAudioReferenceId || '');
 
         return {
@@ -141,62 +91,59 @@ export function App() {
     };
   });
 
-  // Load Sessions when userProfile changes
+  // 5. Custom Hooks (Modularized Subsystems)
+  const { toasts, addToast, removeToast } = useToasts();
+  const { isSpeaking, activeSpeakingId, speakMessage, stopSpeaking } = useSpeechAudio();
+  const {
+    sessions,
+    activeSessionId,
+    messages,
+    setMessages,
+    currentEmotion,
+    syncMessagesToSession,
+    selectSession,
+    createNewChat,
+    renameSession,
+    deleteSession,
+    clearAllSessions,
+    updateSessionEmotion,
+    updateSessionSummary
+  } = useChatSessions(userProfile?.id, currentPersona.id, apiConfig.provider);
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 6. Global Keyboard Shortcuts (Esc to close active modal, Ctrl+K / Cmd+K for conversations)
   useEffect(() => {
-    if (userProfile && userProfile.isSetupComplete) {
-      const userSessions = historyService.getSessions(userProfile.id);
-      let currentActiveId = historyService.getActiveSessionId(userProfile.id);
-
-      if (userSessions.length === 0) {
-        const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
-        setSessions([newSess]);
-        setActiveSessionId(newSess.id);
-        setMessages([]);
-      } else {
-        setSessions(userSessions);
-        if (!currentActiveId || !userSessions.some((s) => s.id === currentActiveId)) {
-          currentActiveId = userSessions[0].id;
-          historyService.setActiveSessionId(userProfile.id, currentActiveId);
-        }
-        setActiveSessionId(currentActiveId);
-        const activeSess = userSessions.find((s) => s.id === currentActiveId);
-        setMessages(activeSess ? activeSess.messages : []);
-        if (activeSess?.currentEmotion) {
-          setCurrentEmotion(activeSess.currentEmotion);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveModal(null);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (userProfile && userProfile.isSetupComplete) {
+          setActiveModal((prev) => (prev === 'history' ? null : 'history'));
         }
       }
-    } else {
-      setSessions([]);
-      setActiveSessionId(null);
-      setMessages([]);
-    }
-  }, [userProfile, currentPersona.id, apiConfig.provider]);
+    };
 
-  // Sync messages change back to active session storage
-  const syncMessagesToSession = (newMessages: ChatMessage[]) => {
-    setMessages(newMessages);
-    if (userProfile && activeSessionId) {
-      const updatedSess = historyService.updateSessionMessages(userProfile.id, activeSessionId, newMessages);
-      if (updatedSess) {
-        setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
-      }
-    }
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [userProfile]);
 
+  // 7. Configuration & Authentication Handlers
   const handleSaveConfig = (newConfig: ApiConfig) => {
     setApiConfig(newConfig);
     localStorage.setItem('viera_api_config', JSON.stringify(newConfig));
     addToast('success', 'Configuration Saved', 'AI model and voice synthesis preferences updated successfully.');
   };
 
-  // Google OAuth Handlers
   const handleGoogleLoginSuccess = (payload: { sub: string; email: string; name: string; picture: string }) => {
     const existing = getCurrentUser();
     if (existing && existing.id === payload.sub && existing.isSetupComplete) {
       setUserProfile(existing);
       setPendingGooglePayload(null);
     } else {
-      // Trigger Onboarding Setup
       setPendingGooglePayload(payload);
     }
   };
@@ -216,70 +163,10 @@ export function App() {
     logoutUser();
     setUserProfile(null);
     setPendingGooglePayload(null);
-    setShowProfile(false);
-    setShowHistory(false);
+    setActiveModal(null);
   };
 
-  // Multi-session Handlers
-  const handleSelectSession = (sessionId: string) => {
-    if (!userProfile) return;
-    historyService.setActiveSessionId(userProfile.id, sessionId);
-    setActiveSessionId(sessionId);
-
-    const target = sessions.find((s) => s.id === sessionId);
-    setMessages(target ? target.messages : []);
-    if (target?.currentEmotion) {
-      setCurrentEmotion(target.currentEmotion);
-    }
-    setShowHistory(false); // Auto-close history modal on selection!
-  };
-
-  const handleCreateNewChat = () => {
-    if (!userProfile) return;
-    const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
-    const updatedSessions = historyService.getSessions(userProfile.id);
-    setSessions(updatedSessions);
-    setActiveSessionId(newSess.id);
-    setMessages([]);
-    setCurrentEmotion(DEFAULT_EMOTION_ID);
-    setShowHistory(false); // Auto-close history modal!
-  };
-
-  const handleRenameSession = (sessionId: string, newTitle: string) => {
-    if (!userProfile) return;
-    historyService.updateSessionTitle(userProfile.id, sessionId, newTitle);
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s)));
-  };
-
-  const handleDeleteSession = (sessionId: string) => {
-    if (!userProfile) return;
-    const remaining = historyService.deleteSession(userProfile.id, sessionId);
-    setSessions(remaining);
-
-    if (remaining.length === 0) {
-      const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
-      setSessions([newSess]);
-      setActiveSessionId(newSess.id);
-      setMessages([]);
-      setCurrentEmotion(DEFAULT_EMOTION_ID);
-    } else if (activeSessionId === sessionId) {
-      const nextActive = remaining[0];
-      setActiveSessionId(nextActive.id);
-      setMessages(nextActive.messages);
-      setCurrentEmotion(nextActive.currentEmotion || DEFAULT_EMOTION_ID);
-    }
-  };
-
-  const handleClearAllSessions = () => {
-    if (!userProfile) return;
-    historyService.clearAllSessions(userProfile.id);
-    const newSess = historyService.createSession(userProfile.id, currentPersona.id, apiConfig.provider);
-    setSessions([newSess]);
-    setActiveSessionId(newSess.id);
-    setMessages([]);
-    setCurrentEmotion(DEFAULT_EMOTION_ID);
-  };
-
+  // 8. Streaming Chat Execution
   const executeStreamingChat = (contextMessages: ChatMessage[]) => {
     setIsLoading(true);
 
@@ -314,7 +201,7 @@ export function App() {
 
         if (emotions.length > 0) {
           const activeEmotion = emotions[emotions.length - 1];
-          setCurrentEmotion(activeEmotion);
+          updateSessionEmotion(activeEmotion);
         }
 
         if (!updateFrameId) {
@@ -348,13 +235,7 @@ export function App() {
         let finalEmotion = currentEmotion;
         if (emotions.length > 0) {
           finalEmotion = emotions[emotions.length - 1];
-          setCurrentEmotion(finalEmotion);
-          if (userProfile && activeSessionId) {
-            historyService.updateSessionEmotion(userProfile.id, activeSessionId, finalEmotion);
-            setSessions((prev) =>
-              prev.map((s) => (s.id === activeSessionId ? { ...s, currentEmotion: finalEmotion } : s))
-            );
-          }
+          updateSessionEmotion(finalEmotion);
         }
 
         const finalMsg: ChatMessage = {
@@ -370,16 +251,11 @@ export function App() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
-        setMessages((prev) => {
-          const next = prev.map((msg) => (msg.id === aiMsgId ? finalMsg : msg));
-          if (userProfile && activeSessionId) {
-            historyService.updateSessionMessages(userProfile.id, activeSessionId, next);
-          }
-          return next;
-        });
+        const next = messagesWithPlaceholder.map((msg) => (msg.id === aiMsgId ? finalMsg : msg));
+        syncMessagesToSession(next);
 
         soundService.playReceive();
-        speakMessage(finalMsg);
+        speakMessage(finalMsg, currentPersona, apiConfig);
 
         // Background Episodic Memory Trigger (consolidates every 50 messages)
         const allMessagesCount = contextMessages.length + 1;
@@ -394,15 +270,7 @@ export function App() {
             userProfile
           ).then((newReflection) => {
             if (newReflection && newReflection.trim()) {
-              const updatedSess = historyService.updateSessionSummary(
-                userProfile.id,
-                activeSessionId,
-                newReflection.trim(),
-                messagesToConsolidate.length
-              );
-              if (updatedSess) {
-                setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
-              }
+              updateSessionSummary(newReflection.trim(), messagesToConsolidate.length);
             }
           });
         }
@@ -435,34 +303,6 @@ export function App() {
 
     const updatedMessages = [...messages, userMsg];
     executeStreamingChat(updatedMessages);
-  };
-
-  const speakMessage = (msg: ChatMessage) => {
-    setActiveSpeakingId(msg.id);
-    setIsSpeaking(true);
-
-    const isJapaneseMode = apiConfig.ttsMode === 'japanese-dub';
-    const textToSpeak = isJapaneseMode && msg.jaText ? msg.jaText : (msg.originalText || msg.text);
-
-    ttsService.speak(
-      textToSpeak,
-      currentPersona,
-      () => {
-        setIsSpeaking(true);
-      },
-      () => {
-        setIsSpeaking(false);
-        setActiveSpeakingId(null);
-      },
-      undefined,
-      apiConfig
-    );
-  };
-
-  const stopSpeaking = () => {
-    ttsService.stop();
-    setIsSpeaking(false);
-    setActiveSpeakingId(null);
   };
 
   const handleRegenerateResponse = () => {
@@ -503,14 +343,8 @@ export function App() {
   };
 
   const handleSelectEmotion = useCallback((emotion: string) => {
-    setCurrentEmotion(emotion);
-    if (userProfile && activeSessionId) {
-      historyService.updateSessionEmotion(userProfile.id, activeSessionId, emotion);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, currentEmotion: emotion } : s))
-      );
-    }
-  }, [userProfile, activeSessionId]);
+    updateSessionEmotion(emotion);
+  }, [updateSessionEmotion]);
 
   return (
     <div className="app-container">
@@ -523,10 +357,10 @@ export function App() {
 
       <Header
         currentPersona={currentPersona}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenHistory={() => setShowHistory(true)}
-        onOpenProfile={() => setShowProfile(true)}
-        onOpenAlternativeMemory={() => setShowAlternativeMemory(true)}
+        onOpenSettings={() => setActiveModal('settings')}
+        onOpenHistory={() => setActiveModal('history')}
+        onOpenProfile={() => setActiveModal('profile')}
+        onOpenAlternativeMemory={() => setActiveModal('alternativeMemory')}
         apiConfig={apiConfig}
         userProfile={userProfile}
       />
@@ -536,9 +370,9 @@ export function App() {
         currentPersona={currentPersona}
         onSendMessage={handleSendMessage}
         onRegenerateResponse={handleRegenerateResponse}
-        onSpeakMessage={speakMessage}
+        onSpeakMessage={(msg) => speakMessage(msg, currentPersona, apiConfig)}
         onStopSpeaking={stopSpeaking}
-        onOpenLorebook={() => setShowAlternativeMemory(true)}
+        onOpenLorebook={() => setActiveModal('alternativeMemory')}
         isSpeaking={isSpeaking}
         activeSpeakingId={activeSpeakingId}
         isLoading={isLoading}
@@ -559,44 +393,44 @@ export function App() {
       )}
 
       {/* 3. Settings Modal */}
-      {showSettings && (
+      {activeModal === 'settings' && (
         <SettingsModal
           apiConfig={apiConfig}
           onSaveConfig={handleSaveConfig}
-          onClose={() => setShowSettings(false)}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
       {/* 4. Alternative Memory & Custom Lore Modal */}
-      {showAlternativeMemory && (
+      {activeModal === 'alternativeMemory' && (
         <AlternativeMemoryModal
           persona={currentPersona}
           onSaveCustomLore={handleUpdateCustomLore}
-          onClose={() => setShowAlternativeMemory(false)}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
-      {/* 5. Project Airi Concept Conversation History Modal */}
-      {showHistory && (
+      {/* 5. Conversation History Modal */}
+      {activeModal === 'history' && (
         <ConversationHistoryModal
           sessions={sessions}
           activeSessionId={activeSessionId}
-          onSelectSession={handleSelectSession}
-          onCreateNewChat={handleCreateNewChat}
-          onRenameSession={handleRenameSession}
-          onDeleteSession={handleDeleteSession}
-          onClearAllSessions={handleClearAllSessions}
-          onClose={() => setShowHistory(false)}
+          onSelectSession={(id) => { selectSession(id); setActiveModal(null); }}
+          onCreateNewChat={() => { createNewChat(); setActiveModal(null); }}
+          onRenameSession={renameSession}
+          onDeleteSession={deleteSession}
+          onClearAllSessions={clearAllSessions}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
-      {/* 6. Character.AI Concept User Profile Modal */}
-      {showProfile && userProfile && (
+      {/* 6. User Profile Modal */}
+      {activeModal === 'profile' && userProfile && (
         <UserProfileModal
           userProfile={userProfile}
           onUpdateProfile={handleUpdateProfile}
           onLogout={handleLogout}
-          onClose={() => setShowProfile(false)}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
