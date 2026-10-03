@@ -9,9 +9,6 @@ You can chat with Firefly, listen to her voice with translated text subtitles, w
 ## What Can It Do?
 
 - **Lifelike 3D Character**: The character moves naturally on your screen—breathing, blinking, and following your cursor or finger with her gaze and head movement.
-- **Interactive Touch Reactions**: You can interact with the character using your mouse or touch screen:
-  - Patting her head triggers sparkling effects and a cheerful, bashful reaction.
-  - Touching her upper attire triggers shy or pouting reactions.
 - **Conversational AI**: Chat freely about any topic. The character responds warmly like a companion with an expressive and friendly personality.
 - **Expressive Anime Voice**: Responses can be spoken out loud with an anime voice style, complete with mouth movements synchronized to her speech.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
@@ -70,8 +67,6 @@ By default, the application can use voice synthesis through your browser or clou
 | Action | How to Interact | Character Response |
 | :--- | :--- | :--- |
 | **Move Mouse** | Move your cursor across the screen | The character's head and eyes follow your cursor. |
-| **Head Pat** | Click the head or hair area | The character tilts her head, smiles warmly, and speaks cheerfully. |
-| **Upper Attire Touch** | Click the upper chest or clothing | The character reacts with shy or pouting expressions. |
 | **Speak (Microphone)** | Click the microphone icon in the chat bar | Your voice is transcribed into chat text. |
 | **Replay Voice** | Click the speaker icon on any message | Replays the character's spoken voice for that message. |
 
