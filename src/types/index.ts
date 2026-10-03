@@ -43,12 +43,19 @@ export interface ApiConfig {
   availableModels?: string[];
 
   // Optional legacy fields for backward compatibility
+  /** @deprecated Legacy provider identifier. Use baseUrl and apiKey instead. */
   provider?: string;
+  /** @deprecated Legacy LM Studio server URL. Use baseUrl instead. */
   lmStudioUrl?: string;
+  /** @deprecated Legacy LM Studio model name. Use model instead. */
   lmStudioModel?: string;
+  /** @deprecated Legacy DeepSeek API key. Use apiKey instead. */
   deepseekApiKey?: string;
+  /** @deprecated Legacy DeepSeek model name. Use model instead. */
   deepseekModel?: string;
+  /** @deprecated Legacy OpenRouter API key. Use apiKey instead. */
   openRouterApiKey?: string;
+  /** @deprecated Legacy OpenRouter model name. Use model instead. */
   openRouterModel?: string;
 
   // Speech Output Mode
@@ -71,13 +78,21 @@ export interface ApiConfig {
   jpTtsReferenceId?: string;
 
   // Legacy TTS fields for seamless backward compatibility
+  /** @deprecated Legacy general TTS provider. Use normalTtsProvider or jpTtsProvider instead. */
   ttsProvider?: TtsProvider;
+  /** @deprecated Legacy Fish Audio key. Use normalTtsApiKey or jpTtsApiKey instead. */
   fishAudioApiKey?: string;
+  /** @deprecated Legacy Fish Audio reference ID. Use normalTtsReferenceId or jpTtsReferenceId instead. */
   fishAudioReferenceId?: string;
+  /** @deprecated Legacy Fish Audio model. Use normalTtsModel or jpTtsModel instead. */
   fishAudioModel?: string;
+  /** @deprecated Legacy custom TTS URL. Use normalTtsUrl or jpTtsUrl instead. */
   customTtsUrl?: string;
+  /** @deprecated Legacy custom TTS API key. Use normalTtsApiKey or jpTtsApiKey instead. */
   customTtsApiKey?: string;
+  /** @deprecated Legacy custom TTS model. Use normalTtsModel or jpTtsModel instead. */
   customTtsModel?: string;
+  /** @deprecated Legacy custom TTS voice ID. Use normalTtsVoice or jpTtsVoice instead. */
   customTtsVoiceId?: string;
 }
 

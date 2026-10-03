@@ -1,145 +1,142 @@
 import type { TtsSynthesizeOptions } from './ttsTypes';
 import type { Persona } from '../../types';
+import { resolveTtsSettings } from './ttsConfigResolver';
 
 /**
- * Universal OpenAI-Compatible TTS Engine (/v1/audio/speech)
- * Supports OpenAI, OpenRouter, ElevenLabs, Groq, Kokoro, LM Studio, and any custom audio gateway.
+ * Local VITS / Edge-TTS Server Strategy (for offline testing)
  */
-export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): Promise<ArrayBuffer> {
-  const { text, apiConfig, signal } = options;
-  const provider = apiConfig?.ttsProvider || 'fish-audio';
+export async function synthesizeEdgeTts(options: {
+  text: string;
+  persona?: Persona;
+  signal?: AbortSignal;
+}): Promise<ArrayBuffer> {
+  const { text, persona, signal } = options;
+  const character = encodeURIComponent(persona?.name || 'Character');
+  const encodedText = encodeURIComponent(text);
+  const localUrl = `http://localhost:5000/tts?text=${encodedText}&character=${character}`;
 
-  // ==========================================
-  // Local VITS / Edge-TTS Server (for offline testing)
-  // ==========================================
-  if (provider === 'edge') {
-    const character = encodeURIComponent(options.persona?.name || 'Character');
-    const encodedText = encodeURIComponent(text);
-    const localUrl = `http://localhost:5000/tts?text=${encodedText}&character=${character}`;
+  const res = await fetch(localUrl, { signal });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Local VITS / Edge-TTS Server HTTP ${res.status}: ${errText || res.statusText}`);
+  }
+  return res.arrayBuffer();
+}
 
-    const res = await fetch(localUrl, { signal });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Local VITS / Edge-TTS Server HTTP ${res.status}: ${errText || res.statusText}`);
-    }
-    return res.arrayBuffer();
+/**
+ * Fish Audio Strategy (Direct Fish Audio API & OpenRouter Audio Speech Gateway)
+ */
+export async function synthesizeFishAudio(options: {
+  text: string;
+  apiKey: string;
+  referenceId?: string;
+  model?: string;
+  isOpenRouter?: boolean;
+  signal?: AbortSignal;
+}): Promise<ArrayBuffer> {
+  const { text, apiKey, referenceId, model, isOpenRouter = false, signal } = options;
+
+  if (!apiKey) {
+    throw new Error('Fish Audio requires an API Key. Please enter your Fish Audio API Key or OpenRouter Key in Settings.');
   }
 
-  // ==========================================
-  // FISH AUDIO
-  // ==========================================
-  if (provider === 'fish-audio') {
-    const directApiKey = (apiConfig?.fishAudioApiKey || '').trim();
-    const openRouterKey = (apiConfig?.openRouterApiKey || (apiConfig?.baseUrl?.includes('openrouter') ? apiConfig?.apiKey : '') || '').trim();
-    const apiKey = directApiKey || openRouterKey;
+  const refId = referenceId?.trim() || undefined;
+  const rawModel = (model || '').trim();
+  const selectedModel = (!rawModel || rawModel === 'tts-1') ? 's2.1-pro-free' : rawModel;
+  const headerModel = selectedModel.replace(/^fish-audio\//, '');
 
-    if (!apiKey) {
-      throw new Error('Fish Audio requires an API Key. Please enter your Fish Audio API Key or OpenRouter Key in Settings.');
-    }
+  const endpoint = isOpenRouter ? 'https://openrouter.ai/api/v1/audio/speech' : '/fish_audio_api/v1/tts';
 
-    // Read voice reference ID freely entered by the user (no hardcoded fallback)
-    const refId = (apiConfig?.fishAudioReferenceId || '').trim();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`,
+  };
 
-    const isOpenRouter = !directApiKey && Boolean(openRouterKey);
-    const rawSelectedModel = (apiConfig?.fishAudioModel || '').trim();
-    const selectedModel = (!rawSelectedModel || rawSelectedModel === 'tts-1') ? 's2.1-pro-free' : rawSelectedModel;
-    const headerModel = selectedModel.replace(/^fish-audio\//, '');
+  if (!isOpenRouter) {
+    headers['model'] = headerModel;
+  }
 
-    const endpoint = isOpenRouter ? 'https://openrouter.ai/api/v1/audio/speech' : '/fish_audio_api/v1/tts';
+  const payload: Record<string, any> = isOpenRouter
+    ? {
+        model: selectedModel.startsWith('fish-audio/') ? selectedModel : `fish-audio/${selectedModel}`,
+        input: text,
+        voice: refId
+      }
+    : {
+        text,
+        format: 'mp3',
+        latency: 'normal',
+        normalize: true,
+        reference_id: refId
+      };
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    };
+  let response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    signal
+  });
 
-    if (!isOpenRouter) {
-      headers['model'] = headerModel;
-    }
-
-    const payload: Record<string, any> = isOpenRouter
-      ? {
-          model: selectedModel.startsWith('fish-audio/') ? selectedModel : `fish-audio/${selectedModel}`,
-          input: text,
-          voice: refId || undefined
-        }
-      : {
-          text,
-          format: 'mp3',
-          latency: 'normal',
-          normalize: true,
-          reference_id: refId || undefined
-        };
-
-    let response = await fetch(endpoint, {
+  // Auto-retry if 400 Bad Request because the custom reference ID was not found in the catalog
+  if (!response.ok && response.status === 400 && (payload.reference_id || payload.voice)) {
+    console.warn('[Viera TTS] Reference ID not found on Fish Audio catalog. Retrying with default system voice...');
+    delete payload.reference_id;
+    delete payload.voice;
+    response = await fetch(endpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
       signal
     });
-
-    // Auto-retry if 400 Bad Request because the user's custom reference ID was not found in catalog
-    if (!response.ok && response.status === 400 && (payload.reference_id || payload.voice)) {
-      console.warn('[Viera TTS] Reference ID not found on Fish Audio catalog. Retrying with default system voice...');
-      delete payload.reference_id;
-      delete payload.voice;
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        signal
-      });
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      throw new Error(`Fish Audio API HTTP ${response.status}: ${errorText || response.statusText}`);
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      const jsonBody = await response.json().catch(() => ({}));
-      throw new Error(`Fish Audio API returned JSON error: ${JSON.stringify(jsonBody)}`);
-    }
-
-    return response.arrayBuffer();
   }
 
-  // ==========================================
-  // UNIVERSAL OPENAI-COMPATIBLE /v1/audio/speech
-  // ==========================================
-  const rawBaseUrl = (
-    apiConfig?.customTtsUrl || 
-    (apiConfig?.baseUrl && !apiConfig.baseUrl.includes('deepseek') ? apiConfig.baseUrl : 'https://api.openai.com/v1')
-  ).trim();
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Fish Audio API HTTP ${response.status}: ${errorText || response.statusText}`);
+  }
 
-  let targetEndpoint = rawBaseUrl;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const jsonBody = await response.json().catch(() => ({}));
+    throw new Error(`Fish Audio API returned JSON error: ${JSON.stringify(jsonBody)}`);
+  }
+
+  return response.arrayBuffer();
+}
+
+/**
+ * Universal OpenAI-Compatible Audio Gateway Strategy (/v1/audio/speech)
+ * Supports OpenAI, OpenRouter, ElevenLabs, Groq, Kokoro, LM Studio, etc.
+ */
+export async function synthesizeOpenAiCompatible(options: {
+  text: string;
+  baseUrl: string;
+  apiKey?: string;
+  model?: string;
+  voiceId?: string;
+  signal?: AbortSignal;
+}): Promise<ArrayBuffer> {
+  const { text, baseUrl, apiKey, model = 'tts-1', voiceId = 'nova', signal } = options;
+
+  let targetEndpoint = baseUrl.trim() || 'https://api.openai.com/v1';
   if (!targetEndpoint.includes('/audio/speech')) {
     targetEndpoint = `${targetEndpoint.replace(/\/+$/, '')}/audio/speech`;
   }
-
-  const apiKey = (
-    apiConfig?.customTtsApiKey || 
-    apiConfig?.apiKey || 
-    apiConfig?.openRouterApiKey || 
-    ''
-  ).trim();
-
-  const model = (apiConfig?.customTtsModel || 'tts-1').trim() || 'tts-1';
-  const voice = (apiConfig?.customTtsVoiceId || '').trim() || 'nova';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  if (apiKey) {
-    headers['Authorization'] = apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`;
+  if (apiKey?.trim()) {
+    const trimmedKey = apiKey.trim();
+    headers['Authorization'] = trimmedKey.startsWith('Bearer ') ? trimmedKey : `Bearer ${trimmedKey}`;
   }
 
-  const payload: Record<string, any> = {
-    model,
+  const payload = {
+    model: model.trim() || 'tts-1',
     input: text,
     response_format: 'mp3',
-    voice
+    voice: voiceId.trim() || 'nova'
   };
 
   const response = await fetch(targetEndpoint, {
@@ -155,6 +152,47 @@ export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): P
   }
 
   return response.arrayBuffer();
+}
+
+/**
+ * Universal Audio Synthesizer Dispatcher
+ * Resolves active provider strategy and dispatches synthesis request.
+ */
+export async function synthesizeUniversalAudio(options: TtsSynthesizeOptions): Promise<ArrayBuffer> {
+  const { text, persona, apiConfig, signal } = options;
+  const settings = resolveTtsSettings(apiConfig, text, persona);
+
+  if (settings.provider === 'edge') {
+    return synthesizeEdgeTts({ text, persona, signal });
+  }
+
+  if (settings.provider === 'fish-audio') {
+    const directKey = (
+      settings.mode === 'japanese'
+        ? apiConfig?.jpTtsApiKey
+        : (apiConfig?.normalTtsApiKey || apiConfig?.fishAudioApiKey)
+    )?.trim();
+    const isOpenRouter = !directKey && (settings.apiKey.startsWith('sk-or-') || Boolean(apiConfig?.openRouterApiKey));
+
+    return synthesizeFishAudio({
+      text,
+      apiKey: settings.apiKey,
+      referenceId: settings.referenceId,
+      model: settings.model,
+      isOpenRouter,
+      signal
+    });
+  }
+
+  // Universal OpenAI-Compatible /v1/audio/speech
+  return synthesizeOpenAiCompatible({
+    text,
+    baseUrl: settings.baseUrl,
+    apiKey: settings.apiKey,
+    model: settings.model,
+    voiceId: settings.voiceId,
+    signal
+  });
 }
 
 /**

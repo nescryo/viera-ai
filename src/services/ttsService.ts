@@ -2,6 +2,7 @@ import type { Persona, ApiConfig } from '../types';
 import { TtsChunker, sanitizeTextForSpeech } from './tts/ttsChunker';
 import { PlaybackQueue } from './tts/playbackQueue';
 import { synthesizeUniversalAudio, speakWebSpeechFallback } from './tts/universalTtsEngine';
+import { resolveTtsSettings } from './tts/ttsConfigResolver';
 import type { TtsChunk, TtsStreamSession, TTSBoundaryEvent } from './tts/ttsTypes';
 
 export type { TTSBoundaryEvent } from './tts/ttsTypes';
@@ -70,19 +71,10 @@ class TTSService {
     const controller = new AbortController();
     this.activeAbortController = controller;
 
-    // Check if network credentials exist for audio synthesis
-    const hasNetworkKey = Boolean(
-      apiConfig?.fishAudioApiKey?.trim() ||
-      apiConfig?.customTtsApiKey?.trim() ||
-      apiConfig?.apiKey?.trim() ||
-      apiConfig?.openRouterApiKey?.trim()
-    );
+    const ttsSettings = resolveTtsSettings(apiConfig, targetText, persona);
 
-    const isExplicitWebSpeech = apiConfig?.ttsProvider === 'webspeech';
-    const isEdgeProvider = apiConfig?.ttsProvider === 'edge';
-
-    // If user explicitly chose WebSpeech or (no network API key is provided and not edge provider), use Web Speech API
-    if (isExplicitWebSpeech || (!hasNetworkKey && !isEdgeProvider)) {
+    // If configuration indicates Web Speech or missing API credentials, fall back to Web Speech API
+    if (ttsSettings.isFallbackWebSpeech) {
       this.isFallbackSpeaking = true;
       const started = speakWebSpeechFallback(
         targetText,
@@ -112,13 +104,11 @@ class TTSService {
 
       // Dispatch audio synthesis concurrently with concurrency limit of 3
       const MAX_CONCURRENT = 3;
-      let _activeRequests = 0;
       let chunkIdx = 0;
 
       const processNextChunk = async () => {
         if (chunkIdx >= chunks.length || controller.signal.aborted) return;
         const currentChunk = chunks[chunkIdx++];
-        _activeRequests++;
 
         try {
           const rawBuffer = await synthesizeUniversalAudio({
@@ -143,7 +133,6 @@ class TTSService {
             return;
           }
         } finally {
-          _activeRequests--;
           if (chunkIdx < chunks.length && !controller.signal.aborted) {
             await processNextChunk();
           }
