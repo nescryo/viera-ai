@@ -5,7 +5,8 @@
  * 
  * Evaluates LLM persona adherence, custom lorebook override fidelity,
  * 3D emotion tag generation, and streaming latency (TTFT & throughput)
- * using production prompt assembly directly against live OpenRouter / DeepSeek APIs.
+ * using production prompt assembly directly against the dedicated benchmark endpoint
+ * configured via VITE_BENCHMARK_* in .env.
  */
 
 import { FIREFLY_CANON_LORE } from '../src/characters/firefly/lore.ts';
@@ -36,7 +37,6 @@ function getArg(flag, defaultValue = '') {
   return defaultValue;
 }
 
-const requestedProvider = getArg('--provider', 'benchmark').toLowerCase();
 const requestedModel = getArg('--model', '');
 const selectedCaseIndex = getArg('--case', '');
 const customLoreArg = getArg('--custom-lore', '');
@@ -47,31 +47,11 @@ const benchmarkUrl = (process.env.VITE_BENCHMARK_API_URL || '').trim();
 const benchmarkKey = (process.env.VITE_BENCHMARK_API_KEY || '').trim();
 const benchmarkModel = (process.env.VITE_BENCHMARK_MODEL || 'ag/gemini-3.8-flash-high').trim();
 
-const openRouterKey = (process.env.VITE_OPENROUTER_API_KEY || '').trim();
-const deepseekKey = (process.env.VITE_DEEPSEEK_API_KEY || '').trim();
-
-let activeApiKey = '';
-let activeBaseUrl = '';
-let activeModel = '';
-let providerName = '';
-
-if (requestedProvider === 'openrouter') {
-  activeApiKey = openRouterKey;
-  activeBaseUrl = 'https://openrouter.ai/api/v1';
-  activeModel = requestedModel || 'deepseek/deepseek-chat';
-  providerName = 'OpenRouter Gateway';
-} else if (requestedProvider === 'deepseek') {
-  activeApiKey = deepseekKey;
-  activeBaseUrl = 'https://api.deepseek.com';
-  activeModel = requestedModel || 'deepseek-chat';
-  providerName = 'DeepSeek Official API';
-} else {
-  // Default: Dedicated Benchmark Endpoint from .env
-  activeApiKey = benchmarkKey || openRouterKey || deepseekKey;
-  activeBaseUrl = benchmarkUrl || 'http://172.18.0.1:20128/v1';
-  activeModel = requestedModel || benchmarkModel;
-  providerName = 'Dedicated Benchmark Gateway (Router Proxy)';
-}
+// Dedicated Benchmark Endpoint from .env (VITE_BENCHMARK_*)
+const activeApiKey = benchmarkKey;
+const activeBaseUrl = benchmarkUrl || 'http://172.18.0.1:20128/v1';
+const activeModel = requestedModel || benchmarkModel;
+const providerName = 'Dedicated Benchmark Gateway (Router Proxy)';
 
 if (!activeApiKey) {
   console.error(`\n${c.red}${c.bold}Error: No API key found in .env!${c.reset}`);

@@ -42,18 +42,15 @@ export function App() {
   // 3. Consolidated Modal State (Replaces scattered boolean flags)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
-  // 4. API Gateway Configuration (Auto-detects keys from .env or localStorage)
+  // 4. API Gateway Configuration (loaded from localStorage, edited via Settings)
   const [apiConfig, setApiConfig] = useState<ApiConfig>(() => {
     const saved = localStorage.getItem('viera_api_config');
-    const envDeepseekKey = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-    const envOpenRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY || '';
-    const envFishAudioKey = import.meta.env.VITE_FISH_AUDIO_API_KEY || '';
 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         const providerInfo = getProviderById(parsed.provider || 'openrouter');
-        const resolvedApiKey = (parsed.apiKey || parsed.deepseekApiKey || parsed.openRouterApiKey || envDeepseekKey || envOpenRouterKey || '').trim();
+        const resolvedApiKey = (parsed.apiKey || parsed.deepseekApiKey || parsed.openRouterApiKey || '').trim();
         const resolvedBaseUrl = (parsed.baseUrl || providerInfo.defaultBaseUrl || '').trim();
         const resolvedModel = (parsed.model || providerInfo.defaultModel || '').trim();
         const resolvedFishRefId = parsed.fishAudioReferenceId === '7f92f8afb8ec43bf81429cc1c9199cb1' ? '' : (parsed.fishAudioReferenceId || '');
@@ -65,7 +62,7 @@ export function App() {
           apiKey: resolvedApiKey,
           model: resolvedModel,
           ttsProvider: (parsed.ttsProvider === 'voicevox' || parsed.ttsProvider === 'vits') ? 'fish-audio' : (parsed.ttsProvider || 'fish-audio'),
-          fishAudioApiKey: parsed.fishAudioApiKey || envFishAudioKey,
+          fishAudioApiKey: parsed.fishAudioApiKey || '',
           fishAudioReferenceId: resolvedFishRefId
         };
       } catch (e) {
@@ -73,15 +70,15 @@ export function App() {
       }
     }
 
-    const initialProvider = envDeepseekKey ? getProviderById('deepseek') : AI_PROVIDERS[0];
+    const initialProvider = AI_PROVIDERS[0];
     return {
       provider: initialProvider.id,
       baseUrl: initialProvider.defaultBaseUrl,
-      apiKey: envDeepseekKey || envOpenRouterKey || '',
+      apiKey: '',
       model: initialProvider.defaultModel,
       availableModels: [],
       ttsProvider: 'fish-audio',
-      fishAudioApiKey: envFishAudioKey,
+      fishAudioApiKey: '',
       fishAudioReferenceId: '',
       fishAudioModel: 's2.1-pro-free',
       customTtsUrl: '',

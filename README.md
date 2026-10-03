@@ -35,7 +35,7 @@ Before you begin, make sure you have the following installed on your computer:
    ```bash
    cp .env.example .env
    ```
-   Open the `.env` file in any text editor and enter the API keys you wish to use (such as your DeepSeek API key for AI chat and Google Client ID for user sign-in).
+   Open the `.env` file in any text editor and enter your Google Client ID for user sign-in (`VITE_GOOGLE_CLIENT_ID`). AI chat and voice API keys are entered later in the in-app Settings.
 
 3. **Start the application**:
    ```bash
