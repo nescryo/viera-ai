@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatSession } from '../types';
+import { DEFAULT_CHARACTER_PACKAGE } from '../characters/registry';
 
 function getSessionsKey(userId: string): string {
   return `viera_sessions_${userId}`;
@@ -47,7 +48,7 @@ export function setActiveSessionId(userId: string, sessionId: string): void {
   localStorage.setItem(getActiveSessionKey(userId), sessionId);
 }
 
-export function createSession(userId: string, characterId: string = 'firefly', provider: string = 'universal'): ChatSession {
+export function createSession(userId: string, characterId: string = DEFAULT_CHARACTER_PACKAGE.id, provider: string = 'universal'): ChatSession {
   const newSession: ChatSession = {
     id: Date.now().toString(),
     title: 'New conversation',

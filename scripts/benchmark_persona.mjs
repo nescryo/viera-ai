@@ -8,8 +8,8 @@
  * using production prompt assembly directly against live OpenRouter / DeepSeek APIs.
  */
 
-import { FIREFLY_CANON_LORE } from '../src/data/fireflyCanonLore.ts';
-import { EMOTION_REGISTRY, generatePromptEmotionRoster, isRegisteredEmotion } from '../src/data/emotionRegistry.ts';
+import { FIREFLY_CANON_LORE } from '../src/characters/firefly/lore.ts';
+import { generatePromptEmotionRoster, isRegisteredEmotion } from '../src/data/emotionRegistry.ts';
 
 // ANSI terminal colors
 const c = {

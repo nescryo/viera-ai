@@ -8,6 +8,7 @@ import {
 import { validateApiKeyAndFetchModels } from '../../services/aiService';
 import { AI_PROVIDERS, type AiProviderInfo, getProviderById } from '../../data/aiProviders';
 import { ttsService } from '../../services/ttsService';
+import { DEFAULT_CHARACTER_PACKAGE } from '../../characters/registry';
 
 interface SettingsModalProps {
   apiConfig: ApiConfig;
@@ -207,14 +208,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
 
     const testPersona = {
-      id: 'firefly',
-      name: 'Firefly',
-      tagline: '',
+      id: DEFAULT_CHARACTER_PACKAGE.id,
+      name: DEFAULT_CHARACTER_PACKAGE.name,
+      tagline: DEFAULT_CHARACTER_PACKAGE.tagline || '',
       greeting: '',
       systemPrompt: '',
-      avatarUrl: '',
-      voice: { pitch: 1.15, rate: 0.98, lang: tab === 'jp' ? 'ja-JP' : 'en-US' },
-      category: 'Honkai: Star Rail' as const
+      avatarUrl: DEFAULT_CHARACTER_PACKAGE.avatarUrl,
+      voice: { ...DEFAULT_CHARACTER_PACKAGE.voice, lang: tab === 'jp' ? 'ja-JP' : (DEFAULT_CHARACTER_PACKAGE.voice?.lang || 'en-US') },
+      category: DEFAULT_CHARACTER_PACKAGE.category
     };
 
     const testText = tab === 'jp'

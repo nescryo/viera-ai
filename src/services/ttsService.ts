@@ -112,13 +112,13 @@ class TTSService {
 
       // Dispatch audio synthesis concurrently with concurrency limit of 3
       const MAX_CONCURRENT = 3;
-      let activeRequests = 0;
+      let _activeRequests = 0;
       let chunkIdx = 0;
 
       const processNextChunk = async () => {
         if (chunkIdx >= chunks.length || controller.signal.aborted) return;
         const currentChunk = chunks[chunkIdx++];
-        activeRequests++;
+        _activeRequests++;
 
         try {
           const rawBuffer = await synthesizeUniversalAudio({
@@ -143,7 +143,7 @@ class TTSService {
             return;
           }
         } finally {
-          activeRequests--;
+          _activeRequests--;
           if (chunkIdx < chunks.length && !controller.signal.aborted) {
             await processNextChunk();
           }

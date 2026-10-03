@@ -1,6 +1,5 @@
 /**
  * Canon Lore & Behavioral Directives for Firefly (Honkai: Star Rail)
- * Auto-referenced from Research/firefly_canon_lore_summary.md
  * Source: Honkai: Star Rail Wiki — Firefly/Lore
  */
 export const FIREFLY_CANON_LORE = `# Firefly — Canon Lore Summary

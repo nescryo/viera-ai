@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile, ChatSession } from './types';
-import { FIREFLY_PERSONA } from './data/personas';
+import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
 import { DEFAULT_EMOTION_ID } from './data/emotionRegistry';
@@ -24,13 +24,13 @@ import { soundService } from './services/soundService';
 import './App.css';
 
 export function App() {
-  // Single dedicated 3D Roleplay Character: Firefly with persistent custom lore
+  // Active 3D Roleplay Character Package with persistent custom lore
   const [currentPersona, setCurrentPersona] = useState<Persona>(() => {
-    const savedLore = localStorage.getItem(`viera_custom_lore_${FIREFLY_PERSONA.id}`);
+    const savedLore = localStorage.getItem(`viera_custom_lore_${DEFAULT_CHARACTER_PACKAGE.id}`);
     if (savedLore) {
-      return { ...FIREFLY_PERSONA, customLore: savedLore };
+      return { ...DEFAULT_CHARACTER_PACKAGE, customLore: savedLore };
     }
-    return FIREFLY_PERSONA;
+    return DEFAULT_CHARACTER_PACKAGE;
   });
   
   // User Authentication & Profile State

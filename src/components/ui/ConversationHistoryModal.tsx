@@ -91,7 +91,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
             <div className="empty-history-state">
               <MessageSquare size={32} className="empty-icon" />
               <p>No past conversations found.</p>
-              <span>Click "+ New" to start chatting with Firefly!</span>
+              <span>Click "+ New" to start chatting!</span>
             </div>
           ) : (
             sessions.map((s) => {
