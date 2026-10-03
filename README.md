@@ -97,7 +97,7 @@ npm run build      # Type-check and build the project for production
 npm run preview    # Preview the production build locally
 npm run lint       # Lint the source code (oxlint)
 npm test           # Run the unit tests (vitest)
-npm run benchmark  # Run the persona benchmark (needs VITE_BENCHMARK_* in .env)
+npm run benchmark  # Run the persona benchmark (needs BENCHMARK_* in .env)
 ```
 
 > Note: Fish Audio requests go through a proxy built into the Vite dev server (`/fish_audio_api`). It works with `npm run dev` and `npm run preview`, but a plain static deployment has no such proxy.
