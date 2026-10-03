@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile } from '../../types';
 import { UserCheck, Sparkles, Pencil, AlertCircle, ChevronDown, Check } from 'lucide-react';
+import { normalizeAvatar } from '../../services/imageUtils';
 
 interface SetupOnboardingModalProps {
   initialProfile: Partial<UserProfile> & { name?: string };
@@ -46,19 +47,19 @@ export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMsg("Image size exceeds 5MB limit.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setPicture(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("Image size exceeds 5MB limit.");
+      return;
     }
+    normalizeAvatar(file)
+      .then((dataUrl) => {
+        setPicture(dataUrl);
+        setErrorMsg(null);
+      })
+      .catch(() => {
+        setErrorMsg("Could not process that image. Please try a different file.");
+      });
   };
 
   const handleSubmit = (e: React.FormEvent) => {

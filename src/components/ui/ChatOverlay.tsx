@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage, Persona } from '../../types';
+import type { ChatMessage, Persona, UserProfile } from '../../types';
 import { 
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
   Mic, MicOff, ChevronDown, MessageCircle
@@ -9,6 +9,7 @@ import { soundService } from '../../services/soundService';
 interface ChatOverlayProps {
   messages: ChatMessage[];
   currentPersona: Persona;
+  userProfile: UserProfile | null;
   onSendMessage: (text: string) => void;
   onRegenerateResponse: () => void;
   onSpeakMessage: (msg: ChatMessage) => void;
@@ -19,6 +20,14 @@ interface ChatOverlayProps {
   isLoading: boolean;
   onErrorToast?: (title: string, message: string) => void;
 }
+
+const getUserInitials = (name?: string): string => {
+  if (!name) return 'YOU';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'YOU';
+  const initials = parts.slice(0, 2).map((p) => p[0]).join('');
+  return initials.toUpperCase();
+};
 
 function escapeHtml(str: string): string {
   return str
@@ -55,6 +64,7 @@ const renderFormattedText = (text: string) => {
 const ChatMessageItem: React.FC<{
   msg: ChatMessage;
   currentPersona: Persona;
+  userProfile: UserProfile | null;
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   copiedId: string | null;
@@ -65,6 +75,7 @@ const ChatMessageItem: React.FC<{
 }> = React.memo(({
   msg,
   currentPersona,
+  userProfile,
   isSpeaking,
   activeSpeakingId,
   copiedId,
@@ -81,14 +92,20 @@ const ChatMessageItem: React.FC<{
       <div className="cai-avatar-column">
         {isAI ? (
           <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-msg-avatar" />
+        ) : userProfile?.picture ? (
+          <img
+            src={userProfile.picture}
+            alt={userProfile.nickname || 'You'}
+            className="cai-msg-avatar"
+          />
         ) : (
-          <div className="cai-user-avatar">YOU</div>
+          <div className="cai-user-avatar">{getUserInitials(userProfile?.nickname)}</div>
         )}
       </div>
 
       <div className="cai-content-column">
         <div className="cai-msg-header">
-          <span className="cai-msg-sender">{isAI ? currentPersona.name : 'You'}</span>
+          <span className="cai-msg-sender">{isAI ? currentPersona.name : (userProfile?.nickname || 'You')}</span>
           <span className="cai-msg-time">{msg.timestamp}</span>
           {isAI && <span className="cai-bot-badge">BOT</span>}
         </div>
@@ -135,6 +152,7 @@ const ChatMessageItem: React.FC<{
 export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   messages,
   currentPersona,
+  userProfile,
   onSendMessage,
   onRegenerateResponse,
   onSpeakMessage,
@@ -298,6 +316,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
             key={msg.id}
             msg={msg}
             currentPersona={currentPersona}
+            userProfile={userProfile}
             isSpeaking={isSpeaking}
             activeSpeakingId={activeSpeakingId}
             copiedId={copiedId}

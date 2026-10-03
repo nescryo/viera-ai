@@ -365,6 +365,7 @@ export function App() {
       <ChatOverlay
         messages={messages}
         currentPersona={currentPersona}
+        userProfile={userProfile}
         onSendMessage={handleSendMessage}
         onRegenerateResponse={handleRegenerateResponse}
         onSpeakMessage={(msg) => speakMessage(msg, currentPersona, apiConfig)}
