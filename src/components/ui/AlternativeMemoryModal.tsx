@@ -97,7 +97,7 @@ export const AlternativeMemoryModal: React.FC<AlternativeMemoryModalProps> = ({
             <textarea
               value={lore}
               onChange={(e) => setLore(e.target.value)}
-              placeholder="Describe the background details of what you want the avatar to remember"
+              placeholder="Describe the background details of what you want the character to remember"
               rows={8}
               style={{
                 width: '100%',
