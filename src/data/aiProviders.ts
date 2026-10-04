@@ -88,7 +88,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
   },
   {
     id: 'custom',
-    name: 'Custom (OpenAI-Compatible)',
+    name: 'Custom',
     domain: 'custom endpoint',
     description: 'Self-hosted vLLM, Together AI, or custom server proxy',
     defaultBaseUrl: '',
