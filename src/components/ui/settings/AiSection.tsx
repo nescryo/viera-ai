@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, ExternalLink, Key, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { AI_PROVIDERS, type AiProviderInfo } from '../../../data/aiProviders';
 import { ProviderSelect } from './ProviderSelect';
 
@@ -67,9 +67,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
         {provider.requiresApiKey ? (
           <div className="form-group">
             <div className="settings-label-row">
-              <label className="form-label settings-label-with-icon" htmlFor="ai-api-key">
-                <Key size={14} /> API key
-              </label>
+              <label className="form-label" htmlFor="ai-api-key">API key</label>
               {provider.helpUrl && (
                 <a className="field-link" href={provider.helpUrl} target="_blank" rel="noreferrer">
                   Get a key <ExternalLink size={11} />
