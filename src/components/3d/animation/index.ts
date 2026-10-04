@@ -239,6 +239,7 @@ export class VieraAnimationController {
   public readonly gazeEngine: GazeTrackingEngine;
   public readonly facialEngine: FacialExpressionEngine;
   public bones: BoneReferences;
+  private readonly focusTarget = new THREE.Vector3();
 
   constructor(mesh: THREE.SkinnedMesh) {
     this.idleEngine = new ProceduralIdleEngine();
@@ -261,7 +262,9 @@ export class VieraAnimationController {
     lipSyncSource,
     cheekMaterials,
     foreheadMaterial,
-    visemeWeights = SILENT_VISEMES
+    visemeWeights = SILENT_VISEMES,
+    focusGazeCenter = false,
+    camera
   }: {
     mesh: THREE.SkinnedMesh;
     modelGroup: THREE.Group;
@@ -274,6 +277,10 @@ export class VieraAnimationController {
     cheekMaterials: THREE.MeshBasicMaterial[];
     foreheadMaterial: THREE.MeshBasicMaterial | null;
     visemeWeights?: VisemeInput;
+    /** When true, eyes stay locked on the camera (screen center) instead of following the pointer */
+    focusGazeCenter?: boolean;
+    /** Camera used as the gaze focus target when focusGazeCenter is true */
+    camera?: THREE.Camera;
   }): void {
     // 1. Calculate Target Yaw and Pitch from pointer
     const targetTorsoYaw = pointerX * 0.16;
@@ -300,7 +307,8 @@ export class VieraAnimationController {
       pointerX,
       pointerY,
       elapsedTime,
-      delta
+      delta,
+      focusGazeCenter && camera ? camera.getWorldPosition(this.focusTarget) : null
     );
 
     // 4. Facial Expressions, Smile-Blink, and Lip-Sync

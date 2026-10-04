@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { BlinkState } from './types';
 import { getEmotionCapability } from '../../../data/emotionRegistry';
-import { LipSyncSolver, SILENT_VISEMES } from './lipSyncSolver';
+import { LipSyncSolver, MOUTH_MORPH_RATE, SILENT_VISEMES } from './lipSyncSolver';
 import type { LipSyncSource, VisemeInput } from './lipSyncSolver';
 
 /**
@@ -292,7 +292,7 @@ export class FacialExpressionEngine {
       morphVowelA, morphVowelI, morphVowelU, morphVowelE, morphVowelO,
       morphSmileMouth, morphSmallMouth, morphFrownMouth, morphTriangleMouth, morphPuckerMouth
     ]);
-    const mouthFactor = 1 - Math.exp(-26 * clampedDelta); // ~crisp lip-sync
+    const mouthFactor = 1 - Math.exp(-MOUTH_MORPH_RATE * clampedDelta); // crisp lip-sync (solver already smooths)
     const faceFactor = 1 - Math.exp(-10 * clampedDelta);  // ~gentle expressions
     for (let i = 0; i < influences.length; i++) {
       const targetVal = this.targetMorphMap.get(i) ?? 0;

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   LipSyncSolver,
+  MOUTH_MORPH_RATE,
   resolveLipSyncSource,
   SILENT_VISEMES
 } from '../src/components/3d/animation/lipSyncSolver';
@@ -133,6 +134,33 @@ describe('LipSyncSolver timeline', () => {
       return out.openness;
     };
     expect(Math.abs(run(30) - run(120))).toBeLessThan(0.05);
+  });
+
+  it('reacts to a vowel onset quickly (solver + engine morph smoothing)', () => {
+    const solver = new LipSyncSolver();
+    // Mirrors the facial engine's mouth morph interpolation stage.
+    const morphFactor = 1 - Math.exp(-MOUTH_MORPH_RATE * DT);
+    let morph = 0;
+    let t50 = -1;
+    let t80 = -1;
+    let ref = 0;
+    // Reference: the steady-state opening for this vowel.
+    {
+      const s = new LipSyncSolver();
+      let out = s.step('audio', vowel('a'), DT, 0);
+      for (let k = 0; k < 120; k++) out = s.step('audio', vowel('a'), DT, k * DT);
+      ref = out.a * out.openness;
+    }
+    for (let k = 0; k < 60; k++) {
+      const out = solver.step('audio', vowel('a'), DT, k * DT);
+      morph += (out.a * out.openness - morph) * morphFactor;
+      const ms = (k + 1) * DT * 1000;
+      if (t50 < 0 && morph >= ref * 0.5) t50 = ms;
+      if (t80 < 0 && morph >= ref * 0.8) t80 = ms;
+    }
+    console.log(`\n=== Onset latency === 50%: ${t50.toFixed(0)} ms, 80%: ${t80.toFixed(0)} ms`);
+    expect(t50).toBeLessThanOrEqual(60);
+    expect(t80).toBeLessThanOrEqual(100);
   });
 
   it('opens the mouth wider when the voice gets excited/louder than usual', () => {

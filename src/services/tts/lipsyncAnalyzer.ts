@@ -85,7 +85,10 @@ export class LipsyncAnalyzer {
       return this.analyserNode;
     }
 
-    const lipsync = new Lipsync({ fftSize: 2048, historySize: 10 });
+    // historySize 6 (~100 ms at 60 fps) instead of 10: the detector averages this
+    // history to classify vowels, so a shorter window reacts sooner. Smoothing is
+    // handled downstream by LipSyncSolver, so the analyser itself stays snappy.
+    const lipsync = new Lipsync({ fftSize: 2048, historySize: 6 });
 
     // Rebind the engine's internal AudioContext/AnalyserNode to our context so
     // our post-DSP graph can connect into the same audio graph. These fields are
@@ -100,7 +103,7 @@ export class LipsyncAnalyzer {
 
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.5;
+    analyser.smoothingTimeConstant = 0.3;
 
     internal.audioContext = ctx;
     internal.analyser = analyser;

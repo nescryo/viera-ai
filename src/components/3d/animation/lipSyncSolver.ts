@@ -39,6 +39,12 @@ export interface LipSyncFrame {
 
 export const SILENT_VISEMES: VisemeInput = { a: 0, i: 0, u: 0, e: 0, o: 0, closed: 0, volume: 0 };
 
+/**
+ * Smoothing rate the facial engine applies to mouth morphs on top of the solver.
+ * Shared here so the latency test measures the full chain.
+ */
+export const MOUTH_MORPH_RATE = 55;
+
 /** Neutral intensity used when no loudness is available (Web Speech) or before any audio. */
 const NEUTRAL_INTENSITY = 0.4;
 
@@ -86,14 +92,14 @@ export class LipSyncSolver {
     // Per-vowel smoothing: fast attack tracks onsets, slower release settles.
     for (const key of ['a', 'i', 'u', 'e', 'o'] as const) {
       const prev = this.vowels[key];
-      const rate = target[key] > prev ? 34 : 22;
+      const rate = target[key] > prev ? 55 : 22;
       this.vowels[key] = prev + (target[key] - prev) * smoothFactor(rate, delta);
     }
 
     // Openness envelope dips toward closed on consonants so the mouth doesn't hang open.
     const peak = Math.max(this.vowels.a, this.vowels.i, this.vowels.u, this.vowels.e, this.vowels.o);
     const rawOpenness = clamp01(peak - target.closed * 0.6);
-    const envRate = rawOpenness > this.envelope ? 32 : 20;
+    const envRate = rawOpenness > this.envelope ? 55 : 20;
     this.envelope += (rawOpenness - this.envelope) * smoothFactor(envRate, delta);
 
     this.updateIntensity(source, target.volume, delta);

@@ -349,6 +349,7 @@ export function App() {
         currentPersona={currentPersona}
         currentEmotion={currentEmotion}
         onSelectEmotion={handleSelectEmotion}
+        isReplying={isLoading || isSpeaking}
       />
 
       <Header

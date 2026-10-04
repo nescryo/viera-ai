@@ -19,13 +19,22 @@ interface SceneProps {
   currentPersona: CharacterPackage | Persona;
   currentEmotion: string;
   onSelectEmotion?: (emotion: string) => void;
+  /** True while the LLM is generating or the reply is being spoken; eyes lock on screen center */
+  isReplying?: boolean;
 }
 
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   currentEmotion,
-  onSelectEmotion
+  onSelectEmotion,
+  isReplying = false
 }) => {
+  // Ref so toggling reply state doesn't reload the 3D model
+  const isReplyingRef = useRef(isReplying);
+  useEffect(() => {
+    isReplyingRef.current = isReplying;
+  }, [isReplying]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
 
@@ -287,7 +296,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           }),
           visemeWeights: ttsService.getVisemeWeights(),
           cheekMaterials: cheekMaterialsRef.current,
-          foreheadMaterial: foreheadShadowMaterialRef.current
+          foreheadMaterial: foreheadShadowMaterialRef.current,
+          focusGazeCenter: isReplyingRef.current,
+          camera
         });
       }
 
