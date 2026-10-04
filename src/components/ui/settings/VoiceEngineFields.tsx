@@ -1,6 +1,5 @@
 import React, { useId } from 'react';
-import { ExternalLink, Globe, Play, Sliders, Sparkles, Square, Volume2 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { ExternalLink, Play, Square } from 'lucide-react';
 import type { TtsEngineProvider } from '../../../types';
 
 type VoiceVariant = 'normal' | 'jp';
@@ -9,22 +8,20 @@ interface EngineOption {
   id: TtsEngineProvider;
   title: string;
   desc: string;
-  icon: LucideIcon;
-  iconClass: string;
 }
 
 const ENGINE_OPTIONS: Record<VoiceVariant, EngineOption[]> = {
   normal: [
-    { id: 'fish-audio', title: 'Fish Audio', desc: 'Character voices, needs a key', icon: Sparkles, iconClass: 'icon-accent' },
-    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key', icon: Globe, iconClass: 'icon-blue' },
-    { id: 'edge', title: 'Free voice', desc: 'No setup needed', icon: Volume2, iconClass: 'icon-sky' },
-    { id: 'custom', title: 'Your own server', desc: 'Local or other services', icon: Sliders, iconClass: 'icon-violet' },
+    { id: 'fish-audio', title: 'Fish Audio', desc: 'Character voices, needs a key' },
+    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key' },
+    { id: 'edge', title: 'Free voice', desc: 'No setup needed' },
+    { id: 'custom', title: 'Your own server', desc: 'Local or other services' },
   ],
   jp: [
-    { id: 'fish-audio', title: 'Fish Audio', desc: 'Anime character voices', icon: Sparkles, iconClass: 'icon-accent' },
-    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key', icon: Globe, iconClass: 'icon-blue' },
-    { id: 'edge', title: 'Free voice', desc: 'No setup needed', icon: Volume2, iconClass: 'icon-sky' },
-    { id: 'custom', title: 'Your own server', desc: 'Local voice server', icon: Sliders, iconClass: 'icon-violet' },
+    { id: 'fish-audio', title: 'Fish Audio', desc: 'Anime character voices' },
+    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key' },
+    { id: 'edge', title: 'Free voice', desc: 'No setup needed' },
+    { id: 'custom', title: 'Your own server', desc: 'Local voice server' },
   ],
 };
 
@@ -82,7 +79,7 @@ export const VoiceEngineFields: React.FC<VoiceEngineFieldsProps> = ({
   return (
     <div className={`settings-panel voice-panel voice-panel--${variant} fade-in`}>
       <div className="engine-grid" role="group" aria-label="Voice engine">
-        {ENGINE_OPTIONS[variant].map(({ id, title, desc, icon: Icon, iconClass }) => (
+        {ENGINE_OPTIONS[variant].map(({ id, title, desc }) => (
           <button
             key={id}
             type="button"
@@ -90,7 +87,6 @@ export const VoiceEngineFields: React.FC<VoiceEngineFieldsProps> = ({
             onClick={() => onSelectProvider(id)}
             aria-pressed={provider === id}
           >
-            <Icon size={20} className={iconClass} />
             <div className="provider-card-info">
               <span className="p-title">{title}</span>
               <span className="p-desc">{desc}</span>

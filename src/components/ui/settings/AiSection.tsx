@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, ExternalLink, Key, RefreshCw, Search, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, Key, RefreshCw, Search } from 'lucide-react';
 import { AI_PROVIDERS, type AiProviderInfo } from '../../../data/aiProviders';
 import { ProviderSelect } from './ProviderSelect';
 
@@ -61,10 +61,6 @@ export const AiSection: React.FC<AiSectionProps> = ({
 
   return (
     <section className="settings-section">
-      <h4 className="settings-section-title">
-        <Sparkles size={16} className="settings-section-icon" /> Chat
-      </h4>
-
       <div className="settings-panel">
         <ProviderSelect providers={AI_PROVIDERS} selected={provider} onSelect={onSelectProvider} />
 

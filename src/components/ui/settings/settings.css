@@ -55,6 +55,53 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Tabs (Chat / Voice) */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.settings-tab {
+  position: relative;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.settings-tab:hover {
+  color: var(--text-normal);
+}
+
+.settings-tab.active {
+  color: var(--text-normal);
+}
+
+.settings-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--settings-accent);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
 /* Sections & panels */
 .settings-section {
   display: flex;
@@ -380,11 +427,6 @@
   color: var(--text-muted);
 }
 
-.icon-accent { color: var(--voice-accent); }
-.icon-blue { color: #60a5fa; }
-.icon-sky { color: #38bdf8; }
-.icon-violet { color: #a78bfa; }
-
 .voice-panel .field-link--accent {
   color: var(--voice-accent);
 }
@@ -420,6 +462,10 @@
 }
 
 @media (max-width: 768px) {
+  .settings-tabs {
+    padding: 0 16px;
+  }
+
   .settings-modal-body {
     padding: 16px;
     gap: 20px;

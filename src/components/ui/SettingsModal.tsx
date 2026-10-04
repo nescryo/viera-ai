@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { ApiConfig, TtsMode, TtsNormalProvider, TtsJpProvider } from '../../types';
-import { X, Save, Settings2, Volume2 } from 'lucide-react';
+import { X, Save, Settings2 } from 'lucide-react';
 import { validateApiKeyAndFetchModels } from '../../services/aiService';
 import { AI_PROVIDERS, type AiProviderInfo, getProviderById } from '../../data/aiProviders';
 import { ttsService } from '../../services/ttsService';
@@ -14,6 +14,13 @@ interface SettingsModalProps {
   onSaveConfig: (newConfig: ApiConfig) => void;
   onClose: () => void;
 }
+
+type SettingsTab = 'chat' | 'voice';
+
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'chat', label: 'Chat' },
+  { id: 'voice', label: 'Voice' },
+];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   apiConfig,
@@ -281,6 +288,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const isJapanese = ttsMode === 'japanese-dub';
+
+  // Tabs: arrow keys / Home / End move between tabs (WAI-ARIA tabs pattern)
+  const [activeTab, setActiveTab] = useState<SettingsTab>('chat');
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const current = SETTINGS_TABS.findIndex((t) => t.id === activeTab);
+    let next = current;
+    if (e.key === 'ArrowRight') next = (current + 1) % SETTINGS_TABS.length;
+    else if (e.key === 'ArrowLeft') next = (current - 1 + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = SETTINGS_TABS.length - 1;
+    else return;
+    e.preventDefault();
+    setActiveTab(SETTINGS_TABS[next].id);
+    tabRefs.current[next]?.focus();
+  };
   const normalFishModel = normalTtsModel.startsWith('s2.1') || normalTtsModel.includes('fish-audio')
     ? normalTtsModel
     : 's2.1-pro-free';
@@ -298,8 +322,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
+        <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+          {SETTINGS_TABS.map((tab, index) => (
+            <button
+              key={tab.id}
+              ref={(el) => { tabRefs.current[index] = el; }}
+              type="button"
+              role="tab"
+              id={`settings-tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls={`settings-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={handleTabKeyDown}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit} className="settings-form">
-          <div className="settings-modal-body">
+          <div
+            className="settings-modal-body"
+            role="tabpanel"
+            id={`settings-panel-${activeTab}`}
+            aria-labelledby={`settings-tab-${activeTab}`}
+          >
+            {activeTab === 'chat' && (
             <AiSection
               provider={activeProvider}
               onSelectProvider={handleSelectProvider}
@@ -313,11 +363,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onModelChange={setModel}
               availableModels={availableModels}
             />
+            )}
 
+            {activeTab === 'voice' && (
             <section className="settings-section">
-              <h4 className="settings-section-title">
-                <Volume2 size={16} className="settings-section-icon" /> Voice
-              </h4>
 
               <label className="settings-toggle-row">
                 <span className="settings-toggle-text">
@@ -374,6 +423,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               )}
             </section>
+            )}
           </div>
 
           <div className="modal-footer">
