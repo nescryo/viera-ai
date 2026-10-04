@@ -6,7 +6,7 @@ import type { Persona } from '../../types';
 import { getCharacterPackage } from '../../characters/registry';
 import type { CharacterPackage } from '../../characters/types';
 import { ttsService } from '../../services/ttsService';
-import { VieraAnimationController } from './animation';
+import { VieraAnimationController, resolveLipSyncSource } from './animation';
 import { isRegisteredEmotion, DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 import { setupCharacterStage } from './environment/characterSphereStage';
 import { createCosmicParticles } from './environment/cosmicParticles';
@@ -17,14 +17,12 @@ if (typeof window !== 'undefined') {
 
 interface SceneProps {
   currentPersona: CharacterPackage | Persona;
-  isSpeaking: boolean;
   currentEmotion: string;
   onSelectEmotion?: (emotion: string) => void;
 }
 
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
-  isSpeaking,
   currentEmotion,
   onSelectEmotion
 }) => {
@@ -36,11 +34,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   useEffect(() => {
     currentEmotionRef.current = currentEmotion;
   }, [currentEmotion]);
-
-  const isSpeakingRef = useRef(isSpeaking);
-  useEffect(() => {
-    isSpeakingRef.current = isSpeaking;
-  }, [isSpeaking]);
 
   const onSelectEmotionRef = useRef(onSelectEmotion);
   useEffect(() => {
@@ -288,7 +281,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           pointerX: pX,
           pointerY: pY,
           emotion: emo,
-          isSpeaking: isSpeakingRef.current || ttsService.isSpeaking(),
+          lipSyncSource: resolveLipSyncSource({
+            isWebAudioPlaying: ttsService.isWebAudioPlaying(),
+            isWebSpeechSpeaking: ttsService.isWebSpeechSpeaking()
+          }),
+          visemeWeights: ttsService.getVisemeWeights(),
           cheekMaterials: cheekMaterialsRef.current,
           foreheadMaterial: foreheadShadowMaterialRef.current
         });

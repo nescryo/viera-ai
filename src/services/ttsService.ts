@@ -1,6 +1,7 @@
 import type { Persona, ApiConfig } from '../types';
 import { TtsChunker, sanitizeTextForSpeech } from './tts/ttsChunker';
 import { PlaybackQueue } from './tts/playbackQueue';
+import type { VisemeWeights } from './tts/lipsyncAnalyzer';
 import { synthesizeUniversalAudio, speakWebSpeechFallback } from './tts/universalTtsEngine';
 import { resolveTtsSettings } from './tts/ttsConfigResolver';
 import type { TtsChunk, TtsStreamSession, TTSBoundaryEvent } from './tts/ttsTypes';
@@ -37,10 +38,27 @@ class TTSService {
   }
 
   /**
-   * Live vocal volume (0.0 to 1.0) for 3D avatar mouth lip sync
+   * True only while real audio is actively playing through Web Audio (Fish Audio /
+   * OpenAI). Lets the avatar drive lip-sync from real amplitude and keep the mouth
+   * closed while audio is still being synthesized or during silent gaps.
    */
-  public getAverageVolume(): number {
-    return this.playbackQueue.getAverageVolume();
+  public isWebAudioPlaying(): boolean {
+    return this.playbackQueue.isWebAudioPlaying();
+  }
+
+  /**
+   * True only while the browser Web Speech fallback is audibly speaking.
+   */
+  public isWebSpeechSpeaking(): boolean {
+    return typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking;
+  }
+
+  /**
+   * Live viseme morph weights (あいうえお + closed) derived from the playing
+   * audio via wawa-lipsync. Used by the avatar for varied, timed lip-sync.
+   */
+  public getVisemeWeights(): VisemeWeights {
+    return this.playbackQueue.getVisemeWeights();
   }
 
   /**

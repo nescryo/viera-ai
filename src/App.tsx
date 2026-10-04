@@ -347,7 +347,6 @@ export function App() {
     <div className="app-container">
       <Scene 
         currentPersona={currentPersona}
-        isSpeaking={isSpeaking}
         currentEmotion={currentEmotion}
         onSelectEmotion={handleSelectEmotion}
       />

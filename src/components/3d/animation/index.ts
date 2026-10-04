@@ -3,11 +3,14 @@ import type { BoneReferences } from './types';
 import { ProceduralIdleEngine } from './proceduralIdleEngine';
 import { GazeTrackingEngine } from './gazeTrackingEngine';
 import { FacialExpressionEngine } from './facialExpressionEngine';
+import { SILENT_VISEMES } from './lipSyncSolver';
+import type { LipSyncSource, VisemeInput } from './lipSyncSolver';
 
 export * from './types';
 export * from './proceduralIdleEngine';
 export * from './gazeTrackingEngine';
 export * from './facialExpressionEngine';
+export * from './lipSyncSolver';
 
 /**
  * Extracts and categorizes all skeleton bones from the MMD SkinnedMesh
@@ -255,9 +258,10 @@ export class VieraAnimationController {
     pointerX,
     pointerY,
     emotion,
-    isSpeaking,
+    lipSyncSource,
     cheekMaterials,
-    foreheadMaterial
+    foreheadMaterial,
+    visemeWeights = SILENT_VISEMES
   }: {
     mesh: THREE.SkinnedMesh;
     modelGroup: THREE.Group;
@@ -266,9 +270,10 @@ export class VieraAnimationController {
     pointerX: number;
     pointerY: number;
     emotion: string;
-    isSpeaking: boolean;
+    lipSyncSource: LipSyncSource;
     cheekMaterials: THREE.MeshBasicMaterial[];
     foreheadMaterial: THREE.MeshBasicMaterial | null;
+    visemeWeights?: VisemeInput;
   }): void {
     // 1. Calculate Target Yaw and Pitch from pointer
     const targetTorsoYaw = pointerX * 0.16;
@@ -302,11 +307,12 @@ export class VieraAnimationController {
     this.facialEngine.update(
       mesh,
       emotion,
-      isSpeaking,
+      lipSyncSource,
       elapsedTime,
       delta,
       cheekMaterials,
-      foreheadMaterial
+      foreheadMaterial,
+      visemeWeights
     );
   }
 }

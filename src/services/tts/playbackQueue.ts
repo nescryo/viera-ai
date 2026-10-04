@@ -4,9 +4,13 @@
  * Guarantees that audio chunks fetched concurrently play strictly in sequence (0, 1, 2, ...).
  * Routes audio through warmth EQ, studio acoustic convolver reverb, and an AnalyserNode for lip-sync.
  */
+import { LipsyncAnalyzer } from './lipsyncAnalyzer';
+import type { VisemeWeights } from './lipsyncAnalyzer';
+
 export class PlaybackQueue {
   private audioCtx: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private lipsyncAnalyzer = new LipsyncAnalyzer();
   private currentSource: AudioBufferSourceNode | null = null;
 
   private nextSequenceToPlay = 0;
@@ -39,23 +43,6 @@ export class PlaybackQueue {
    */
   public getAnalyser(): AnalyserNode | null {
     return this.analyser;
-  }
-
-  /**
-   * Reads real-time vocal volume (0.0 to 1.0) from the AnalyserNode for procedural mouth opening.
-   */
-  public getAverageVolume(): number {
-    if (!this.analyser || !this.isCurrentlyPlaying) return 0;
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-
-    let sum = 0;
-    // Focus on vocal speech frequencies (around 100Hz - 3500Hz)
-    const voiceBins = Math.min(dataArray.length, 32);
-    for (let i = 0; i < voiceBins; i++) {
-      sum += dataArray[i];
-    }
-    return (sum / voiceBins) / 255;
   }
 
   /**
@@ -148,8 +135,8 @@ export class PlaybackQueue {
       // Initialize AnalyserNode if not already created
       if (!this.analyser) {
         this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 256;
-        this.analyser.smoothingTimeConstant = 0.8;
+        this.analyser.fftSize = 512;
+        this.analyser.smoothingTimeConstant = 0.5;
       }
 
       // 1. Equalizer for warm vocal acoustics
@@ -193,6 +180,11 @@ export class PlaybackQueue {
       // Tee master into Analyser (for lip sync) and Destination (speakers)
       masterGain.connect(this.analyser);
       masterGain.connect(ctx.destination);
+
+      // Also tee the post-DSP signal into the wawa-lipsync analyser for viseme
+      // detection. Sharing our AudioContext keeps the graph valid.
+      const lipsyncAnalyser = this.lipsyncAnalyzer.getAnalyserFor(ctx);
+      masterGain.connect(lipsyncAnalyser);
 
       source.onended = () => {
         if (sessionToken !== this.activeSessionToken) return;
@@ -244,5 +236,27 @@ export class PlaybackQueue {
 
   public isSpeaking(): boolean {
     return this.isCurrentlyPlaying || this.readyBuffers.size > 0;
+  }
+
+  /**
+   * True only while a decoded audio buffer is actively routed through Web Audio
+   * (Fish Audio / OpenAI). This is the real signal that sound is coming out of
+   * the speakers right now, as opposed to isSpeaking() which is also true while
+   * chunks are still being synthesized or queued (no audible sound yet).
+   */
+  public isWebAudioPlaying(): boolean {
+    return this.isCurrentlyPlaying;
+  }
+
+  /**
+   * Analyses the live post-DSP audio and returns the current viseme morph
+   * weights (あいうえお + closed). Returns silent weights when no audio is
+   * actively playing, so the mouth closes during gaps and before the first chunk.
+   */
+  public getVisemeWeights(): VisemeWeights {
+    if (!this.isCurrentlyPlaying) {
+      return { a: 0, i: 0, u: 0, e: 0, o: 0, closed: 0, volume: 0 };
+    }
+    return this.lipsyncAnalyzer.analyze();
   }
 }

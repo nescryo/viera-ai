@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { BlinkState } from './types';
 import { getEmotionCapability } from '../../../data/emotionRegistry';
+import { LipSyncSolver, SILENT_VISEMES } from './lipSyncSolver';
+import type { LipSyncSource, VisemeInput } from './lipSyncSolver';
 
 /**
  * AIRI-inspired Facial Expression, Auto-Blink & Lip-Sync Engine
@@ -21,6 +23,10 @@ export class FacialExpressionEngine {
   // Active smooth morph influences
   private targetMorphMap: Map<number, number> = new Map();
 
+  // Pure lip-sync solver (per-vowel smoothing + openness envelope), unit-tested
+  // in tests/lipSyncSolver.test.ts.
+  private lipSync = new LipSyncSolver();
+
 
 
   /**
@@ -29,11 +35,12 @@ export class FacialExpressionEngine {
   public update(
     mesh: THREE.SkinnedMesh,
     emotion: string,
-    isSpeaking: boolean,
+    lipSyncSource: LipSyncSource,
     elapsedTime: number,
     delta: number,
     cheekMaterials: THREE.MeshBasicMaterial[],
-    foreheadMaterial: THREE.MeshBasicMaterial | null
+    foreheadMaterial: THREE.MeshBasicMaterial | null,
+    visemeWeights: VisemeInput = SILENT_VISEMES
   ): void {
     if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) return;
 
@@ -187,50 +194,69 @@ export class FacialExpressionEngine {
       targetSmallMouth = 0.35;
     }
 
-    // 4. WINNER-RUNNER ORGANIC SPEECH WAVE GENERATOR
-    if (isSpeaking) {
-      const t = elapsedTime;
-      const speechWave1 = Math.sin(t * 13.5);
-      const speechWave2 = Math.sin(t * 23.7) * 0.4;
-      const speechWave3 = Math.cos(t * 8.3) * 0.3;
-      const noisePause = Math.sin(t * 3.1);
+    // 4. VISEME-DRIVEN LIP-SYNC (wawa-lipsync)
+    // The playback queue runs wawa-lipsync on the live post-DSP audio and emits
+    // viseme weights for あいうえお + a closed consonant hint. We smooth each
+    // vowel channel and an overall "openness" envelope so the mouth forms varied
+    // shapes that track the actual speech, and closes during pauses / before
+    // audio starts (all weights are 0 when silent).
+    // The solver runs every frame so the mouth also eases closed when the source
+    // drops to 'none' (before audio arrives, between chunks, after speech ends).
+    const lip = this.lipSync.step(lipSyncSource, visemeWeights, clampedDelta, elapsedTime);
+    if (lip.openness > 0.001) {
+      const sA = lip.a;
+      const sI = lip.i;
+      const sU = lip.u;
+      const sE = lip.e;
+      const sO = lip.o;
+      const vClosed = lip.closed;
+      // Energetic speech opens the mouth wider (and raises the caps); calm speech
+      // stays smaller. gain ranges from ~0.75 (calm) to ~1.35 (excited).
+      const gain = 0.75 + 0.6 * lip.intensity;
+      const env = Math.min(1, lip.openness * gain);
+      const cap = (base: number) => base * gain;
 
-      // Syllable micro-pauses
-      const organicFactor = noisePause < -0.3 ? 0.08 : 1.0;
-      const combinedWave = Math.max(0, (speechWave1 + speechWave2 + speechWave3) * 0.55);
-      const openPower = Math.pow(combinedWave, 1.1) * organicFactor;
-
+      // Emotion-aware mouth styling layered on top of the smoothed viseme shapes.
       if (emotion === 'sad' || emotion === 'terrified') {
         targetSmileMouth = 0;
         targetFrownMouth = 0.22;
         targetSmallMouth = 0;
-        targetVowelA = Math.min(0.35, openPower * 0.40);
-        targetVowelI = Math.abs(Math.sin(t * 9.0)) * 0.15 * organicFactor;
-        targetVowelO = Math.abs(Math.sin(t * 6.0)) * 0.20 * organicFactor;
+        targetVowelA = Math.min(cap(0.35), sA * env * 0.9);
+        targetVowelI = Math.min(cap(0.18), sI * env * 0.6);
+        targetVowelO = Math.min(cap(0.25), sO * env * 0.8);
       } else if (emotion === 'pouting') {
         targetSmileMouth = 0;
         targetFrownMouth = 0.12;
         targetSmallMouth = 0;
         targetTriangleMouth = 0.10;
         targetPuckerMouth = 0.10;
-        targetVowelA = Math.min(0.38, openPower * 0.45);
-        targetVowelI = Math.abs(Math.sin(t * 9.5)) * 0.18 * organicFactor;
-        targetVowelO = Math.abs(Math.sin(t * 6.5)) * 0.20 * organicFactor;
+        targetVowelA = Math.min(cap(0.38), sA * env * 0.9);
+        targetVowelU = Math.min(cap(0.24), sU * env);
+        targetVowelO = Math.min(cap(0.28), sO * env);
       } else if (emotion === 'angry' || emotion === 'jealous') {
         targetSmileMouth = 0;
         targetFrownMouth = 0.28;
         targetSmallMouth = 0;
-        targetVowelA = Math.min(0.42, openPower * 0.48);
+        targetVowelA = Math.min(cap(0.48), sA * env);
+        targetVowelI = Math.min(cap(0.24), sI * env * 0.7);
       } else if (emotion === 'blush' || emotion === 'blush-hardly') {
         targetSmileMouth = 0.20;
-        targetSmallMouth = 0.35 * (1 - openPower);
-        targetVowelA = Math.min(0.35, openPower * 0.38);
+        targetSmallMouth = 0.35 * (1 - env);
+        targetVowelA = Math.min(cap(0.35), sA * env * 0.85);
+        targetVowelU = Math.min(cap(0.24), sU * env);
       } else {
-        targetSmileMouth = 0.35;
-        targetVowelA = Math.min(0.52, openPower * 0.55);
-        targetVowelI = Math.abs(Math.sin(t * 11.2)) * 0.22 * organicFactor;
-        targetVowelE = Math.abs(Math.cos(t * 17.4)) * 0.18 * organicFactor;
-        targetVowelO = Math.abs(Math.sin(t * 6.8)) * 0.25 * organicFactor;
+        // Speech-reactive smile: brighter on energetic lines.
+        targetSmileMouth = 0.10 + 0.10 * env + 0.12 * lip.intensity;
+        targetVowelA = Math.min(cap(0.58), sA * env);
+        targetVowelI = Math.min(cap(0.34), sI * env);
+        targetVowelU = Math.min(cap(0.30), sU * env);
+        targetVowelE = Math.min(cap(0.30), sE * env);
+        targetVowelO = Math.min(cap(0.38), sO * env);
+      }
+
+      // Consonant closures briefly narrow the mouth over the open vowel.
+      if (vClosed > 0.01) {
+        targetSmallMouth = Math.max(targetSmallMouth, Math.min(0.4, vClosed * 0.4));
       }
     }
 
@@ -260,13 +286,22 @@ export class FacialExpressionEngine {
     setMorph(morphSadEye, targetSadEye);
 
     // 5. SMOOTH MORPH INTERPOLATION STEP
+    // Frame-rate independent smoothing. Mouth/viseme morphs use a faster rate so
+    // the lips track speech crisply, while expression morphs ease more gently.
+    const mouthMorphs = new Set<number | undefined>([
+      morphVowelA, morphVowelI, morphVowelU, morphVowelE, morphVowelO,
+      morphSmileMouth, morphSmallMouth, morphFrownMouth, morphTriangleMouth, morphPuckerMouth
+    ]);
+    const mouthFactor = 1 - Math.exp(-26 * clampedDelta); // ~crisp lip-sync
+    const faceFactor = 1 - Math.exp(-10 * clampedDelta);  // ~gentle expressions
     for (let i = 0; i < influences.length; i++) {
       const targetVal = this.targetMorphMap.get(i) ?? 0;
       if (i === morphBlink || i === morphSmileBlink) {
         // Direct snappy assignment for reflex blinks so it perfectly tracks the exact 0.18s sine curve
         influences[i] = targetVal;
       } else {
-        influences[i] += (targetVal - influences[i]) * 0.15;
+        const factor = mouthMorphs.has(i) ? mouthFactor : faceFactor;
+        influences[i] += (targetVal - influences[i]) * factor;
       }
     }
 
