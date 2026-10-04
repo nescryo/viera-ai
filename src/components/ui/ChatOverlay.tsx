@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, Persona, UserProfile } from '../../types';
 import { 
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
-  Mic, MicOff, ChevronDown, MessageCircle, MessageSquare
+  Mic, MicOff, MessageCircle, MessageCircleOff
 } from 'lucide-react';
 import { soundService } from '../../services/soundService';
 
@@ -14,21 +14,11 @@ interface ChatOverlayProps {
   onRegenerateResponse: () => void;
   onSpeakMessage: (msg: ChatMessage) => void;
   onStopSpeaking: () => void;
-  onOpenLorebook?: () => void;
-  onOpenHistory?: () => void;
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   isLoading: boolean;
   onErrorToast?: (title: string, message: string) => void;
 }
-
-const getUserInitials = (name?: string): string => {
-  if (!name) return 'YOU';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'YOU';
-  const initials = parts.slice(0, 2).map((p) => p[0]).join('');
-  return initials.toUpperCase();
-};
 
 function escapeHtml(str: string): string {
   return str
@@ -64,8 +54,6 @@ const renderFormattedText = (text: string) => {
 
 const ChatMessageItem: React.FC<{
   msg: ChatMessage;
-  currentPersona: Persona;
-  userProfile: UserProfile | null;
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   copiedId: string | null;
@@ -75,8 +63,6 @@ const ChatMessageItem: React.FC<{
   onRegenerateResponse: () => void;
 }> = React.memo(({
   msg,
-  currentPersona,
-  userProfile,
   isSpeaking,
   activeSpeakingId,
   copiedId,
@@ -90,31 +76,12 @@ const ChatMessageItem: React.FC<{
 
   return (
     <div className={`cai-message-card ${isAI ? 'cai-msg-ai' : 'cai-msg-user'}`}>
-      <div className="cai-avatar-column">
-        {isAI ? (
-          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-msg-avatar" />
-        ) : userProfile?.picture ? (
-          <img
-            src={userProfile.picture}
-            alt={userProfile.nickname || 'You'}
-            className="cai-msg-avatar"
-          />
-        ) : (
-          <div className="cai-user-avatar">{getUserInitials(userProfile?.nickname)}</div>
-        )}
+      <div className="cai-msg-bubble">
+        {renderFormattedText(msg.text)}
       </div>
 
-      <div className="cai-content-column">
-        <div className="cai-msg-header">
-          <span className="cai-msg-sender">{isAI ? currentPersona.name : (userProfile?.nickname || 'You')}</span>
-          <span className="cai-msg-time">{msg.timestamp}</span>
-          {isAI && <span className="cai-bot-badge">BOT</span>}
-        </div>
-
-        <div className="cai-msg-bubble">
-          {renderFormattedText(msg.text)}
-        </div>
-
+      <div className="cai-msg-meta">
+        <span className="cai-msg-time">{msg.timestamp}</span>
         {isAI && (
           <div className="cai-msg-actions">
             <button 
@@ -123,7 +90,7 @@ const ChatMessageItem: React.FC<{
               title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
               aria-label={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
             >
-              {isCurrentlySpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {isCurrentlySpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
             </button>
 
             <button 
@@ -132,7 +99,7 @@ const ChatMessageItem: React.FC<{
               title="Copy text"
               aria-label="Copy text to clipboard"
             >
-              {copiedId === msg.id ? <Check size={16} color="#23a55a" /> : <Copy size={16} />}
+              {copiedId === msg.id ? <Check size={15} /> : <Copy size={15} />}
             </button>
 
             <button 
@@ -141,7 +108,7 @@ const ChatMessageItem: React.FC<{
               title="Regenerate response"
               aria-label="Regenerate response"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={15} />
             </button>
           </div>
         )}
@@ -153,13 +120,10 @@ const ChatMessageItem: React.FC<{
 export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   messages,
   currentPersona,
-  userProfile,
   onSendMessage,
   onRegenerateResponse,
   onSpeakMessage,
   onStopSpeaking,
-  onOpenLorebook,
-  onOpenHistory,
   isSpeaking,
   activeSpeakingId,
   isLoading,
@@ -168,7 +132,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isFeedHidden, setIsFeedHidden] = useState(false);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -176,7 +140,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, isLoading, latestMessageText]);
+  }, [messages.length, isLoading, latestMessageText, isFeedHidden]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,121 +214,58 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     }
   };
 
-  if (isMinimized) {
-    return (
-      <button 
-        type="button"
-        className="chat-toggle-fab glass-panel fade-in"
-        onClick={() => setIsMinimized(false)}
-        aria-label={`Open chat with ${currentPersona.name}`}
-      >
-        <div className="fab-avatar-badge">
-          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="fab-avatar-img" />
-          <span className="fab-pulse-dot" />
-        </div>
-        <span className="fab-text">Chat with {currentPersona.name}</span>
-        <MessageCircle size={18} className="fab-icon" />
-      </button>
-    );
-  }
-
   return (
-    <div className="chat-overlay-container glass-panel fade-in">
-      <div className="chat-header-banner">
-        <div 
-          className="banner-left clickable-banner"
-          onClick={onOpenLorebook}
-          title="Click to view & edit character Lorebook"
-          role="button"
-          tabIndex={0}
-        >
-          <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="banner-avatar" />
-          <div className="banner-details">
-            <h2 className="banner-name">{currentPersona.name}</h2>
-            <p className="banner-tagline">{currentPersona.tagline}</p>
-          </div>
-        </div>
-
-        <div className="banner-right-actions">
-          {onOpenHistory && (
-            <button 
-              type="button"
-              className="chat-header-action-btn" 
-              onClick={onOpenHistory}
-              title="Conversations History"
-              aria-label="Open Conversations History"
-            >
-              <MessageSquare size={17} />
-            </button>
-          )}
-
-          <button 
-            type="button"
-            className="chat-collapse-btn" 
-            onClick={() => setIsMinimized(true)}
-            title="Minimize Chat"
-            aria-label="Minimize Chat Overlay"
-          >
-            <ChevronDown size={20} />
-          </button>
-        </div>
-      </div>
-
-      <div className="chat-messages-feed">
-        <div className="cai-welcome-card">
-          <img 
-            src={currentPersona.avatarUrl} 
-            alt={currentPersona.name} 
-            className="cai-large-avatar clickable-avatar" 
-            onClick={onOpenLorebook}
-            title="Click to view & edit character Lorebook"
-            role="button"
-            tabIndex={0}
-          />
-          <h3 className="cai-welcome-title">{currentPersona.name}</h3>
-          <p className="cai-welcome-tagline">{currentPersona.tagline}</p>
-          <div className="cai-greeting-bubble">
-            {renderFormattedText(currentPersona.greeting)}
-          </div>
-        </div>
-
-        {messages.map((msg) => (
-          <ChatMessageItem
-            key={msg.id}
-            msg={msg}
-            currentPersona={currentPersona}
-            userProfile={userProfile}
-            isSpeaking={isSpeaking}
-            activeSpeakingId={activeSpeakingId}
-            copiedId={copiedId}
-            onSpeakMessage={onSpeakMessage}
-            onStopSpeaking={onStopSpeaking}
-            onCopy={handleCopy}
-            onRegenerateResponse={onRegenerateResponse}
-          />
-        ))}
-
-        {isLoading && (
-          <div className="cai-message-card cai-msg-ai typing-indicator-card">
-            <div className="cai-avatar-column">
-              <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="cai-msg-avatar spinning-avatar" />
+    <div className="chat-overlay-container fade-in">
+      {!isFeedHidden && (
+        <div className="chat-messages-feed">
+          <div className="cai-message-card cai-msg-ai cai-greeting">
+            <div className="cai-msg-bubble">
+              {renderFormattedText(currentPersona.greeting)}
             </div>
-            <div className="cai-content-column">
-              <div className="cai-msg-header">
-                <span className="cai-msg-sender">{currentPersona.name}</span>
-                <span className="cai-typing-status">typing...</span>
-              </div>
-              <div className="cai-dots-loader">
+          </div>
+
+          {messages.map((msg) => (
+            <ChatMessageItem
+              key={msg.id}
+              msg={msg}
+              isSpeaking={isSpeaking}
+              activeSpeakingId={activeSpeakingId}
+              copiedId={copiedId}
+              onSpeakMessage={onSpeakMessage}
+              onStopSpeaking={onStopSpeaking}
+              onCopy={handleCopy}
+              onRegenerateResponse={onRegenerateResponse}
+            />
+          ))}
+
+          {isLoading && (
+            <div
+              className="cai-message-card cai-msg-ai typing-indicator-card"
+              role="status"
+              aria-label={`${currentPersona.name} is typing`}
+            >
+              <div className="cai-msg-bubble cai-dots-loader">
                 <span /><span /><span />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          <div ref={messagesEndRef} />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="cai-input-form">
+        <button
+          type="button"
+          className="feed-toggle-btn"
+          onClick={() => setIsFeedHidden((prev) => !prev)}
+          aria-pressed={isFeedHidden}
+          title={isFeedHidden ? 'Show messages' : 'Hide messages'}
+          aria-label={isFeedHidden ? 'Show messages' : 'Hide messages'}
+        >
+          {isFeedHidden ? <MessageCircle size={17} /> : <MessageCircleOff size={17} />}
+        </button>
+
         <button 
           type="button" 
           className={`mic-btn ${isRecording ? 'recording' : ''}`}

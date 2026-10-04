@@ -1,14 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { MMDLoader, OutlineEffect } from 'three-stdlib';
 import * as MMDParser from 'mmd-parser';
-import { ChevronDown } from 'lucide-react';
 import type { Persona } from '../../types';
 import { getCharacterPackage } from '../../characters/registry';
 import type { CharacterPackage } from '../../characters/types';
 import { ttsService } from '../../services/ttsService';
 import { VieraAnimationController } from './animation';
-import { EMOTION_REGISTRY, isRegisteredEmotion, DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
+import { isRegisteredEmotion, DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 import { setupCharacterStage } from './environment/characterSphereStage';
 import { createCosmicParticles } from './environment/cosmicParticles';
 
@@ -23,8 +22,6 @@ interface SceneProps {
   onSelectEmotion?: (emotion: string) => void;
 }
 
-const TESTING_EMOTIONS = EMOTION_REGISTRY;
-
 export const Scene: React.FC<SceneProps> = React.memo(({
   currentPersona,
   isSpeaking,
@@ -33,11 +30,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
-  const [modelLoaded, setModelLoaded] = useState(false);
-  const [loadStatus, setLoadStatus] = useState<string>("Loading 3D Model...");
-  const [isEmotionListOpen, setIsEmotionListOpen] = useState<boolean>(() => 
-    typeof window !== 'undefined' ? window.innerWidth > 900 : false
-  );
 
   // Keep track of currentEmotion in ref to avoid re-loading 3D model on emotion changes
   const currentEmotionRef = useRef(currentEmotion);
@@ -164,7 +156,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     const mmdLoader = new MMDLoader(loadingManager);
     mmdLoader.setResourcePath(charPkg.model.resourcePath);
 
-    setLoadStatus(`Loading ${charPkg.name} 3D Model...`);
 
     mmdLoader.load(
       charPkg.model.pmxUrl,
@@ -198,15 +189,12 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         // appears fully shaded at once instead of materials popping in.
         mmdMesh.visible = false;
         modelGroup.add(mmdMesh);
-        setLoadStatus(`Finalizing ${charPkg.name} textures...`);
 
         let revealed = false;
         const revealModel = () => {
           if (revealed || isDisposed) return;
           revealed = true;
           mmdMesh.visible = true;
-          setModelLoaded(true);
-          setLoadStatus(`${charPkg.name} 3D Active`);
         };
 
         // Reveal once ALL textures tracked by the manager have finished loading.
@@ -221,12 +209,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           }
         });
       },
-      (xhr: ProgressEvent) => {
-        if (xhr.lengthComputable && !isDisposed) {
-          const percent = ((xhr.loaded / xhr.total) * 100).toFixed(0);
-          setLoadStatus(`Loading ${charPkg.name} 3D Model (${percent}%)`);
-        }
-      },
+      undefined,
       (error: unknown) => {
         if (isDisposed) return;
         console.error("PMX Load error:", error);
@@ -244,8 +227,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         avatarCard.position.y = 1.15;
         modelGroup.add(avatarCard);
 
-        setModelLoaded(true);
-        setLoadStatus(`${charPkg.name} 3D (Fallback Avatar Active)`);
       }
     );
 
@@ -367,45 +348,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   return (
     <div className="scene-container">
       <div ref={containerRef} className="three-canvas-container" />
-      
-      <div className="scene-status-overlay">
-        <span className="live-vrm-badge">
-          <span className="pulse-dot" /> 
-          {modelLoaded ? `3D Viewport • ${loadStatus}` : loadStatus}
-        </span>
-        <span className="current-emotion-badge">
-          Expression: {currentEmotion || 'Relaxed'}
-        </span>
-
-        {/* Vertical Emotion Testing Toolbar */}
-        <div className="testing-emotions-bar">
-          <button 
-            type="button"
-            className="testing-label-toggle"
-            onClick={() => setIsEmotionListOpen((prev) => !prev)}
-            aria-expanded={isEmotionListOpen}
-            aria-label="Toggle expressions list"
-          >
-            <span>Test Expression</span>
-            <ChevronDown size={14} className={`toggle-arrow ${isEmotionListOpen ? 'open' : ''}`} />
-          </button>
-          
-          {isEmotionListOpen && (
-            <div className="testing-emotions-list">
-              {TESTING_EMOTIONS.map((emo) => (
-                <button
-                  key={emo.id}
-                  className={`emotion-test-btn ${currentEmotion === emo.id ? 'active' : ''}`}
-                  onClick={() => onSelectEmotion?.(emo.id)}
-                  aria-label={`Test expression: ${emo.label}`}
-                >
-                  {emo.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 });

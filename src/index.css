@@ -123,3 +123,13 @@ textarea:focus-visible,
   outline: 2px solid var(--accent-cyan) !important;
   outline-offset: 2px !important;
 }
+
+/* Quiet icon buttons: a soft ring instead of the bright cyan outline */
+.header-right .icon-btn:focus-visible,
+.feed-toggle-btn:focus-visible,
+.cai-action-btn:focus-visible,
+.mic-btn:focus-visible,
+.send-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55) !important;
+  outline-offset: 1px !important;
+}

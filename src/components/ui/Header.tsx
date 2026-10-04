@@ -1,22 +1,26 @@
 import React from 'react';
 import type { UserProfile } from '../../types';
-import { Settings, User } from 'lucide-react';
+import { MessagesSquare, Settings, User } from 'lucide-react';
+import { ExpressionMenu } from './ExpressionMenu';
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onOpenProfile: () => void;
   userProfile: UserProfile | null;
-  // Optional legacy props so existing callers stay valid
-  currentPersona?: any;
-  onOpenHistory?: () => void;
-  onOpenAlternativeMemory?: () => void;
-  apiConfig?: any;
+  currentEmotion: string;
+  onSelectEmotion: (emotion: string) => void;
+  onOpenHistory: () => void;
+  onOpenLorebook: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenProfile,
-  userProfile
+  userProfile,
+  currentEmotion,
+  onSelectEmotion,
+  onOpenHistory,
+  onOpenLorebook
 }) => {
   return (
     <header className="header-container floating-header">
@@ -30,6 +34,22 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Settings & Profile (⚙ ◉) */}
       <div className="header-right">
+        <ExpressionMenu
+          currentEmotion={currentEmotion}
+          onSelectEmotion={onSelectEmotion}
+          onOpenLorebook={onOpenLorebook}
+        />
+
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onOpenHistory}
+          title="Conversation History"
+          aria-label="Open Conversation History"
+        >
+          <MessagesSquare size={20} strokeWidth={2} />
+        </button>
+
         {/* Settings Icon */}
         <button 
           className="icon-btn settings-btn" 
@@ -37,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Settings & API"
           aria-label="Open Settings and API Configuration"
         >
-          <Settings size={18} />
+          <Settings size={20} strokeWidth={2} />
         </button>
 
         {/* User Profile Avatar Icon */}
@@ -50,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
           {userProfile?.picture ? (
             <img src={userProfile.picture} alt={userProfile.nickname || 'Profile'} className="header-user-avatar" />
           ) : (
-            <User size={18} />
+            <User size={24} strokeWidth={2} />
           )}
         </button>
       </div>

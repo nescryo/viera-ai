@@ -356,6 +356,10 @@ export function App() {
         onOpenSettings={() => setActiveModal('settings')}
         onOpenProfile={() => setActiveModal('profile')}
         userProfile={userProfile}
+        currentEmotion={currentEmotion}
+        onSelectEmotion={handleSelectEmotion}
+        onOpenHistory={() => setActiveModal('history')}
+        onOpenLorebook={() => setActiveModal('alternativeMemory')}
       />
 
       <ChatOverlay
@@ -366,8 +370,6 @@ export function App() {
         onRegenerateResponse={handleRegenerateResponse}
         onSpeakMessage={(msg) => speakMessage(msg, currentPersona, apiConfig)}
         onStopSpeaking={stopSpeaking}
-        onOpenLorebook={() => setActiveModal('alternativeMemory')}
-        onOpenHistory={() => setActiveModal('history')}
         isSpeaking={isSpeaking}
         activeSpeakingId={activeSpeakingId}
         isLoading={isLoading}
