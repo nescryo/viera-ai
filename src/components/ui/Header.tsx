@@ -1,103 +1,36 @@
-import React, { useEffect, useState } from 'react';
-import type { Persona, ApiConfig, UserProfile } from '../../types';
-import { Settings, Sparkles, Circle, MessageSquare, User } from 'lucide-react';
-import { checkEndpointOnline } from '../../services/aiService';
+import React from 'react';
+import type { UserProfile } from '../../types';
+import { Settings, User } from 'lucide-react';
 
 interface HeaderProps {
-  currentPersona: Persona;
   onOpenSettings: () => void;
-  onOpenHistory: () => void;
   onOpenProfile: () => void;
-  onOpenAlternativeMemory?: () => void;
-  apiConfig: ApiConfig;
   userProfile: UserProfile | null;
+  // Optional legacy props so existing callers stay valid
+  currentPersona?: any;
+  onOpenHistory?: () => void;
+  onOpenAlternativeMemory?: () => void;
+  apiConfig?: any;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentPersona,
   onOpenSettings,
-  onOpenHistory,
   onOpenProfile,
-  onOpenAlternativeMemory,
-  apiConfig,
   userProfile
 }) => {
-  const [isEndpointOnline, setIsEndpointOnline] = useState<boolean>(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    const checkConnection = async () => {
-      const url = apiConfig.baseUrl || apiConfig.lmStudioUrl || 'https://openrouter.ai/api/v1';
-      const online = await checkEndpointOnline(url);
-      if (isMounted) setIsEndpointOnline(online);
-    };
-
-    checkConnection();
-    const interval = setInterval(checkConnection, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [apiConfig.baseUrl, apiConfig.lmStudioUrl]);
-
-  const activeModelDisplay = apiConfig.model ? apiConfig.model.split('/').pop() : 'AI Model';
-
   return (
-    <header className="header-container glass-panel">
-      {/* Left: App Brand & Active 3D Character Status */}
+    <header className="header-container floating-header">
+      {/* Left: App Brand (Pom-Pom Logo + VIERA) */}
       <div className="header-left">
         <div className="brand-badge">
-          <Sparkles className="icon-sparkle" size={20} />
+          <img src="/pom-pom-circle.png" alt="Viera Logo" className="brand-logo-img" />
           <span className="brand-title">VIERA</span>
-          <span className="brand-version">3D</span>
-        </div>
-
-        <div className="divider-v" />
-
-        <div 
-          className="single-persona-chip clickable-chip"
-          onClick={onOpenAlternativeMemory}
-          title="Click to view & edit character Lorebook"
-          role="button"
-          tabIndex={0}
-        >
-          <div className="avatar-wrapper">
-            <img src={currentPersona.avatarUrl} alt={currentPersona.name} className="chip-avatar" />
-            <Circle className="status-online" size={10} />
-          </div>
-          <div className="chip-info">
-            <span className="chip-name">{currentPersona.name}</span>
-            <span className="chip-category">
-              {currentPersona.customLore?.trim() ? '✦ Lorebook Active' : 'Active 3D Avatar'}
-            </span>
-          </div>
         </div>
       </div>
 
-      {/* Right: 3D Model Loader, History, Settings & Profile */}
+      {/* Right: Settings & Profile (⚙ ◉) */}
       <div className="header-right">
-        <div 
-          className={`provider-pill ${isEndpointOnline ? 'online' : 'offline'}`}
-          title={`Endpoint: ${apiConfig.baseUrl || 'https://openrouter.ai/api/v1'}\nModel: ${apiConfig.model || 'Default'}`}
-        >
-          <span className={`provider-dot ${isEndpointOnline ? 'dot-online' : 'dot-offline'}`} />
-          <span className="provider-name">
-            {activeModelDisplay}
-          </span>
-        </div>
-
-
-        {/* 1. Conversation History Icon (Left of Settings) */}
-        <button 
-          className="icon-btn history-btn" 
-          onClick={onOpenHistory} 
-          title="Conversations History"
-          aria-label="Open Conversations History"
-        >
-          <MessageSquare size={18} />
-        </button>
-
-        {/* 2. Settings Icon */}
+        {/* Settings Icon */}
         <button 
           className="icon-btn settings-btn" 
           onClick={onOpenSettings} 
@@ -107,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
           <Settings size={18} />
         </button>
 
-        {/* 3. User Profile Avatar Icon (Right of Settings) */}
+        {/* User Profile Avatar Icon */}
         <button 
           className="icon-btn profile-avatar-btn" 
           onClick={onOpenProfile} 

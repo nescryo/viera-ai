@@ -353,12 +353,8 @@ export function App() {
       />
 
       <Header
-        currentPersona={currentPersona}
         onOpenSettings={() => setActiveModal('settings')}
-        onOpenHistory={() => setActiveModal('history')}
         onOpenProfile={() => setActiveModal('profile')}
-        onOpenAlternativeMemory={() => setActiveModal('alternativeMemory')}
-        apiConfig={apiConfig}
         userProfile={userProfile}
       />
 
@@ -371,6 +367,7 @@ export function App() {
         onSpeakMessage={(msg) => speakMessage(msg, currentPersona, apiConfig)}
         onStopSpeaking={stopSpeaking}
         onOpenLorebook={() => setActiveModal('alternativeMemory')}
+        onOpenHistory={() => setActiveModal('history')}
         isSpeaking={isSpeaking}
         activeSpeakingId={activeSpeakingId}
         isLoading={isLoading}

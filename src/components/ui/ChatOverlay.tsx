@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, Persona, UserProfile } from '../../types';
 import { 
   Send, Volume2, VolumeX, Copy, Check, RotateCcw,
-  Mic, MicOff, ChevronDown, MessageCircle
+  Mic, MicOff, ChevronDown, MessageCircle, MessageSquare
 } from 'lucide-react';
 import { soundService } from '../../services/soundService';
 
@@ -15,6 +15,7 @@ interface ChatOverlayProps {
   onSpeakMessage: (msg: ChatMessage) => void;
   onStopSpeaking: () => void;
   onOpenLorebook?: () => void;
+  onOpenHistory?: () => void;
   isSpeaking: boolean;
   activeSpeakingId: string | null;
   isLoading: boolean;
@@ -158,6 +159,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   onSpeakMessage,
   onStopSpeaking,
   onOpenLorebook,
+  onOpenHistory,
   isSpeaking,
   activeSpeakingId,
   isLoading,
@@ -282,15 +284,30 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
             <p className="banner-tagline">{currentPersona.tagline}</p>
           </div>
         </div>
-        <button 
-          type="button"
-          className="chat-collapse-btn" 
-          onClick={() => setIsMinimized(true)}
-          title="Minimize Chat"
-          aria-label="Minimize Chat Overlay"
-        >
-          <ChevronDown size={20} />
-        </button>
+
+        <div className="banner-right-actions">
+          {onOpenHistory && (
+            <button 
+              type="button"
+              className="chat-header-action-btn" 
+              onClick={onOpenHistory}
+              title="Conversations History"
+              aria-label="Open Conversations History"
+            >
+              <MessageSquare size={17} />
+            </button>
+          )}
+
+          <button 
+            type="button"
+            className="chat-collapse-btn" 
+            onClick={() => setIsMinimized(true)}
+            title="Minimize Chat"
+            aria-label="Minimize Chat Overlay"
+          >
+            <ChevronDown size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="chat-messages-feed">

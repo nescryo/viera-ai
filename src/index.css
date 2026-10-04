@@ -1,37 +1,55 @@
 :root {
-  /* Discord Dark Theme Color Palette */
-  --bg-primary: #313338;
-  --bg-secondary: #2b2d31;
-  --bg-tertiary: #1e1f22;
-  --bg-floating: #232428;
-  --bg-input: #383a40;
+  /* Astral Glassmorphism Theme (Honkai: Star Rail / Celestial Aesthetic) */
+  --bg-primary: #0f1322;      /* Deep Space Cosmic Canvas */
+  --bg-secondary: #0a0d18;    /* Dark Card & Overlay Backplate */
+  --bg-tertiary: #060810;     /* Deep Void Backdrop */
+  --bg-floating: #13182c;     /* Elevated Popovers & Menus */
+  --bg-input: #12172a;        /* Deep Tinted Form Inputs */
   
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-hover: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(255, 255, 255, 0.12);
   
-  --accent-blurple: #5865f2;
-  --accent-blurple-hover: #4752c4;
-  --accent-green: #3b82f6; /* Modernized to Deep Royal Blue */
-  --accent-blue: #3b82f6;
-  --accent-blue-hover: #2563eb;
-  --accent-red: #f23f43;
-  --accent-gold: #f0b232;
+  /* Glowing Astral Accents */
+  --accent-cyan: #00d2ff;     /* Luminescent Firefly Cyan */
+  --accent-cyan-hover: #38bdf8;
+  --accent-iris: #6366f1;     /* Starlight Indigo / Celestial Iris */
+  --accent-iris-hover: #4f46e5;
   
-  --text-normal: #f2f3f5;
-  --text-muted: #949ba4;
-  --text-action: #c4b5fd; /* Soft purple for *roleplay actions* */
-  --text-quote: #a5f3fc;  /* Soft cyan for "speech dialogue" */
+  /* Semantic & Compatibility Mappings */
+  --accent-blurple: #6366f1;  /* Upgraded from discord blurple to celestial iris */
+  --accent-blurple-hover: #4f46e5;
+  --accent-green: #00d2ff;    /* Luminescent Cyan for online / active indicator */
+  --accent-blue: #38bdf8;
+  --accent-blue-hover: #0284c7;
+  --accent-red: #f43f5e;      /* Modern Rose Red */
+  --accent-gold: #fbbf24;     /* Starlight Gold */
   
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-glass: rgba(255, 255, 255, 0.14);
+  /* High-Contrast Accessible Text */
+  --text-normal: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-action: #c084fc;     /* Luminescent lavender for *roleplay actions* */
+  --text-quote: #67e8f9;      /* Luminescent cyan for "speech dialogue" */
   
-  --glass-bg: rgba(43, 45, 49, 0.82);
+  /* Glass Surfaces & Boundaries (Refined Translucent Frosted Glass) */
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-glass: rgba(255, 255, 255, 0.16);
+  --border-active: rgba(0, 210, 255, 0.45);
+  --border-chat-focus: #2563eb; /* Deep Royal Blue for chat input focus */
+  
+  --glass-bg: rgba(24, 30, 56, 0.38);
+  --glass-card: rgba(26, 33, 62, 0.36);
   --glass-blur: blur(20px);
+  
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  --shadow-glow-cyan: 0 0 16px rgba(0, 210, 255, 0.3);
+  --shadow-glow-iris: 0 0 16px rgba(99, 102, 241, 0.3);
   
   --font-main: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', sans-serif;
   --font-mono: 'Fira Code', monospace;
   
+  --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -54,10 +72,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Scrollbar - Discord Style */
+/* Custom Scrollbar - Astral Cosmic Style */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -65,12 +83,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1a1b1e;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #111214;
+  background: rgba(0, 210, 255, 0.3);
 }
 
 /* Animations */
@@ -80,8 +98,8 @@ body {
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(88, 101, 242, 0.3); }
-  50% { box-shadow: 0 0 25px rgba(88, 101, 242, 0.6); }
+  0%, 100% { box-shadow: 0 0 15px rgba(0, 210, 255, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(0, 210, 255, 0.6); }
 }
 
 .fade-in {
@@ -102,6 +120,6 @@ input:focus-visible,
 select:focus-visible, 
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent-blurple) !important;
+  outline: 2px solid var(--accent-cyan) !important;
   outline-offset: 2px !important;
 }
