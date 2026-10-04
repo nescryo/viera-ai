@@ -1,21 +1,29 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import type { AiProviderInfo } from '../../../data/aiProviders';
 
-interface ProviderSelectProps {
-  providers: AiProviderInfo[];
-  selected: AiProviderInfo;
-  onSelect: (provider: AiProviderInfo) => void;
+export interface SettingsSelectOption<T extends string> {
+  id: T;
+  label: string;
+  /** Short muted note shown after the label (e.g. "No setup needed"). */
+  tag?: string;
+}
+
+interface SettingsSelectProps<T extends string> {
+  label: string;
+  options: SettingsSelectOption<T>[];
+  value: T;
+  onChange: (id: T) => void;
 }
 
 /**
- * Compact dropdown for picking the AI provider.
+ * Compact dropdown used across Settings (chat provider, voice engine).
  * Reuses the profile dropdown look and opens downward.
  */
-export const ProviderSelect: React.FC<ProviderSelectProps> = ({ providers, selected, onSelect }) => {
+export const SettingsSelect = <T extends string>({ label, options, value, onChange }: SettingsSelectProps<T>) => {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const labelId = useId();
+  const selected = options.find((o) => o.id === value) ?? options[0];
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -34,14 +42,14 @@ export const ProviderSelect: React.FC<ProviderSelectProps> = ({ providers, selec
     };
   }, [isOpen]);
 
-  const choose = (provider: AiProviderInfo) => {
-    if (provider.id !== selected.id) onSelect(provider);
+  const choose = (id: T) => {
+    if (id !== value) onChange(id);
     setIsOpen(false);
   };
 
   return (
     <div className="form-group">
-      <label className="form-label" id={labelId}>Provider</label>
+      <label className="form-label" id={labelId}>{label}</label>
       <div className="settings-select" ref={rootRef}>
         <button
           type="button"
@@ -51,32 +59,32 @@ export const ProviderSelect: React.FC<ProviderSelectProps> = ({ providers, selec
           aria-expanded={isOpen}
           aria-labelledby={labelId}
         >
-          <span>{selected.name}</span>
+          <span>{selected?.label}</span>
           <ChevronDown size={16} className={`dropdown-arrow ${isOpen ? 'open' : ''}`} />
         </button>
 
         {isOpen && (
           <ul className="cai-custom-dropdown-menu settings-select-menu" role="listbox" aria-labelledby={labelId}>
-            {providers.map((provider) => {
-              const isSelected = provider.id === selected.id;
+            {options.map((option) => {
+              const isSelected = option.id === value;
               return (
                 <li
-                  key={provider.id}
+                  key={option.id}
                   role="option"
                   aria-selected={isSelected}
                   tabIndex={0}
                   className={`cai-dropdown-option ${isSelected ? 'selected' : ''}`}
-                  onClick={() => choose(provider)}
+                  onClick={() => choose(option.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      choose(provider);
+                      choose(option.id);
                     }
                   }}
                 >
                   <span>
-                    {provider.name}
-                    {!provider.requiresApiKey && <span className="settings-select-tag">On your computer</span>}
+                    {option.label}
+                    {option.tag && <span className="settings-select-tag">{option.tag}</span>}
                   </span>
                   {isSelected && <Check size={14} className="option-check" />}
                 </li>

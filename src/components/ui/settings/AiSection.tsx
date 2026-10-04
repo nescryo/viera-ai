@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { AI_PROVIDERS, type AiProviderInfo } from '../../../data/aiProviders';
-import { ProviderSelect } from './ProviderSelect';
+import { SettingsSelect, type SettingsSelectOption } from './SettingsSelect';
+
+const PROVIDER_OPTIONS: SettingsSelectOption<string>[] = AI_PROVIDERS.map((p) => ({
+  id: p.id,
+  label: p.name,
+  tag: p.requiresApiKey ? undefined : 'On your computer',
+}));
 
 export type ValidationStatus = 'idle' | 'validating' | 'valid' | 'invalid';
 
@@ -62,7 +68,15 @@ export const AiSection: React.FC<AiSectionProps> = ({
   return (
     <section className="settings-section">
       <div className="settings-panel">
-        <ProviderSelect providers={AI_PROVIDERS} selected={provider} onSelect={onSelectProvider} />
+        <SettingsSelect
+          label="Provider"
+          options={PROVIDER_OPTIONS}
+          value={provider.id}
+          onChange={(id) => {
+            const next = AI_PROVIDERS.find((p) => p.id === id);
+            if (next) onSelectProvider(next);
+          }}
+        />
 
         {provider.requiresApiKey ? (
           <div className="form-group">

@@ -213,7 +213,7 @@
   box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.15);
 }
 
-.field-hint {
+.settings-modal .field-hint {
   display: block;
   margin: 0;
   font-size: 0.75rem;
@@ -284,7 +284,8 @@
   font-weight: 500;
 }
 
-.settings-select-menu {
+/* Two classes so this wins over App.css, which loads after this file */
+.settings-select .settings-select-menu {
   background: var(--bg-floating);
   border-color: var(--border-glass);
   top: calc(100% + 6px);
@@ -408,51 +409,6 @@
   --voice-accent-soft: var(--settings-jp-accent-soft);
 }
 
-.engine-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-}
-
-.settings-modal .provider-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--settings-surface);
-  color: var(--text-normal);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-
-.settings-modal .provider-card:hover {
-  background: var(--settings-surface-hover);
-}
-
-.settings-modal .provider-card.active {
-  border-color: var(--voice-accent);
-  background: var(--voice-accent-soft);
-}
-
-.provider-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.p-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.p-desc {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
 .voice-panel .field-link--accent {
   color: var(--voice-accent);
 }
@@ -534,7 +490,4 @@
     gap: 20px;
   }
 
-  .engine-grid {
-    grid-template-columns: 1fr;
-  }
 }

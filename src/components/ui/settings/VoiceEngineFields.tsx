@@ -1,27 +1,22 @@
 import React, { useId } from 'react';
 import { ExternalLink, Play, Square } from 'lucide-react';
 import type { TtsEngineProvider } from '../../../types';
+import { SettingsSelect, type SettingsSelectOption } from './SettingsSelect';
 
 type VoiceVariant = 'normal' | 'jp';
 
-interface EngineOption {
-  id: TtsEngineProvider;
-  title: string;
-  desc: string;
-}
-
-const ENGINE_OPTIONS: Record<VoiceVariant, EngineOption[]> = {
+const ENGINE_OPTIONS: Record<VoiceVariant, SettingsSelectOption<TtsEngineProvider>[]> = {
   normal: [
-    { id: 'fish-audio', title: 'Fish Audio', desc: 'Character voices, needs a key' },
-    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key' },
-    { id: 'edge', title: 'Free voice', desc: 'No setup needed' },
-    { id: 'custom', title: 'Your own server', desc: 'Local or other services' },
+    { id: 'edge', label: 'Free voice', tag: 'No setup needed' },
+    { id: 'fish-audio', label: 'Fish Audio', tag: 'Character voices' },
+    { id: 'universal', label: 'OpenAI / OpenRouter', tag: 'Uses your own key' },
+    { id: 'custom', label: 'Your own server', tag: 'Local or other services' },
   ],
   jp: [
-    { id: 'fish-audio', title: 'Fish Audio', desc: 'Anime character voices' },
-    { id: 'universal', title: 'OpenAI / OpenRouter', desc: 'Uses your own key' },
-    { id: 'edge', title: 'Free voice', desc: 'No setup needed' },
-    { id: 'custom', title: 'Your own server', desc: 'Local voice server' },
+    { id: 'edge', label: 'Free voice', tag: 'No setup needed' },
+    { id: 'fish-audio', label: 'Fish Audio', tag: 'Anime character voices' },
+    { id: 'universal', label: 'OpenAI / OpenRouter', tag: 'Uses your own key' },
+    { id: 'custom', label: 'Your own server', tag: 'Local voice server' },
   ],
 };
 
@@ -78,22 +73,12 @@ export const VoiceEngineFields: React.FC<VoiceEngineFieldsProps> = ({
 
   return (
     <div className={`settings-panel voice-panel voice-panel--${variant} fade-in`}>
-      <div className="engine-grid" role="group" aria-label="Voice engine">
-        {ENGINE_OPTIONS[variant].map(({ id, title, desc }) => (
-          <button
-            key={id}
-            type="button"
-            className={`provider-card ${provider === id ? 'active' : ''}`}
-            onClick={() => onSelectProvider(id)}
-            aria-pressed={provider === id}
-          >
-            <div className="provider-card-info">
-              <span className="p-title">{title}</span>
-              <span className="p-desc">{desc}</span>
-            </div>
-          </button>
-        ))}
-      </div>
+      <SettingsSelect
+        label="Voice engine"
+        options={ENGINE_OPTIONS[variant]}
+        value={provider}
+        onChange={onSelectProvider}
+      />
 
       {provider === 'fish-audio' && (
         <div className="settings-fields fade-in">
