@@ -332,10 +332,10 @@ export function App() {
     }));
     addToast(
       'success',
-      'Lorebook Updated',
+      'Memory Updated',
       trimmed
-        ? `${currentPersona.name} has updated their lorebook with your background details.`
-        : `Custom lorebook cleared. ${currentPersona.name} is operating strictly on pure canon lore.`
+        ? `${currentPersona.name} has updated their memory with your background details.`
+        : `Custom memory cleared. ${currentPersona.name} is operating strictly on pure canon lore.`
     );
   };
 

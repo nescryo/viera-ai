@@ -1,0 +1,93 @@
+/* ==========================================================================
+   MEMORY MODAL
+   Imported by AlternativeMemoryModal.tsx. Fields/buttons: forms/forms.css.
+   ========================================================================== */
+
+.modal-container.memory-modal {
+  width: 580px;
+  max-width: 92vw;
+}
+
+.memory-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+  padding: 0 24px 20px;
+  overflow-y: auto;
+}
+
+.memory-subtitle {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Plain row, no box: it labels whose memory this is */
+.memory-persona {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.memory-persona-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-glass);
+}
+
+.memory-persona-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.memory-persona-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.memory-persona-tagline {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memory-word-count {
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-modal .memory-textarea {
+  min-height: 180px;
+}
+
+.memory-modal .memory-footer {
+  justify-content: space-between;
+}
+
+.memory-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Disabled ghost button stays in place but fades out */
+.memory-footer .btn--ghost:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 480px) {
+  .memory-modal .memory-footer {
+    flex-wrap: wrap;
+  }
+}

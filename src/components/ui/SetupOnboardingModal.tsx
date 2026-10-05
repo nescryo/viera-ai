@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react';
 import { AvatarPicker } from './profile/AvatarPicker';
 import { ProfileFields } from './profile/ProfileFields';
 import { validateProfileInput, type Gender } from '../../services/profileValidation';
+import { createInitialsAvatar } from '../../services/initialsAvatar';
 import './forms/forms.css';
 import './profile/profile.css';
 
@@ -12,17 +13,18 @@ interface SetupOnboardingModalProps {
   onCompleteSetup: (completedProfile: UserProfile) => void;
 }
 
-const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/bottts/svg?seed=viera';
-
 export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
   initialProfile,
   onCompleteSetup
 }) => {
   const [username, setUsername] = useState<string>((initialProfile.username || '').replace(/^@+/, ''));
   const [nickname, setNickname] = useState<string>(initialProfile.nickname || initialProfile.name || '');
-  const [picture, setPicture] = useState<string>(initialProfile.picture || DEFAULT_AVATAR);
+  // null = no upload yet, so the avatar shows initials that follow the display name
+  const [uploadedPicture, setUploadedPicture] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender>(initialProfile.gender || 'unspecified');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const picture = uploadedPicture ?? createInitialsAvatar(nickname || username);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,12 +58,12 @@ export const SetupOnboardingModal: React.FC<SetupOnboardingModalProps> = ({
       >
         <div className="onboarding-head">
           <h2 id="onboarding-title" className="onboarding-title">Set up your profile</h2>
-          <p className="onboarding-subtitle">Tell Firefly who you are.</p>
+          <p className="onboarding-subtitle">Tell them who you are.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="profile-form">
           <div className="profile-form-body">
-            <AvatarPicker picture={picture} size="md" editable onChange={setPicture} onError={setErrorMsg} />
+            <AvatarPicker picture={picture} size="md" editable onChange={setUploadedPicture} onError={setErrorMsg} />
 
             {errorMsg && (
               <div className="form-alert" role="alert">

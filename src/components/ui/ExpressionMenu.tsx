@@ -9,7 +9,7 @@ interface ExpressionMenuProps {
 }
 
 /**
- * Header character menu: preview facial expressions and open the Lorebook.
+ * Header character menu: preview facial expressions and open Memory.
  * Closes on outside click or Escape.
  */
 export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
@@ -52,7 +52,7 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Open character menu"
-        title="Expressions & Lorebook"
+        title="Expressions & Memory"
       >
         <Smile size={23} strokeWidth={2} />
       </button>
@@ -85,7 +85,7 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
             }}
           >
             <BookOpen size={15} strokeWidth={1.75} />
-            Lorebook
+            Memory
           </button>
         </div>
       )}

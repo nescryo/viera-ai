@@ -36,7 +36,7 @@ export const ProfileFields = ({
       value={nickname}
       onChange={onNicknameChange}
       maxLength={NICKNAME_MAX}
-      placeholder="What should Firefly call you?"
+      placeholder="What should they call you?"
       required
     />
     <Select
