@@ -1,0 +1,340 @@
+/* ==========================================================================
+   SHARED CONTROLS
+   Fields, dropdown and buttons used by Settings, Profile, Onboarding and
+   Conversations. Colors come from the tokens in index.css (--accent*,
+   --field-bg*, --line-soft, --focus-ring*).
+   Imported by the components in this folder (TextField, Select) and by any
+   modal that uses the .btn classes directly.
+   ========================================================================== */
+
+/* Fields */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-input {
+  width: 100%;
+  background: var(--field-bg);
+  border: 1px solid var(--border-subtle);
+  padding: 11px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.2s ease;
+}
+
+.form-input::placeholder {
+  color: var(--text-subtle);
+}
+
+.form-input:hover {
+  background: var(--field-bg-hover);
+}
+
+.form-input:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
+}
+
+.input-affix {
+  position: relative;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-subtle);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.form-input.has-prefix {
+  padding-left: 27px;
+}
+
+textarea.form-input {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* Native select matches the custom dropdown */
+select.form-input {
+  appearance: none;
+  padding-right: 36px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+select.form-input option {
+  background: var(--bg-floating);
+  color: var(--text-normal);
+}
+
+/* Validation states */
+.form-input.validation-valid {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15);
+}
+
+.form-input.validation-invalid {
+  border-color: var(--accent-red);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.15);
+}
+
+.form-input.validation-validating {
+  border-color: #eab308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.15);
+}
+
+/* Small text around fields */
+.field-hint {
+  display: block;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.field-counter {
+  align-self: flex-end;
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+}
+
+.field-counter.is-full {
+  color: var(--accent-red);
+}
+
+.field-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+
+.field-status.is-valid { color: var(--accent-cyan); }
+.field-status.is-invalid { color: var(--accent-red); }
+.field-status.is-validating { color: #eab308; }
+
+.field-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 0.75rem;
+  color: var(--accent-light);
+  text-decoration: none;
+}
+
+.field-link:hover {
+  text-decoration: underline;
+}
+
+.form-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.1);
+  color: #fda4af;
+  font-size: 0.8rem;
+}
+
+.form-alert svg {
+  flex-shrink: 0;
+}
+
+/* Dropdown (see Select.tsx). Opens downward. */
+.select {
+  position: relative;
+}
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  font-weight: 500;
+}
+
+.select-trigger:focus-visible {
+  outline: none !important;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
+}
+
+.select-menu.select-menu--up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.select-arrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.select-arrow.is-open {
+  transform: rotate(180deg);
+}
+
+.select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-floating);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.select-option:hover {
+  background: var(--field-bg-hover);
+  color: var(--text-normal);
+}
+
+.select-option.is-selected {
+  background: var(--accent-soft);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.select-option:focus-visible {
+  outline: 2px solid var(--accent-light) !important;
+  outline-offset: -2px !important;
+}
+
+.select-option-check {
+  color: var(--accent-light);
+}
+
+.select-tag {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-subtle);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent-light) !important;
+  outline-offset: 2px !important;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* White text on --accent-strong is 6:1; on the lighter iris it is under 4.5:1 */
+.btn--primary {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--focus-ring);
+}
+
+.btn--secondary {
+  background: var(--field-bg);
+  border-color: var(--border-subtle);
+  color: var(--text-normal);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--field-bg-hover);
+  border-color: var(--border-glass);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--field-bg);
+  color: var(--text-normal);
+}
+
+.btn--ghost.is-danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.1);
+  color: #fda4af;
+}
+
+/* White on #e11d48 is 4.7:1 */
+.btn--danger {
+  background: #e11d48;
+  color: #ffffff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #be123c;
+}

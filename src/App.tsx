@@ -381,7 +381,7 @@ export function App() {
         <LoginModal onGoogleLoginSuccess={handleGoogleLoginSuccess} />
       )}
 
-      {/* 2. Discord-style "Complete Your Setup" Onboarding Modal */}
+      {/* 2. First-run profile setup modal */}
       {pendingGooglePayload && (
         <SetupOnboardingModal
           initialProfile={pendingGooglePayload}

@@ -104,7 +104,7 @@ export interface UserProfile {
   picture: string;          // Avatar URL
   gender?: 'male' | 'female' | 'non-binary' | 'unspecified';
   bio?: string;
-  isSetupComplete: boolean; // Discord onboarding flag
+  isSetupComplete: boolean; // True once the first-run profile setup is done
   createdAt: number;
 }
 

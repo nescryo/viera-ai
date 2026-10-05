@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, ExternalLink, RefreshCw, Search } from 'lucide-react';
 import { AI_PROVIDERS, type AiProviderInfo } from '../../../data/aiProviders';
-import { SettingsSelect, type SettingsSelectOption } from './SettingsSelect';
+import { Select, type SelectOption } from '../forms/Select';
 
-const PROVIDER_OPTIONS: SettingsSelectOption<string>[] = AI_PROVIDERS.map((p) => ({
+const PROVIDER_OPTIONS: SelectOption<string>[] = AI_PROVIDERS.map((p) => ({
   id: p.id,
   label: p.name,
   tag: p.requiresApiKey ? undefined : 'On your computer',
@@ -68,7 +68,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
   return (
     <section className="settings-section">
       <div className="settings-panel">
-        <SettingsSelect
+        <Select
           label="Provider"
           options={PROVIDER_OPTIONS}
           value={provider.id}
@@ -80,7 +80,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
 
         {provider.requiresApiKey ? (
           <div className="form-group">
-            <div className="settings-label-row">
+            <div className="form-label-row">
               <label className="form-label" htmlFor="ai-api-key">API key</label>
               {provider.helpUrl && (
                 <a className="field-link" href={provider.helpUrl} target="_blank" rel="noreferrer">

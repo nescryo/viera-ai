@@ -1,11 +1,11 @@
 import React, { useId } from 'react';
 import { ExternalLink, Play, Square } from 'lucide-react';
 import type { TtsEngineProvider } from '../../../types';
-import { SettingsSelect, type SettingsSelectOption } from './SettingsSelect';
+import { Select, type SelectOption } from '../forms/Select';
 
 type VoiceVariant = 'normal' | 'jp';
 
-const ENGINE_OPTIONS: Record<VoiceVariant, SettingsSelectOption<TtsEngineProvider>[]> = {
+const ENGINE_OPTIONS: Record<VoiceVariant, SelectOption<TtsEngineProvider>[]> = {
   normal: [
     { id: 'edge', label: 'Free voice', tag: 'No setup needed' },
     { id: 'fish-audio', label: 'Fish Audio', tag: 'Character voices' },
@@ -73,7 +73,7 @@ export const VoiceEngineFields: React.FC<VoiceEngineFieldsProps> = ({
 
   return (
     <div className={`settings-panel voice-panel voice-panel--${variant} fade-in`}>
-      <SettingsSelect
+      <Select
         label="Voice engine"
         options={ENGINE_OPTIONS[variant]}
         value={provider}

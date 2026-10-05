@@ -7,6 +7,7 @@ import { ttsService } from '../../services/ttsService';
 import { DEFAULT_CHARACTER_PACKAGE } from '../../characters/registry';
 import { AiSection, type ValidationStatus } from './settings/AiSection';
 import { VoiceEngineFields } from './settings/VoiceEngineFields';
+import './forms/forms.css';
 import './settings/settings.css';
 
 interface SettingsModalProps {
@@ -427,10 +428,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
+            <button type="button" className="btn btn--secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-save">
+            <button type="submit" className="btn btn--primary">
               <Save size={16} />
               <span>Save</span>
             </button>

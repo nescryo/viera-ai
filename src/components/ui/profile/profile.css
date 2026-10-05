@@ -1,0 +1,175 @@
+/* ==========================================================================
+   PROFILE + ONBOARDING
+   Shared avatar and form layout for UserProfileModal and
+   SetupOnboardingModal. Fields/buttons come from ../forms/forms.css.
+   ========================================================================== */
+
+/* Avatar */
+.avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+}
+
+.avatar--md { --avatar-size: 76px; }
+.avatar--lg { --avatar-size: 96px; }
+
+.avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--field-bg);
+  border: 1px solid var(--border-glass);
+  transition: filter 0.2s ease;
+}
+
+.avatar-button {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.avatar-button:hover .avatar-img {
+  filter: brightness(0.8);
+}
+
+.avatar-button:focus-visible {
+  outline: 2px solid var(--accent-light) !important;
+  outline-offset: 3px !important;
+}
+
+.avatar-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-floating);
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.avatar-file-input {
+  display: none;
+}
+
+/* Form layout shared by the editor and onboarding */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.profile-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px 24px 24px;
+  overflow-y: auto;
+}
+
+.profile-form-body > .avatar {
+  align-self: center;
+}
+
+/* Profile modal */
+.modal-container.profile-modal {
+  width: 420px;
+  max-width: 92vw;
+}
+
+.profile-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 24px 28px;
+  text-align: center;
+}
+
+.profile-name {
+  margin-top: 16px;
+  max-width: 100%;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.profile-meta {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.profile-handle {
+  color: var(--accent-light);
+}
+
+.profile-bio {
+  margin-top: 16px;
+  max-width: 100%;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profile-add-bio {
+  margin-top: 12px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--accent-light);
+}
+
+.profile-modal .modal-footer {
+  justify-content: space-between;
+}
+
+.profile-modal .profile-form .modal-footer {
+  justify-content: flex-end;
+}
+
+/* Onboarding */
+.modal-container.onboarding-modal {
+  width: 420px;
+  max-width: 92vw;
+}
+
+.onboarding-head {
+  padding: 28px 24px 12px;
+  text-align: center;
+}
+
+.onboarding-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.onboarding-subtitle {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.onboarding-modal .modal-footer {
+  justify-content: stretch;
+}

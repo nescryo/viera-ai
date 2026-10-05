@@ -15,9 +15,7 @@
   --accent-iris: #6366f1;     /* Starlight Indigo / Celestial Iris */
   --accent-iris-hover: #4f46e5;
   
-  /* Semantic & Compatibility Mappings */
-  --accent-blurple: #6366f1;  /* Upgraded from discord blurple to celestial iris */
-  --accent-blurple-hover: #4f46e5;
+  /* Semantic Mappings */
   --accent-green: #00d2ff;    /* Luminescent Cyan for online / active indicator */
   --accent-blue: #38bdf8;
   --accent-blue-hover: #0284c7;
@@ -40,6 +38,17 @@
   /* Text field focus: deep iris, darker than the bright cyan accents */
   --focus-ring: #4338ca;
   --focus-ring-soft: rgba(67, 56, 202, 0.28);
+
+  /* UI accent for controls and modals (iris). Cyan stays for status/brand glow. */
+  --accent: var(--accent-iris);
+  --accent-strong: var(--accent-iris-hover);
+  --accent-light: #a5b4fc;
+  --accent-soft: rgba(99, 102, 241, 0.14);
+
+  /* Field and hairline surfaces that sit on the glass */
+  --field-bg: rgba(255, 255, 255, 0.04);
+  --field-bg-hover: rgba(255, 255, 255, 0.07);
+  --line-soft: rgba(255, 255, 255, 0.08);
   
   --glass-bg: rgba(24, 30, 56, 0.38);
   --glass-card: rgba(26, 33, 62, 0.36);
@@ -140,7 +149,7 @@ select:focus-visible {
 /* Quiet icon buttons: a soft ring instead of the bright cyan outline */
 .header-right .icon-btn:focus-visible,
 .feed-toggle-btn:focus-visible,
-.cai-action-btn:focus-visible,
+.chat-action-btn:focus-visible,
 .mic-btn:focus-visible,
 .send-btn:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.55) !important;

@@ -34,7 +34,7 @@ const renderFormattedText = (text: string) => {
   const withEmotions = safeText.replace(/\[(.*?)\]/g, '<span class="emotion-tag">$1</span>');
   const withNarratives = withEmotions.replace(
     /&lt;narrative&gt;([\s\S]*?)&lt;\/narrative&gt;/gi,
-    '<span class="cai-narrative-text">$1</span>'
+    '<span class="chat-narrative">$1</span>'
   );
   const withBoldItalic = withNarratives.replace(
     /\*\*\*(.*?)\*\*\*/g,
@@ -75,17 +75,17 @@ const ChatMessageItem: React.FC<{
   const isCurrentlySpeaking = activeSpeakingId === msg.id && isSpeaking;
 
   return (
-    <div className={`cai-message-card ${isAI ? 'cai-msg-ai' : 'cai-msg-user'}`}>
-      <div className="cai-msg-bubble">
+    <div className={`chat-message ${isAI ? 'chat-message--ai' : 'chat-message--user'}`}>
+      <div className="chat-bubble">
         {renderFormattedText(msg.text)}
       </div>
 
-      <div className="cai-msg-meta">
-        <span className="cai-msg-time">{msg.timestamp}</span>
+      <div className="chat-meta">
+        <span className="chat-time">{msg.timestamp}</span>
         {isAI && (
-          <div className="cai-msg-actions">
+          <div className="chat-actions">
             <button 
-              className={`cai-action-btn ${isCurrentlySpeaking ? 'speaking-active' : ''}`}
+              className={`chat-action-btn ${isCurrentlySpeaking ? 'speaking-active' : ''}`}
               onClick={() => isCurrentlySpeaking ? onStopSpeaking() : onSpeakMessage(msg)}
               title={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
               aria-label={isCurrentlySpeaking ? "Stop Speaking" : "Listen to Voice"}
@@ -94,7 +94,7 @@ const ChatMessageItem: React.FC<{
             </button>
 
             <button 
-              className="cai-action-btn" 
+              className="chat-action-btn" 
               onClick={() => onCopy(msg.id, msg.text)}
               title="Copy text"
               aria-label="Copy text to clipboard"
@@ -103,7 +103,7 @@ const ChatMessageItem: React.FC<{
             </button>
 
             <button 
-              className="cai-action-btn"
+              className="chat-action-btn"
               onClick={onRegenerateResponse}
               title="Regenerate response"
               aria-label="Regenerate response"
@@ -218,8 +218,8 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     <div className="chat-overlay-container fade-in">
       {!isFeedHidden && (
         <div className="chat-messages-feed">
-          <div className="cai-message-card cai-msg-ai cai-greeting">
-            <div className="cai-msg-bubble">
+          <div className="chat-message chat-message--ai chat-greeting">
+            <div className="chat-bubble">
               {renderFormattedText(currentPersona.greeting)}
             </div>
           </div>
@@ -240,11 +240,11 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
 
           {isLoading && (
             <div
-              className="cai-message-card cai-msg-ai typing-indicator-card"
+              className="chat-message chat-message--ai typing-indicator-card"
               role="status"
               aria-label={`${currentPersona.name} is typing`}
             >
-              <div className="cai-msg-bubble cai-dots-loader">
+              <div className="chat-bubble chat-typing">
                 <span /><span /><span />
               </div>
             </div>
@@ -254,7 +254,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="cai-input-form">
+      <form onSubmit={handleSubmit} className="chat-input-form">
         <button
           type="button"
           className="feed-toggle-btn"
@@ -281,7 +281,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder={`Message ${currentPersona.name}...`}
-          className="cai-text-input"
+          className="chat-input"
           disabled={isLoading}
           aria-label={`Message input for ${currentPersona.name}`}
         />

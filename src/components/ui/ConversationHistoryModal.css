@@ -1,17 +1,11 @@
 /* ==========================================================================
    CONVERSATION HISTORY MODAL
    Imported by ConversationHistoryModal.tsx. Shares modal chrome
-   (.modal-header, .modal-close-btn, .btn-cancel) with Settings via App.css.
+   (App.css) and buttons (forms/forms.css) with Settings.
    Selectors use two classes so App.css (loaded later) cannot override them.
    ========================================================================== */
 
 .modal-container.history-modal {
-  --history-accent: var(--accent-iris);
-  --history-accent-strong: var(--accent-iris-hover);
-  --history-accent-light: #a5b4fc;
-  --history-accent-soft: rgba(99, 102, 241, 0.14);
-  --history-line: rgba(255, 255, 255, 0.08);
-
   width: 520px;
   max-width: 92vw;
   max-height: 80vh;
@@ -19,11 +13,7 @@
 }
 
 .history-modal .modal-header {
-  border-bottom: 1px solid var(--history-line);
-}
-
-.history-modal .modal-icon {
-  color: var(--history-accent-light);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .history-header-actions {
@@ -33,23 +23,9 @@
 }
 
 .history-modal .history-new-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  min-height: 36px;
   padding: 8px 14px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--history-accent);
-  color: #ffffff;
-  font-family: inherit;
   font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.history-modal .history-new-btn:hover {
-  background: var(--history-accent-strong);
 }
 
 /* List */
@@ -103,7 +79,7 @@
 }
 
 .history-modal .history-row.active {
-  background: var(--history-accent-soft);
+  background: var(--accent-soft);
 }
 
 .history-modal .history-row.active::before {
@@ -114,7 +90,7 @@
   bottom: 8px;
   width: 2px;
   border-radius: 2px;
-  background: var(--history-accent-light);
+  background: var(--accent-light);
 }
 
 .history-modal .history-row-main {
@@ -263,7 +239,7 @@
 /* Footer */
 .history-modal .history-footer {
   padding: 10px 24px 14px;
-  border-top: 1px solid var(--history-line);
+  border-top: 1px solid var(--line-soft);
 }
 
 .history-modal .history-clear-link {
@@ -337,24 +313,6 @@
   flex: 1;
 }
 
-.history-modal .history-danger-btn {
-  min-height: 40px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent-red);
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.15s ease;
-}
-
-.history-modal .history-danger-btn:hover {
-  filter: brightness(1.1);
-}
-
 @media (max-width: 480px) {
   .history-modal .history-new-btn span {
     display: none;
@@ -362,5 +320,6 @@
 
   .history-modal .history-new-btn {
     padding: 8px;
+    min-width: 36px;
   }
 }

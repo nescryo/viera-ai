@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import type { ChatSession } from '../../types';
 import { Plus, Trash2, Pencil, Check, X, MessageSquare, AlertTriangle } from 'lucide-react';
 import { groupByDay } from '../../services/dateGrouping';
+import './forms/forms.css';
 import './ConversationHistoryModal.css';
 
 interface ConversationHistoryModalProps {
@@ -77,7 +78,7 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
             <h3 id="history-title">Conversations</h3>
           </div>
           <div className="history-header-actions">
-            <button type="button" className="history-new-btn" onClick={onCreateNewChat} aria-label="New chat">
+            <button type="button" className="btn btn--primary history-new-btn" onClick={onCreateNewChat} aria-label="New chat">
               <Plus size={16} />
               <span>New chat</span>
             </button>
@@ -169,8 +170,8 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
               <h3 id="confirm-delete-title">Delete this conversation?</h3>
               <p><strong>"{sessionToDelete.title}"</strong> will be removed. This can't be undone.</p>
               <div className="history-confirm-actions">
-                <button type="button" className="btn-cancel" onClick={() => setSessionToDelete(null)} autoFocus>Cancel</button>
-                <button type="button" className="history-danger-btn" onClick={confirmDeleteSingle}>Delete</button>
+                <button type="button" className="btn btn--secondary" onClick={() => setSessionToDelete(null)} autoFocus>Cancel</button>
+                <button type="button" className="btn btn--danger" onClick={confirmDeleteSingle}>Delete</button>
               </div>
             </div>
           </div>
@@ -183,10 +184,10 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
               <h3 id="confirm-clear-title">Clear all history?</h3>
               <p>All saved conversations will be permanently erased.</p>
               <div className="history-confirm-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowClearAllConfirm(false)} autoFocus>Cancel</button>
+                <button type="button" className="btn btn--secondary" onClick={() => setShowClearAllConfirm(false)} autoFocus>Cancel</button>
                 <button
                   type="button"
-                  className="history-danger-btn"
+                  className="btn btn--danger"
                   onClick={() => {
                     onClearAllSessions();
                     setShowClearAllConfirm(false);
