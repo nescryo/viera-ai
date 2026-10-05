@@ -1,0 +1,77 @@
+/* ==========================================================================
+   LOGIN GATE
+   Imported by LoginModal.tsx. Uses the shared tokens and .form-alert.
+   ========================================================================== */
+
+.modal-backdrop.auth-gate-backdrop {
+  z-index: 9999;
+  background: rgba(8, 10, 18, 0.92);
+}
+
+.modal-container.login-modal {
+  width: 380px;
+  max-width: 92vw;
+  padding: 36px 28px 24px;
+  align-items: center;
+  text-align: center;
+}
+
+.login-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-glass);
+}
+
+.login-title {
+  margin-top: 16px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.login-tagline {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.login-features {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.login-action {
+  width: 100%;
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Reserve the Google button's height so nothing jumps when it renders */
+.login-google-slot {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-loading {
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+}
+
+.login-modal .form-alert {
+  width: 100%;
+  text-align: left;
+}
+
+.login-note {
+  margin-top: 24px;
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+}

@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, ShieldCheck, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { parseGoogleJwtPayload } from '../../services/authService';
+import './forms/forms.css';
+import './LoginModal.css';
+
+// Temporary logo until Viera has its own mark
+const LOGO_URL = '/pom-pom-circle.png';
+
+// Shown to users; technical details go to the console instead
+const SIGN_IN_UNAVAILABLE = "Sign-in isn't available right now. Please try again later.";
 
 interface LoginModalProps {
   onGoogleLoginSuccess: (jwtPayload: { sub: string; email: string; name: string; picture: string }) => void;
@@ -15,7 +23,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
 
   useEffect(() => {
     if (!clientId) {
-      setErrorMsg("VITE_GOOGLE_CLIENT_ID is missing in .env! Please set your Google OAuth Client ID.");
+      console.error('[Viera Auth] VITE_GOOGLE_CLIENT_ID is not set in .env.');
+      setErrorMsg(SIGN_IN_UNAVAILABLE);
       return;
     }
 
@@ -25,7 +34,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
         if (payload) {
           onGoogleLoginSuccess(payload);
         } else {
-          setErrorMsg("Failed to decode Google login token.");
+          console.error('[Viera Auth] Failed to decode the Google credential.');
+          setErrorMsg("Couldn't sign you in. Please try again.");
         }
       }
     };
@@ -44,7 +54,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
             size: 'large',
             shape: 'pill',
             width: 280,
-            text: 'continue_with'
+            text: 'continue_with',
+            // Match the app's language instead of the browser's
+            locale: 'en'
           });
         }
       }
@@ -57,7 +69,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
       script.async = true;
       script.defer = true;
       script.onload = () => initializeGis();
-      script.onerror = () => setErrorMsg("Failed to load Google Sign-In SDK. Please check your network connection.");
+      script.onerror = () => {
+        console.error('[Viera Auth] Failed to load the Google Sign-In script.');
+        setErrorMsg("Couldn't reach Google. Check your connection and reload.");
+      };
       document.body.appendChild(script);
     } else {
       initializeGis();
@@ -66,53 +81,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onGoogleLoginSuccess }) 
 
   return (
     <div className="modal-backdrop auth-gate-backdrop">
-      <div className="modal-container login-gate-card glass-panel">
-        <div className="login-header-glow">
-          <div className="login-brand-icon">
-            <Sparkles size={36} className="sparkle-glow" />
-          </div>
-          <h1 className="login-title">Welcome to Viera</h1>
-          <p className="login-subtitle">3D Interactive Anime Companion & AI Assistant</p>
-        </div>
+      <div
+        className="modal-container login-modal glass-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-title"
+      >
+        <img src={LOGO_URL} alt="" className="login-logo" />
+        <h1 id="login-title" className="login-title">Viera</h1>
+        <p className="login-tagline">Talk, ask, or just hang out — in 3D.</p>
+        <p className="login-features">Chat · Voice · Remembers your conversations</p>
 
-        <div className="login-body">
-          <div className="feature-bullets">
-            <div className="bullet-item">
-              <ShieldCheck size={18} className="bullet-icon" />
-              <span>Real-time 3D Raycasting & Touch Interactions</span>
+        <div className="login-action">
+          {errorMsg && (
+            <div className="form-alert" role="alert">
+              <AlertCircle size={16} />
+              <span>{errorMsg}</span>
             </div>
-            <div className="bullet-item">
-              <ShieldCheck size={18} className="bullet-icon" />
-              <span>Fish Audio & Neural Anime Voice Synthesis</span>
-            </div>
-            <div className="bullet-item">
-              <ShieldCheck size={18} className="bullet-icon" />
-              <span>Secure Multi-Session Conversation History</span>
-            </div>
-          </div>
+          )}
 
-          <div className="google-auth-box">
-            <p className="auth-prompt">Sign in with your Google Account to continue</p>
-
-            {errorMsg ? (
-              <div className="auth-error-banner">
-                <AlertCircle size={16} />
-                <span>{errorMsg}</span>
-              </div>
-            ) : null}
-
-            <div className="google-btn-wrapper">
-              <div ref={googleBtnRef} className="google-btn-render" />
-              {!isGisLoaded && !errorMsg && (
-                <div className="gis-loading-spinner">Loading Google OAuth...</div>
-              )}
-            </div>
+          <div className="login-google-slot">
+            <div ref={googleBtnRef} />
+            {!isGisLoaded && !errorMsg && <span className="login-loading">Loading…</span>}
           </div>
         </div>
 
-        <div className="login-footer">
-          <span className="privacy-note">Protected by Google OAuth 2.0 • Pure Client-Side Encryption</span>
-        </div>
+        <p className="login-note">Your chats are saved on this device.</p>
       </div>
     </div>
   );
