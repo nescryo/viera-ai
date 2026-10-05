@@ -5,7 +5,7 @@
    Type scale: 0.95rem (section), 0.85rem (labels/body), 0.75rem (hints).
    ========================================================================== */
 
-.settings-modal {
+.modal-container.settings-modal {
   /* One accent from the theme (iris). Cyan is reserved for "connected". */
   --settings-accent: var(--accent-iris);
   --settings-accent-strong: var(--accent-iris-hover);
@@ -179,8 +179,8 @@
 }
 
 .settings-modal .form-input:focus {
-  border-color: var(--settings-accent);
-  box-shadow: 0 0 0 3px var(--settings-accent-soft);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
 }
 
 /* Native select matches the custom provider dropdown */

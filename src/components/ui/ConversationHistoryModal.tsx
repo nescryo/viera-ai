@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ChatSession } from '../../types';
-import { Plus, Trash2, Edit2, Check, X, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, MessageSquare, AlertTriangle } from 'lucide-react';
+import { groupByDay } from '../../services/dateGrouping';
+import './ConversationHistoryModal.css';
 
 interface ConversationHistoryModalProps {
   sessions: ChatSession[];
@@ -12,6 +14,18 @@ interface ConversationHistoryModalProps {
   onClearAllSessions: () => void;
   onClose: () => void;
 }
+
+/** Short relative time: "now", "5m", "3h", "2d", "4mo". */
+const formatShortTime = (timestamp: number): string => {
+  const mins = Math.floor((Date.now() - timestamp) / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  return `${Math.floor(days / 30)}mo`;
+};
 
 export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> = ({
   sessions,
@@ -28,38 +42,17 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
   const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState<boolean>(false);
 
-  const formatRelativeTime = (timestamp: number) => {
-    const diffMs = Date.now() - timestamp;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  const groups = useMemo(() => groupByDay(sessions, (s) => s.updatedAt), [sessions]);
 
-    if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 30) return `${diffDays} days ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
-  };
-
-  const handleStartRename = (e: React.MouseEvent, s: ChatSession) => {
-    e.stopPropagation();
+  const startRename = (s: ChatSession) => {
     setEditingId(s.id);
     setEditingTitle(s.title);
   };
 
-  const handleSaveRename = (e: React.MouseEvent | React.FormEvent, id: string) => {
-    e.stopPropagation();
+  const saveRename = (e: React.FormEvent, id: string) => {
     e.preventDefault();
-    if (editingTitle.trim()) {
-      onRenameSession(id, editingTitle.trim());
-    }
+    if (editingTitle.trim()) onRenameSession(id, editingTitle.trim());
     setEditingId(null);
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, s: ChatSession) => {
-    e.stopPropagation();
-    setSessionToDelete(s);
   };
 
   const confirmDeleteSingle = () => {
@@ -71,153 +64,135 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-container history-modal-card glass-panel" onClick={(e) => e.stopPropagation()}>
-        {/* Top Header Row (Project Airi Concept) */}
-        <div className="history-modal-header">
-          <div className="title-with-icon">
-            <MessageSquare size={20} className="header-icon-teal" />
-            <h2 className="modal-title">Conversations</h2>
+      <div
+        className="modal-container history-modal glass-panel"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-title"
+      >
+        <div className="modal-header">
+          <div className="modal-title-group">
+            <MessageSquare className="modal-icon" size={20} />
+            <h3 id="history-title">Conversations</h3>
           </div>
-          
-          <button className="new-chat-btn-top" onClick={onCreateNewChat} aria-label="Create new conversation">
-            <Plus size={16} />
-            <span>+ New</span>
-          </button>
+          <div className="history-header-actions">
+            <button type="button" className="history-new-btn" onClick={onCreateNewChat} aria-label="New chat">
+              <Plus size={16} />
+              <span>New chat</span>
+            </button>
+            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close conversations">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable Sessions List */}
-        <div className="history-sessions-list custom-scrollbar">
+        <div className="history-body">
           {sessions.length === 0 ? (
-            <div className="empty-history-state">
-              <MessageSquare size={32} className="empty-icon" />
-              <p>No past conversations found.</p>
-              <span>Click "+ New" to start chatting!</span>
+            <div className="history-empty">
+              <p>No conversations yet.</p>
+              <span>Start one with New chat.</span>
             </div>
           ) : (
-            sessions.map((s) => {
-              const isActive = s.id === activeSessionId;
-              const isEditing = s.id === editingId;
+            groups.map((group) => (
+              <section key={group.label} className="history-group" aria-label={group.label}>
+                <h4 className="history-group-label">{group.label}</h4>
+                <ul className="history-list">
+                  {group.items.map((s) => {
+                    const isActive = s.id === activeSessionId;
+                    const title = s.title || 'New conversation';
 
-              return (
-                <div
-                  key={s.id}
-                  className={`history-card-item ${isActive ? 'active' : ''}`}
-                  onClick={() => onSelectSession(s.id)}
-                >
-                  <div className="card-main-info">
-                    {isEditing ? (
-                      <form onSubmit={(e) => handleSaveRename(e, s.id)} className="rename-form" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          className="rename-input glass-input"
-                          autoFocus
-                          aria-label="Edit session title"
-                        />
-                        <button type="submit" className="card-action-btn check-btn" title="Save" aria-label="Save new title">
-                          <Check size={14} />
-                        </button>
-                        <button type="button" className="card-action-btn cancel-btn" onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel editing">
-                          <X size={14} />
-                        </button>
-                      </form>
-                    ) : (
-                      <>
-                        <h4 className="session-card-title">{s.title || 'New conversation'}</h4>
-                        <span className="session-card-time">{formatRelativeTime(s.updatedAt)}</span>
-                      </>
-                    )}
-                  </div>
+                    if (s.id === editingId) {
+                      return (
+                        <li key={s.id} className="history-row is-editing">
+                          <form className="history-rename" onSubmit={(e) => saveRename(e, s.id)}>
+                            <input
+                              type="text"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEditingId(null); } }}
+                              className="history-rename-input"
+                              autoFocus
+                              aria-label="Conversation title"
+                            />
+                            <button type="submit" className="history-icon-btn" aria-label="Save title">
+                              <Check size={15} />
+                            </button>
+                            <button type="button" className="history-icon-btn" onClick={() => setEditingId(null)} aria-label="Cancel rename">
+                              <X size={15} />
+                            </button>
+                          </form>
+                        </li>
+                      );
+                    }
 
-                  <div className="card-right-actions">
-                    <span className="provider-badge">
-                      {(s.provider || 'AI').toUpperCase()}
-                    </span>
-
-                    {!isEditing && (
-                      <div className="hover-actions-group">
+                    return (
+                      <li key={s.id} className={`history-row ${isActive ? 'active' : ''}`}>
                         <button
-                          className="card-action-btn edit-btn"
-                          onClick={(e) => handleStartRename(e, s)}
-                          title="Rename Session"
-                          aria-label={`Rename session ${s.title}`}
+                          type="button"
+                          className="history-row-main"
+                          onClick={() => onSelectSession(s.id)}
+                          aria-current={isActive ? 'true' : undefined}
                         >
-                          <Edit2 size={14} />
+                          <span className="history-row-title">{title}</span>
+                          <span className="history-row-time">{formatShortTime(s.updatedAt)}</span>
                         </button>
-                        <button
-                          className="card-action-btn delete-btn"
-                          onClick={(e) => handleDeleteClick(e, s)}
-                          title="Delete Session"
-                          aria-label={`Delete session ${s.title}`}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+                        <div className="history-row-actions">
+                          <button type="button" className="history-icon-btn" onClick={() => startRename(s)} aria-label={`Rename ${title}`}>
+                            <Pencil size={14} />
+                          </button>
+                          <button type="button" className="history-icon-btn is-danger" onClick={() => setSessionToDelete(s)} aria-label={`Delete ${title}`}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="history-modal-footer">
-          {sessions.length > 0 && (
-            <button
-              className="clear-all-btn"
-              onClick={() => setShowClearAllConfirm(true)}
-              aria-label="Clear all conversation history"
-            >
-              <Trash2 size={14} />
-              <span>Clear All History</span>
+        {sessions.length > 0 && (
+          <div className="history-footer">
+            <button type="button" className="history-clear-link" onClick={() => setShowClearAllConfirm(true)}>
+              Clear all history
             </button>
-          )}
+          </div>
+        )}
 
-          <button className="modal-close-btn-ghost" onClick={onClose} aria-label="Close modal">
-            Close
-          </button>
-        </div>
-
-        {/* Single Session Delete Confirmation Sub-modal */}
         {sessionToDelete && (
-          <div className="inner-confirm-overlay" onClick={() => setSessionToDelete(null)}>
-            <div className="inner-confirm-card glass-panel" onClick={(e) => e.stopPropagation()}>
-              <AlertTriangle size={28} className="warn-icon-yellow" />
-              <h3>Delete Conversation?</h3>
-              <p>Are you sure you want to delete <strong>"{sessionToDelete.title}"</strong>? This action cannot be undone.</p>
-              <div className="confirm-btn-group">
-                <button className="cancel-confirm-btn" onClick={() => setSessionToDelete(null)}>
-                  Cancel
-                </button>
-                <button className="delete-confirm-btn" onClick={confirmDeleteSingle}>
-                  Delete
-                </button>
+          <div className="history-confirm-overlay" onClick={() => setSessionToDelete(null)}>
+            <div className="history-confirm glass-panel" role="alertdialog" aria-labelledby="confirm-delete-title" onClick={(e) => e.stopPropagation()}>
+              <AlertTriangle size={24} className="history-confirm-icon" />
+              <h3 id="confirm-delete-title">Delete this conversation?</h3>
+              <p><strong>"{sessionToDelete.title}"</strong> will be removed. This can't be undone.</p>
+              <div className="history-confirm-actions">
+                <button type="button" className="btn-cancel" onClick={() => setSessionToDelete(null)} autoFocus>Cancel</button>
+                <button type="button" className="history-danger-btn" onClick={confirmDeleteSingle}>Delete</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Clear All Sessions Confirmation Sub-modal */}
         {showClearAllConfirm && (
-          <div className="inner-confirm-overlay" onClick={() => setShowClearAllConfirm(false)}>
-            <div className="inner-confirm-card glass-panel" onClick={(e) => e.stopPropagation()}>
-              <AlertTriangle size={28} className="warn-icon-red" />
-              <h3>Clear All History?</h3>
-              <p>This will permanently erase all your saved conversation sessions. Are you sure?</p>
-              <div className="confirm-btn-group">
-                <button className="cancel-confirm-btn" onClick={() => setShowClearAllConfirm(false)}>
-                  Cancel
-                </button>
+          <div className="history-confirm-overlay" onClick={() => setShowClearAllConfirm(false)}>
+            <div className="history-confirm glass-panel" role="alertdialog" aria-labelledby="confirm-clear-title" onClick={(e) => e.stopPropagation()}>
+              <AlertTriangle size={24} className="history-confirm-icon" />
+              <h3 id="confirm-clear-title">Clear all history?</h3>
+              <p>All saved conversations will be permanently erased.</p>
+              <div className="history-confirm-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowClearAllConfirm(false)} autoFocus>Cancel</button>
                 <button
-                  className="delete-confirm-btn danger"
+                  type="button"
+                  className="history-danger-btn"
                   onClick={() => {
                     onClearAllSessions();
                     setShowClearAllConfirm(false);
                   }}
                 >
-                  Clear All
+                  Clear all
                 </button>
               </div>
             </div>

@@ -589,7 +589,7 @@
 }
 
 .cai-input-form:focus-within {
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--focus-ring);
 }
 
 .cai-text-input {
@@ -612,6 +612,7 @@
 .cai-text-input:focus,
 .cai-text-input:focus-visible {
   outline: none !important;
+  box-shadow: none !important;
 }
 
 .feed-toggle-btn, .mic-btn, .send-btn {
@@ -1166,286 +1167,6 @@
 }
 
 /* ==========================================================================
-   PROJECT AIRI CONCEPT CONVERSATION HISTORY MODAL
-   ========================================================================== */
-.history-modal-card {
-  width: 90%;
-  max-width: 520px;
-  padding: 24px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-glass);
-  display: flex;
-  flex-direction: column;
-  max-height: 80vh;
-  position: relative;
-}
-
-.history-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 16px;
-}
-
-.title-with-icon {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.header-icon-teal { color: var(--accent-green); }
-
-.new-chat-btn-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent-green);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 0.85rem;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
-}
-
-.new-chat-btn-top:hover {
-  filter: brightness(1.15);
-  transform: translateY(-1px);
-}
-
-.history-sessions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  padding-right: 4px;
-  max-height: 380px;
-}
-
-.empty-history-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-  gap: 8px;
-}
-
-.empty-icon { color: var(--border-glass); }
-
-.history-card-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 14px 18px;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.history-card-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.history-card-item.active {
-  background: linear-gradient(135deg, rgba(29, 78, 216, 0.22), rgba(10, 14, 28, 0.65));
-  border: 1px solid #1d4ed8;
-  box-shadow: 0 0 15px rgba(29, 78, 216, 0.25);
-}
-
-.card-main-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  flex: 1;
-  overflow: hidden;
-  margin-right: 12px;
-}
-
-.session-card-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-normal);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.session-card-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.card-right-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.provider-badge {
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--accent-green);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  letter-spacing: 0.05em;
-}
-
-.hover-actions-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  opacity: 0.4;
-  transition: opacity 0.2s ease;
-}
-
-.history-card-item:hover .hover-actions-group { opacity: 1; }
-
-.card-action-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  min-height: 34px;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.card-action-btn:hover { color: var(--text-normal); background: rgba(255, 255, 255, 0.1); }
-.card-action-btn.delete-btn:hover { color: #ff7b7b; background: rgba(237, 66, 69, 0.15); }
-.card-action-btn.check-btn { color: var(--accent-green); }
-.card-action-btn.cancel-btn { color: var(--text-muted); }
-
-.rename-form {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
-
-.rename-input {
-  font-size: 0.85rem;
-  padding: 4px 8px;
-  height: 32px;
-  flex: 1;
-}
-
-.history-modal-footer {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.clear-all-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(237, 66, 69, 0.4);
-  color: #ff7b7b;
-  font-size: 0.8rem;
-  padding: 6px 14px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.clear-all-btn:hover {
-  background: rgba(237, 66, 69, 0.15);
-}
-
-.modal-close-btn-ghost {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 6px 12px;
-}
-
-.modal-close-btn-ghost:hover { color: var(--text-normal); }
-
-/* Inner Confirm Sub-modals */
-.inner-confirm-overlay {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  border-radius: var(--radius-xl);
-}
-
-.inner-confirm-card {
-  width: 85%;
-  max-width: 360px;
-  padding: 24px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.warn-icon-yellow { color: #e6a23c; }
-.warn-icon-red { color: #f56c6c; }
-
-.confirm-btn-group {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  margin-top: 8px;
-}
-
-.cancel-confirm-btn {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.delete-confirm-btn {
-  flex: 1;
-  background: #f56c6c;
-  border: none;
-  color: #fff;
-  font-weight: 700;
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-/* ==========================================================================
    CHARACTER.AI CONCEPT USER PROFILE MODAL
    ========================================================================== */
 .cai-profile-card {
@@ -1758,9 +1479,9 @@
 }
 
 .cai-input-group:focus-within {
-  border-color: var(--accent-green);
+  border-color: var(--focus-ring);
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
 }
 
 .cai-input-label {

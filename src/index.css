@@ -36,6 +36,10 @@
   --border-glass: rgba(255, 255, 255, 0.16);
   --border-active: rgba(0, 210, 255, 0.45);
   --border-chat-focus: #2563eb; /* Deep Royal Blue for chat input focus */
+
+  /* Text field focus: deep iris, darker than the bright cyan accents */
+  --focus-ring: #4338ca;
+  --focus-ring-soft: rgba(67, 56, 202, 0.28);
   
   --glass-bg: rgba(24, 30, 56, 0.38);
   --glass-card: rgba(26, 33, 62, 0.36);
@@ -122,6 +126,15 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--accent-cyan) !important;
   outline-offset: 2px !important;
+}
+
+/* Text fields show focus with their own deep-iris border, not the cyan ring */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  border-color: var(--focus-ring) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
 }
 
 /* Quiet icon buttons: a soft ring instead of the bright cyan outline */
