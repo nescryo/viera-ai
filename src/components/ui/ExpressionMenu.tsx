@@ -54,7 +54,7 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
         aria-label="Open character menu"
         title="Expressions & Lorebook"
       >
-        <Smile size={20} strokeWidth={2} />
+        <Smile size={23} strokeWidth={2} />
       </button>
 
       {isOpen && (

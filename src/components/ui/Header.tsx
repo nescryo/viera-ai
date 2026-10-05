@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Conversation History"
           aria-label="Open Conversation History"
         >
-          <MessagesSquare size={20} strokeWidth={2} />
+          <MessagesSquare size={23} strokeWidth={2} />
         </button>
 
         {/* Settings Icon */}
@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Settings & API"
           aria-label="Open Settings and API Configuration"
         >
-          <Settings size={20} strokeWidth={2} />
+          <Settings size={23} strokeWidth={2} />
         </button>
 
         {/* User Profile Avatar Icon */}
@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
           {userProfile?.picture ? (
             <img src={userProfile.picture} alt={userProfile.nickname || 'Profile'} className="header-user-avatar" />
           ) : (
-            <User size={24} strokeWidth={2} />
+            <User size={27} strokeWidth={2} />
           )}
         </button>
       </div>
