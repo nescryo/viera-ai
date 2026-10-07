@@ -3,7 +3,7 @@ import type { ChatMessage, Persona, ApiConfig, UserProfile } from './types';
 import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
-import { getCurrentUser, saveCurrentUser, logoutUser } from './services/authService';
+import { subscribeToAuth, saveCurrentUser, logoutUser } from './services/authService';
 import { soundService } from './services/soundService';
 
 import { useToasts } from './hooks/useToasts';
@@ -36,8 +36,16 @@ export function App() {
   });
 
   // 2. User Authentication & Profile State
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getCurrentUser());
-  const [pendingGooglePayload, setPendingGooglePayload] = useState<{ sub: string; email: string; name: string; picture: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [pendingProfile, setPendingProfile] = useState<UserProfile | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+
+  useEffect(() => subscribeToAuth((profile) => {
+    setUserProfile(profile?.isSetupComplete ? profile : null);
+    setPendingProfile(profile && !profile.isSetupComplete ? profile : null);
+    setIsRestoringSession(false);
+    if (!profile) setActiveModal(null);
+  }), []);
 
   // 3. Consolidated Modal State (Replaces scattered boolean flags)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -135,20 +143,10 @@ export function App() {
     addToast('success', 'Configuration Saved', 'AI model and voice synthesis preferences updated successfully.');
   };
 
-  const handleGoogleLoginSuccess = (payload: { sub: string; email: string; name: string; picture: string }) => {
-    const existing = getCurrentUser();
-    if (existing && existing.id === payload.sub && existing.isSetupComplete) {
-      setUserProfile(existing);
-      setPendingGooglePayload(null);
-    } else {
-      setPendingGooglePayload(payload);
-    }
-  };
-
   const handleCompleteSetup = (completedProfile: UserProfile) => {
     saveCurrentUser(completedProfile);
     setUserProfile(completedProfile);
-    setPendingGooglePayload(null);
+    setPendingProfile(null);
   };
 
   const handleUpdateProfile = (updated: UserProfile) => {
@@ -156,11 +154,15 @@ export function App() {
     setUserProfile(updated);
   };
 
-  const handleLogout = () => {
-    logoutUser();
-    setUserProfile(null);
-    setPendingGooglePayload(null);
-    setActiveModal(null);
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      setUserProfile(null);
+      setPendingProfile(null);
+      setActiveModal(null);
+    } catch {
+      addToast('error', 'Sign-out failed', 'Please check your connection and try again.');
+    }
   };
 
   // 8. Streaming Chat Execution
@@ -376,15 +378,16 @@ export function App() {
         onErrorToast={(title, msg) => addToast('warning', title, msg)}
       />
 
-      {/* 1. Google OAuth Auth Gate Modal */}
-      {!userProfile && !pendingGooglePayload && (
-        <LoginModal onGoogleLoginSuccess={handleGoogleLoginSuccess} />
+      {/* 1. Supabase OAuth Auth Gate Modal */}
+      {!userProfile && !pendingProfile && (
+        <LoginModal isRestoringSession={isRestoringSession} />
       )}
 
       {/* 2. First-run profile setup modal */}
-      {pendingGooglePayload && (
+      {pendingProfile && (
         <SetupOnboardingModal
-          initialProfile={pendingGooglePayload}
+          key={pendingProfile.id}
+          initialProfile={pendingProfile}
           onCompleteSetup={handleCompleteSetup}
         />
       )}

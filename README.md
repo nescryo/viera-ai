@@ -13,7 +13,7 @@ You can chat with Firefly, listen to her voice (optionally dubbed in Japanese wh
 - **Expressive Anime Voice**: Responses can be spoken out loud, complete with mouth movements synchronized to her speech. Pick a voice engine in Settings (see below), or let the browser's built-in speech be the fallback.
 - **Japanese Dubbing Mode**: Firefly speaks in Japanese while the chat text stays in the language you are using.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
-- **User Profiles & Chat History**: Sign in with your Google account to save your chat sessions, customize your display name, and set your profile avatar.
+- **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth to save your chat sessions locally, customize your display name, and set your profile avatar.
 
 ---
 
@@ -36,7 +36,17 @@ Before you begin, make sure you have the following installed on your computer:
    ```bash
    cp .env.example .env
    ```
-   Open the `.env` file in any text editor and enter your Google Client ID for user sign-in (`VITE_GOOGLE_CLIENT_ID`). AI chat and voice API keys are entered later in the in-app Settings.
+   Open `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from your Supabase project's Connect/API Keys settings. Use the **publishable key**, never a secret or `service_role` key. AI chat and voice API keys are entered later in the in-app Settings.
+
+   **Configure GitHub and Google authentication**:
+   - In Supabase → Authentication → Sign In / Providers → GitHub, copy the OAuth callback URL (usually `https://YOUR_PROJECT.supabase.co/auth/v1/callback`).
+   - In GitHub → Settings → Developer settings → OAuth Apps, create an OAuth App. Set its Homepage URL to your app URL and its Authorization callback URL to the **Supabase callback URL** above.
+   - Enter the GitHub Client ID and Client Secret in the **Supabase dashboard only**, then enable GitHub. Keep Email and any unused sign-in providers disabled.
+   - To enable Google, create an OAuth client ID of type **Web application** in Google Cloud Console → Google Auth Platform / APIs & Services → Credentials. Configure the consent screen (add test users while in Testing), add your app origin as an Authorized JavaScript origin, and add the **Supabase callback URL** as an Authorized redirect URI. Enter the Google Client ID and Client Secret in Supabase → Authentication → Sign In / Providers → Google, enable it, and save. Keep the client secret out of frontend environment variables.
+   - In Supabase → Authentication → URL Configuration, set Site URL to your production app URL and add `http://localhost:5173/` plus your production app URL to the allowed Redirect URLs. Include the path if you host the app under a subpath.
+   - Restart Vite after changing `.env`. For production hosting, set the same two public variables in the hosting environment and rebuild.
+
+   Supabase manages the authentication session; profile preferences and chat history remain on this device. Existing Google profiles/history are not automatically migrated to GitHub accounts. No Supabase database tables are required.
 
 3. **Start the application**:
    ```bash

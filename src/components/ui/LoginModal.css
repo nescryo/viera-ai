@@ -52,17 +52,55 @@
   gap: 12px;
 }
 
-/* Reserve the Google button's height so nothing jumps when it renders */
-.login-google-slot {
-  min-height: 44px;
+.login-provider-button {
+  min-height: 48px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-glass);
+  border-radius: 24px;
+  background: #24292f;
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+  cursor: pointer;
 }
 
-.login-loading {
-  font-size: 0.8rem;
-  color: var(--text-subtle);
+.login-provider-button:hover:not(:disabled) {
+  background: #32383f;
+}
+
+.login-provider-button--google {
+  background: #fff;
+  color: #1f1f1f;
+  border-color: #dadce0;
+}
+
+.login-provider-button--google:hover:not(:disabled) {
+  background: #f2f5fc;
+  box-shadow: 0 2px 12px rgba(66, 133, 244, 0.2);
+}
+
+.login-provider-logo {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.login-provider-button:focus-visible {
+  outline: 2px solid var(--text-normal);
+  outline-offset: 3px;
+}
+
+.login-provider-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .login-modal .form-alert {
