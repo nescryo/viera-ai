@@ -11,9 +11,9 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
   anchor: [0.5, 0.62],
   maskRenderTextures: 2, // the model has 49 clipping masks (> 36)
   params: {
-    angleX: 'AngleX',
-    angleY: 'AngleY',
-    angleZ: 'AngleZ',
+    angleX: 'ParamAngleX',
+    angleY: 'ParamAngleY',
+    angleZ: 'ParamAngleZ',
     bodyAngleX: 'ParamBodyAngleX',
     eyeBallX: 'ParamEyeBallX',
     eyeBallY: 'ParamEyeBallY',
