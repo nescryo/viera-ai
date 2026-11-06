@@ -7,6 +7,7 @@ import type { CharacterPackage } from '../../characters/types';
 import { ttsService } from '../../services/ttsService';
 import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../services/tts/lipSyncSolver';
 import { DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
+import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
@@ -56,7 +57,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     });
     host.appendChild(app.view as HTMLCanvasElement);
 
-    Live2DModel.from(config.modelUrl, { autoInteract: false, autoHitTest: false, autoFocus: false })
+    Live2DModel.from(config.modelUrl, { autoHitTest: false, autoFocus: false })
       .then((model) => {
         if (disposed) {
           model.destroy();
@@ -90,6 +91,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const clamped = Math.max(core.getParameterMinimumValue(index), Math.min(core.getParameterMaximumValue(index), value));
           core.setParameterValueById(id, clamped);
         };
+
+        setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
 
         model.anchor.set(0.5, 0.5);
         app.stage.addChild(model);

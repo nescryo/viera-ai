@@ -29,6 +29,11 @@ export interface CharacterModelConfig {
   params: Live2DParamMap;
   /** Emotion ID -> parameter targets. Emotions without an entry fall back to the default. */
   emotions: Record<string, EmotionParams>;
+  /**
+   * Mask render textures needed by the model (default 1). Cubism fits 36 clipping masks
+   * in one; each extra texture adds 32. Check the console for "not supported mask count".
+   */
+  maskRenderTextures?: number;
   /** Attribution text required by the model license */
   credits?: string;
 }
