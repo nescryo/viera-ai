@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import type { Persona } from '../types';
 
 export interface CharacterModelConfig {
@@ -26,13 +25,6 @@ export interface CharacterModelConfig {
   };
 }
 
-export interface CharacterMaterialResult {
-  /** Cheek blush overlay materials modulated by emotion traits */
-  cheekMaterials: THREE.MeshBasicMaterial[];
-  /** Forehead shock/horror shadow overlay material modulated by emotion traits */
-  foreheadMaterial: THREE.MeshBasicMaterial | null;
-}
-
 /**
  * Universal, self-contained character package specification.
  * Fully compatible with standard Persona while equipping the 3D viewport with
@@ -41,12 +33,4 @@ export interface CharacterMaterialResult {
 export interface CharacterPackage extends Persona {
   /** 3D model, viewport, and camera specs */
   model: CharacterModelConfig;
-  /**
-   * Custom cel-shading material traversal & overlay binding.
-   * @param mesh - The loaded MMD skinned mesh.
-   * @param manager - Optional loading manager so textures created here are
-   * tracked alongside the model's own textures (used to defer showing the
-   * model until every texture has finished decoding).
-   */
-  optimizeMaterials: (mesh: THREE.SkinnedMesh, manager?: THREE.LoadingManager) => CharacterMaterialResult;
 }
