@@ -15,6 +15,7 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
     angleY: 'ParamAngleY',
     angleZ: 'ParamAngleZ',
     bodyAngleX: 'ParamBodyAngleX',
+    bodyAngleZ: 'ParamBodyAngleZ',
     eyeBallX: 'ParamEyeBallX',
     eyeBallY: 'ParamEyeBallY',
     mouthOpen: 'ParamMouthOpenY',

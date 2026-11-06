@@ -9,6 +9,8 @@ import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../servi
 import { DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { BreathingCycle } from '../../avatar/breathing';
+import { IdleSway } from '../../avatar/idleSway';
+import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
@@ -19,6 +21,9 @@ const MAX_HEAD_ANGLE = 30;
 const MAX_BODY_ANGLE = 10;
 // Head lifts slightly (degrees) while inhaling
 const BREATH_HEAD_NOD = 1.5;
+// Idle sway / saccade strength while replying (the character holds eye contact and stays calmer)
+const REPLY_SWAY_AMOUNT = 0.5;
+const REPLY_SACCADE_AMOUNT = 0.4;
 
 interface SceneProps {
   currentPersona: CharacterPackage | Persona;
@@ -129,6 +134,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         const blender = new ParamBlender();
         const breathing = new BreathingCycle();
+        const sway = new IdleSway();
+        const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
 
@@ -153,11 +160,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           pointer.y += (gy - pointer.y) * follow;
 
           const p = config.params;
-          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE);
+          const replying = replyingRef.current;
+          const swayFrame = sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
+          const eyeJitter = saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
+
+          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
           setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
-          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE);
-          setParam(p.eyeBallX, pointer.x);
-          setParam(p.eyeBallY, pointer.y);
+          setParam(p.angleZ, swayFrame.headRoll);
+          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX);
+          setParam(p.bodyAngleZ, swayFrame.bodyZ);
+          setParam(p.eyeBallX, pointer.x + eyeJitter.x);
+          setParam(p.eyeBallY, pointer.y + eyeJitter.y);
           p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
           const targets = resolveEmotionTargets(config.emotions, emotionRef.current, DEFAULT_EMOTION_ID);

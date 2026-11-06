@@ -16,6 +16,7 @@ export interface Live2DParamMap {
   angleY: string;
   angleZ: string;
   bodyAngleX?: string;
+  bodyAngleZ?: string;
   eyeBallX: string;
   eyeBallY: string;
   mouthOpen: string;
