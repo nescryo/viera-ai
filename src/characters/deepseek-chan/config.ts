@@ -7,8 +7,8 @@ import type { CharacterModelConfig } from '../types';
  */
 export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
   modelUrl: '/models/deepseek-chan/%E5%A4%A7%E8%82%A5%E9%B1%BC.model3.json',
-  scale: 0.95,
-  anchor: [0.35, 0.55],
+  scale: 1.35,
+  anchor: [0.5, 0.62],
   maskRenderTextures: 2, // the model has 49 clipping masks (> 36)
   params: {
     angleX: 'AngleX',
