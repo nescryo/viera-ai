@@ -9,6 +9,7 @@ import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../servi
 import { DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { BreathingCycle } from '../../avatar/breathing';
+import { resolveRenderQuality } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
@@ -56,12 +57,13 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     let disposed = false;
     let cleanup: (() => void) | null = null;
 
+    const quality = resolveRenderQuality(window.devicePixelRatio);
     const app = new PIXI.Application({
       resizeTo: host,
       backgroundAlpha: 0,
-      antialias: true,
+      antialias: quality.antialias,
       autoDensity: true,
-      resolution: window.devicePixelRatio || 1
+      resolution: quality.resolution
     });
     host.appendChild(app.view as HTMLCanvasElement);
 
