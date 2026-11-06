@@ -1,5 +1,15 @@
 import type { Persona } from '../types';
 
+/** A parameter that moves with the breath. */
+export interface BreathTarget {
+  /** Model parameter ID. */
+  id: string;
+  /** Offset in parameter units reached at full inhale. Negative values reverse the direction. */
+  amount: number;
+  /** `chest` follows the breath directly; `shoulder` and `head` trail it slightly. */
+  channel: 'chest' | 'shoulder' | 'head';
+}
+
 /** Logical avatar parameter names mapped to model-specific Live2D parameter IDs. */
 export interface Live2DParamMap {
   angleX: string;
@@ -11,6 +21,11 @@ export interface Live2DParamMap {
   mouthOpen: string;
   mouthForm: string;
   breath?: string;
+  /**
+   * Extra parameters nudged by the breath, added on top of whatever motion and physics
+   * already set this frame (so physics-driven bounce is kept).
+   */
+  breathTargets?: BreathTarget[];
   /** Optional vowel parameters driven by lip-sync visemes. */
   visemes?: { a: string; i: string; u: string; e: string; o: string };
 }

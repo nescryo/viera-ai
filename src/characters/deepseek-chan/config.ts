@@ -20,6 +20,13 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
     mouthOpen: 'ParamMouthOpenY',
     mouthForm: 'ParamMouthForm',
     breath: 'ParamBreath',
+    // Added on top of physics output. Ranges: ChestY* -1..1, BodyAngleY/ShoulderY/ShoulderYy -30..30.
+    breathTargets: [
+      { id: 'ChestY4', amount: 1, channel: 'chest' },
+      { id: 'ParamBodyAngleY', amount: 3, channel: 'chest' },
+      { id: 'ShoulderY', amount: 6, channel: 'shoulder' },
+      { id: 'ShoulderYy', amount: 8, channel: 'shoulder' }
+    ],
     visemes: { a: 'ParamA', i: 'ParamI', u: 'ParamU', e: 'ParamE', o: 'ParamO' }
   },
   emotions: {

@@ -8,6 +8,7 @@ import { ttsService } from '../../services/ttsService';
 import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../services/tts/lipSyncSolver';
 import { DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
+import { BreathingCycle } from '../../avatar/breathing';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
@@ -16,6 +17,8 @@ Live2DModel.registerTicker(PIXI.Ticker);
 
 const MAX_HEAD_ANGLE = 30;
 const MAX_BODY_ANGLE = 10;
+// Head lifts slightly (degrees) while inhaling
+const BREATH_HEAD_NOD = 1.5;
 
 interface SceneProps {
   currentPersona: CharacterPackage | Persona;
@@ -67,13 +70,14 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const internal = model.internalModel;
         // The plugin's typings do not expose the EventEmitter methods of InternalModel.
         const events = internal as unknown as {
-          on(event: 'beforeModelUpdate', fn: () => void): void;
-          off(event: 'beforeModelUpdate', fn: () => void): void;
+          on(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
+          off(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
         };
         const core = internal.coreModel as unknown as {
           getParameterIndex(id: string): number;
           getParameterMinimumValue(index: number): number;
           getParameterMaximumValue(index: number): number;
+          getParameterValueById(id: string): number;
           setParameterValueById(id: string, value: number): void;
         };
 
@@ -90,6 +94,12 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const index = core.getParameterIndex(id);
           const clamped = Math.max(core.getParameterMinimumValue(index), Math.min(core.getParameterMaximumValue(index), value));
           core.setParameterValueById(id, clamped);
+        };
+
+        // Adds `delta` to the value physics/motion already set this frame (clamped to the range).
+        const addParam = (id: string, delta: number): void => {
+          if (core.getParameterIndex(id) < 0) return;
+          setParam(id, core.getParameterValueById(id) + delta);
         };
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
@@ -118,8 +128,17 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         window.addEventListener('pointermove', onPointerMove);
 
         const blender = new ParamBlender();
+        const breathing = new BreathingCycle();
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
+
+        // Physics reads ParamBreath, and it runs before `beforeModelUpdate`. Set the value
+        // right after the motion update so hair, skirt, ribbons and ears react to the breath.
+        let breath = breathing.step(0, 0);
+        const onAfterMotionUpdate = (): void => {
+          breath = breathing.step(Math.min(app.ticker.deltaMS / 1000, 0.1), elapsed);
+          setParam(config.params.breath, breath.level);
+        };
 
         // Runs right before the core model is updated, so these values win over motions.
         const onBeforeModelUpdate = (): void => {
@@ -135,11 +154,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
           const p = config.params;
           setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE);
-          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE);
+          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
           setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE);
           setParam(p.eyeBallX, pointer.x);
           setParam(p.eyeBallY, pointer.y);
-          setParam(p.breath, 0.5 + 0.5 * Math.sin(elapsed * 1.6));
+          p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
           const targets = resolveEmotionTargets(config.emotions, emotionRef.current, DEFAULT_EMOTION_ID);
           blender.step(targets, delta).forEach((value, id) => setParam(id, value));
@@ -159,9 +178,11 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             setParam(p.visemes.o, frame.o);
           }
         };
+        events.on('afterMotionUpdate', onAfterMotionUpdate);
         events.on('beforeModelUpdate', onBeforeModelUpdate);
 
         cleanup = () => {
+          events.off('afterMotionUpdate', onAfterMotionUpdate);
           events.off('beforeModelUpdate', onBeforeModelUpdate);
           window.removeEventListener('pointermove', onPointerMove);
           resizeObserver.disconnect();
