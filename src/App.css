@@ -9,7 +9,7 @@
   background-color: var(--bg-tertiary);
 }
 
-/* 3D Scene Background */
+/* Live2D Scene Background */
 .scene-container {
   position: absolute;
   top: 0;
@@ -19,7 +19,7 @@
   z-index: 1;
 }
 
-.three-canvas-container {
+.live2d-canvas-container {
   width: 100%;
   height: 100%;
 }

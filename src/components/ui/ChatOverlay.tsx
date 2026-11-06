@@ -218,11 +218,13 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
     <div className="chat-overlay-container fade-in">
       {!isFeedHidden && (
         <div className="chat-messages-feed">
-          <div className="chat-message chat-message--ai chat-greeting">
-            <div className="chat-bubble">
-              {renderFormattedText(currentPersona.greeting)}
+          {currentPersona.greeting.trim() && (
+            <div className="chat-message chat-message--ai chat-greeting">
+              <div className="chat-bubble">
+                {renderFormattedText(currentPersona.greeting)}
+              </div>
             </div>
-          </div>
+          )}
 
           {messages.map((msg) => (
             <ChatMessageItem

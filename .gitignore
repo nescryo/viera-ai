@@ -29,3 +29,6 @@ dist-ssr
 *.sw?
 reference/
 
+
+# Live2D model files: license forbids redistribution (see Terms of Use inside the folder)
+public/models/deepseek-chan/
