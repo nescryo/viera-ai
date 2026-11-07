@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Left: App Brand (Pom-Pom Logo + VIERA) */}
       <div className="header-left">
         <div className="brand-badge">
-          <img src="/pom-pom-circle.png" alt="Viera Logo" className="brand-logo-img" />
+          <img src="/viera-avatar.png" alt="Viera Logo" className="brand-logo-img" />
           <span className="brand-title">VIERA</span>
         </div>
       </div>

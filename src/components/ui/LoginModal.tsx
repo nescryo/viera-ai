@@ -5,7 +5,7 @@ import './forms/forms.css';
 import './LoginModal.css';
 
 // Temporary logo until Viera has its own mark
-const LOGO_URL = '/pom-pom-circle.png';
+const LOGO_URL = '/viera-avatar.png';
 
 // Shown to users; technical details go to the console instead
 const SIGN_IN_UNAVAILABLE = "Sign-in isn't available right now. Please try again later.";
