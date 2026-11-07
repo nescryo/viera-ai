@@ -51,7 +51,7 @@ src/
   types/                     Shared types (index.ts)
 tests/                       Vitest tests (*.test.ts)
 public/models/deepseek-chan/ Live2D model (moc3, model3.json, textures, motions, expressions) and its terms of use
-scripts/                     benchmark_persona.mjs, create_emotion_plane.py
+scripts/                     benchmark_persona.mjs
 reference/                   Third-party reference material (gitignored). Do not modify.
 docs/                        Currently empty
 ```
@@ -118,5 +118,5 @@ Never:
 - Model file names are Chinese (`大肥鱼.*`), so `modelUrl` is URL-encoded. Keep that encoding when editing it.
 - The model textures are 4096px PNGs (about 44 MB), so the PWA precache is large (about 62 MB).
 - `vits_server.py` uses only the Python standard library, but it shells out to the `edge-tts` executable. If the executable is missing, it logs a warning and returns no audio.
-- `src/characters/firefly/lore.ts` is a leftover from the old Firefly character. Check whether anything uses it before relying on it.
+- `src/characters/deepseek-chan/lore.ts` exports `DEEPSEEK_CHAN_CANON_LORE`, which is empty for now. Only `scripts/benchmark_persona.mjs` imports it.
 - The repository has many large binary assets. Avoid reading or diffing them.
