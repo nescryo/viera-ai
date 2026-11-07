@@ -1,13 +1,13 @@
 # AGENTS.md
 
-Guidance for AI coding agents working on Viera 3D. For end-user docs, see `README.md`.
+Guidance for AI coding agents working on Viera. For end-user docs, see `README.md`.
 
 ## Project overview
 
-Viera is a browser-based 3D virtual companion (character: Firefly from *Honkai: Star Rail*). It combines a Three.js MMD (`.pmx`) character, an LLM chat, TTS with lip-sync, facial/idle/gaze animation, and Google sign-in with local chat history.
+Viera is a browser-based Live2D virtual companion (character: DeepSeek-chan, a free model by Kamiya Ryoko). It combines a Live2D (`.model3.json` / `.moc3`) character, an LLM chat, TTS with lip-sync, procedural idle/gaze animation, and Google sign-in with local chat history.
 
 - Frontend only: React 19 + TypeScript + Vite 8, no backend of its own.
-- 3D: `three`, `three-stdlib`, `mmd-parser` (PMX models, custom cel-shading).
+- Live2D: `pixi.js` 7 + `pixi-live2d-display-lipsyncpatch` (Cubism 4 build), with the Cubism Core runtime loaded by a `<script>` tag in `index.html`.
 - Lint: `oxlint`. Tests: `vitest`.
 - Optional Python helper: `vits_server.py` (local TTS bridge).
 
@@ -37,17 +37,20 @@ python3 vits_server.py   # serves GET http://localhost:5000/tts?text=...&charact
 ```
 src/
   App.tsx, main.tsx          App entry and top-level state wiring
-  characters/                Character packages (registry.ts, types.ts, firefly/)
-  components/3d/             Scene.tsx, animation/ (idle, facial, gaze), environment/ (stage, particles)
+  avatar/                    Pure Live2D animation logic: breathing, idleSway, saccade, spring,
+                             paramBlender, live2dMasks, renderQuality
+  characters/                Character packages (registry.ts, types.ts, deepseek-chan/)
+  components/live2d/         Scene.tsx (PixiJS stage and Live2D model)
   components/ui/             Chat overlay, header, modals (settings, login, profile, history, onboarding), toasts
   data/                      aiProviders.ts, emotionRegistry.ts
   hooks/                     useChatSessions, useSpeechAudio, useToasts
   services/                  aiService, authService, historyService, soundService, ttsService,
-                             expressionValidator, dubbingValidator
-  services/tts/              universalTtsEngine, ttsConfigResolver, ttsChunker, playbackQueue, ttsTypes
+                             expressionValidator, dubbingValidator, and small helpers
+  services/tts/              universalTtsEngine, ttsConfigResolver, ttsChunker, playbackQueue,
+                             lipSyncSolver, lipsyncAnalyzer, ttsTypes
   types/                     Shared types (index.ts)
 tests/                       Vitest tests (*.test.ts)
-public/models/               PMX models and textures (firefly, stages)
+public/models/deepseek-chan/ Live2D model (moc3, model3.json, textures, motions, expressions) and its terms of use
 scripts/                     benchmark_persona.mjs, create_emotion_plane.py
 reference/                   Third-party reference material (gitignored). Do not modify.
 docs/                        Currently empty
@@ -55,11 +58,13 @@ docs/                        Currently empty
 
 ### Key concepts
 
-- Characters are `CharacterPackage`s (`src/characters/types.ts`): a `Persona` plus `model` config (PMX URL, scale, camera framing, stage) and `optimizeMaterials`. New characters are registered in `src/characters/registry.ts`.
+- Characters are `CharacterPackage`s (`src/characters/types.ts`): metadata, a system prompt, and `model` config (`.model3.json` URL, scale, anchor, parameter IDs, per-emotion parameter targets, `maskRenderTextures`). New characters are registered in `src/characters/registry.ts`.
+- Animation is parameter-driven. `src/avatar/` holds pure functions (breathing, sway, saccades, springs, blending) that write Live2D parameters by ID. Parameter IDs come from the character config, not from hard-coded strings.
 - Emotions and actions are defined in `src/data/emotionRegistry.ts`. The LLM output is parsed and validated by `expressionValidator.ts` and `dubbingValidator.ts`. Keep registry, prompt roster, and validators in sync.
 - AI providers (OpenAI-compatible) are listed in `src/data/aiProviders.ts`. Add new providers there.
 - TTS settings are resolved in `services/tts/ttsConfigResolver.ts`. Japanese text or `japanese-dub` mode selects the Japanese voice path, and Web Speech is the fallback.
 - Fish Audio requests go through the Vite dev proxy `/fish_audio_api` (see `vite.config.ts`). The proxy is configured under `server.proxy`, so it only works with `npm run dev` (and `vite preview`, which inherits it by default). A static production deploy has no such proxy, so account for that when changing the TTS endpoints.
+- PWA: `vite.config.ts` precaches the app shell plus the `deepseek-chan` model files (`moc3`, `json`, textures). Update its `globPatterns` / `globIgnores` when model assets change.
 
 ## Code style
 
@@ -67,13 +72,13 @@ docs/                        Currently empty
 - ES modules only (`"type": "module"`).
 - Function components with hooks. `react/rules-of-hooks` is an error, and `react/only-export-components` is a warning (keep non-component exports out of component files).
 - Match the existing style: 2-space indent, single quotes, semicolons, JSDoc comments on exported functions.
-- Put logic in `services/` or `hooks/`, not inside large components. `App.tsx`, `SettingsModal.tsx`, and `App.css` are already large, so prefer extracting over growing them.
+- Put logic in `services/`, `avatar/`, or `hooks/`, not inside large components. `App.tsx`, `SettingsModal.tsx`, and `App.css` are already large, so prefer extracting over growing them.
 - Styling is plain CSS (`src/App.css`, `src/index.css`). No CSS framework.
 
 ## Testing
 
-- Tests live in `tests/` and are named `<module>.test.ts`. Currently covered: `ttsConfigResolver`, `narrativeSanitizer`, `expressionValidator`, `dubbingValidator`.
-- Add or update tests for any change to parsing/validation/config-resolution logic (pure functions are easy to test). 3D rendering code is not unit-tested.
+- Tests live in `tests/` and are named `<module>.test.ts`. They cover the pure logic: TTS config, validators, lip-sync, and the `avatar/` animation functions, among others. Check `tests/` for the current list.
+- Add or update tests for any change to parsing/validation/config-resolution logic and `avatar/` animation math (pure functions are easy to test). The PixiJS/Live2D rendering in `Scene.tsx` is not unit-tested.
 - Run a single file with `npx vitest run tests/<name>.test.ts`.
 
 ## Environment and secrets
@@ -86,16 +91,17 @@ docs/                        Currently empty
 
 ## Assets and licensing
 
-- Firefly and *Honkai: Star Rail* belong to miHoYo / HoYoverse. The PMX model's own usage rules (`public/models/firefly/使用规则.txt`) say: no redistribution, no commercial use, no adult/extreme/gore/harassment content, and modification is allowed.
+- DeepSeek-chan is a free Live2D model. Credits: illustration and PSD layer separation by Kamiya Ryoko, Live2D rigging by 霓虹猫_NeonNeko, released by Kamiya Ryoko. Keep these credits in `README.md`.
+- The model's terms of use (`public/models/deepseek-chan/DeepSeek-chan  Free Live2D Model – Terms of Use & Setup Guide.txt`) allow personal use and content creation, and require credit. They prohibit reselling, re-uploading the complete model files for others to download, claiming the model as your own work, and brand or commercial use without the creator's approval. Do not do any of these, and flag it if a task would.
 - Do not add, replace, or re-export model and texture files in `public/models/` unless asked. Do not duplicate them elsewhere.
 - Do not modify or delete anything under `reference/` (third-party, GPL-licensed Blender-StellarToon).
-- Project code is MIT (see `LICENSE`).
+- Project code is MIT (see `LICENSE`). The MIT license covers code only, not the model assets.
 
 ## Boundaries
 
 Ask first before:
 - Adding or upgrading dependencies (keep exact versions where possible, prefer well-known packages).
-- Changing the PMX model loading path, shader/material pipeline, or the LLM output format (emotion/action/dual-language tags). These are tightly coupled.
+- Changing the Live2D model loading path (the Cubism Core script in `index.html`, `Scene.tsx` setup, mask handling in `live2dMasks.ts`) or the LLM output format (emotion/action/dual-language tags). These are tightly coupled.
 - Changing the auth or chat-history storage logic (`authService.ts`, `historyService.ts`).
 
 Never:
@@ -107,6 +113,10 @@ Never:
 
 - Node 18+ is required (the benchmark script uses `--experimental-strip-types` and `--env-file`, so use a recent Node release for that).
 - `npm run build` runs `tsc -b` first, so type errors fail the build even if Vite would succeed.
+- The Cubism Core runtime (`live2dcubismcore.min.js`) is loaded from the official Live2D CDN with `defer` in `index.html`. It must be present before the Live2D model loads, and it needs network access on first load.
+- The model has 49 clipping masks, more than the default 36, so `maskRenderTextures` is set to 2 in `src/characters/deepseek-chan/config.ts`. Keep it when changing masks or the renderer.
+- Model file names are Chinese (`大肥鱼.*`), so `modelUrl` is URL-encoded. Keep that encoding when editing it.
+- The model textures are 4096px PNGs (about 44 MB), so the PWA precache is large (about 62 MB).
 - `vits_server.py` uses only the Python standard library, but it shells out to the `edge-tts` executable. If the executable is missing, it logs a warning and returns no audio.
-- The `firefly` model folder contains two identical-size `.pmx` files (`firefly.pmx` and a Chinese-named original). The app loads the path set in `src/characters/firefly/config.ts`. Confirm there before touching either one.
+- `src/characters/firefly/lore.ts` is a leftover from the old Firefly character. Check whether anything uses it before relying on it.
 - The repository has many large binary assets. Avoid reading or diffing them.
