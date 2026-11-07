@@ -1,8 +1,8 @@
 import type { CharacterModelConfig } from '../types';
 
 /**
- * DeepSeek-chan Live2D model (free model, no redistribution).
- * Files live in public/models/deepseek-chan/ and are gitignored.
+ * DeepSeek-chan Live2D model (free model, see its terms of use file).
+ * Files live in public/models/deepseek-chan/.
  * Emotion values are a first pass and need visual tuning.
  */
 export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {

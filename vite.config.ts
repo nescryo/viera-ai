@@ -8,17 +8,23 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Precache the app shell plus the large 3D model/texture assets so a full
-      // page reload (F5) serves them from the Cache Storage instead of the
-      // network. These assets are large but rarely change.
+      // Precache the app shell plus the Live2D model files (moc3, JSON, WebP
+      // textures) so a full page reload (F5) serves them from the Cache Storage
+      // instead of the network.
       workbox: {
         globPatterns: [
           '**/*.{js,css,html,ico,png,jpg,jpeg,svg,webp}',
-          '**/*.{pmx,bmp,txt}'
+          'models/deepseek-chan/**/*.{moc3,json}'
         ],
-        // The character + stage models total ~25 MB; raise the per-file precache
-        // limit so the PMX/texture files are not skipped.
-        maximumFileSizeToCacheInBytes: 30 * 1024 * 1024
+        globIgnores: [
+          // Preview image next to the model; the runtime never loads it.
+          'models/deepseek-chan/*.png',
+          // Editor/VTuber tooling files the runtime never loads.
+          'models/deepseek-chan/*.vtube.json',
+          'models/deepseek-chan/items_pinned_to_model.json'
+        ],
+        // The largest cached file is the .moc3 (~16 MB).
+        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024
       }
     })
   ],
