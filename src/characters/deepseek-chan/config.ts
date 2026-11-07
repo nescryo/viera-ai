@@ -7,8 +7,8 @@ import type { CharacterModelConfig } from '../types';
  */
 export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
   modelUrl: '/models/deepseek-chan/%E5%A4%A7%E8%82%A5%E9%B1%BC.model3.json',
-  scale: 1.70,
-  anchor: [0.5, 0.76],
+  scale: 1.80,
+  anchor: [0.5, 0.79],
   maskRenderTextures: 2, // the model has 49 clipping masks (> 36)
   params: {
     angleX: 'ParamAngleX',
@@ -42,6 +42,24 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
       ...['RRibbonX1', 'RRibbonX2', 'RRibbonX3', 'RRibbonX4'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
       ...['ribbonX1', 'ribbonX2', 'ribbonX3', 'ribbonX4', 'ribbonX5', 'ribbonX6', 'ribbonX7'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
       ...['ribbonY1', 'ribbonY2', 'ribbonY3', 'ribbonY4', 'ribbonY5', 'ribbonY6', 'ribbonY7'].map((id) => ({ id, amount: 0.25, axis: 'y' as const, relative: true }))
+    ],
+    // Soft skirt swing on top of physics. Amounts are fractions of each parameter's half-range;
+    // first pass, needs visual tuning.
+    skirtTargets: [
+      ...['SkirtX1', 'SkirtX2', 'SkirtX3', 'SkirtX4'].map((id) => ({ id, amount: 0.08, axis: 'x' as const, relative: true })),
+      ...['SkirtLayerX1', 'SkirtLayerX2', 'SkirtLayerX3', 'SkirtLayerX4', 'SkirtLayerX5', 'SkirtLayerX6'].map((id) => ({ id, amount: 0.06, axis: 'x' as const, relative: true })),
+      ...['SkirtY', 'SkirtY2', 'SkirtY3', 'SkirtY4', 'SkirtY5'].map((id) => ({ id, amount: 0.05, axis: 'y' as const, relative: true }))
+    ],
+    // Standing weight shift and breath coupling at the hips, on top of physics. Amounts are
+    // fractions of each parameter's half-range. First pass: the ranges and the direction of
+    // each parameter were not checked, and HipAngleYUP / HipAngleYDOWN are assumed to be
+    // opposite halves. Needs visual tuning.
+    hipTargets: [
+      { id: 'HipAngleZ', amount: 0.12, channel: 'shift' },
+      { id: 'HipZ1', amount: 0.1, channel: 'shift' },
+      { id: 'HipZ2', amount: 0.1, channel: 'shift' },
+      { id: 'HipAngleYUP', amount: 0.05, channel: 'breath' },
+      { id: 'HipAngleYDOWN', amount: -0.05, channel: 'breath' }
     ],
     // Arm sway and speaking gestures. Amounts are fractions of each parameter's half-range;
     // signs and sizes are a first pass and need visual tuning.

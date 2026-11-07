@@ -37,6 +37,16 @@ export interface ArmTarget {
   side: 'l' | 'r';
 }
 
+/** A hip parameter driven by the standing weight shift or the breath. */
+export interface HipTarget {
+  /** Model parameter ID. */
+  id: string;
+  /** Fraction of the parameter's half-range reached at full swing. Negative reverses the direction. */
+  amount: number;
+  /** `shift` is the slow side-to-side weight shift; `breath` is the tiny breath-driven rise and fall. */
+  channel: 'shift' | 'breath';
+}
+
 /** Logical avatar parameter names mapped to model-specific Live2D parameter IDs. */
 export interface Live2DParamMap {
   angleX: string;
@@ -64,6 +74,13 @@ export interface Live2DParamMap {
    * Added on top of physics output.
    */
   ribbonTargets?: JiggleTarget[];
+  /**
+   * Skirt parameters swung by a soft spring that trails the body.
+   * Added on top of physics output.
+   */
+  skirtTargets?: JiggleTarget[];
+  /** Hip parameters for the standing weight shift and breath coupling, added on top of physics output. */
+  hipTargets?: HipTarget[];
   /** Arm and hand parameters for idle sway and speaking gestures, added on top of physics output. */
   armTargets?: ArmTarget[];
   /** Optional vowel parameters driven by lip-sync visemes. */

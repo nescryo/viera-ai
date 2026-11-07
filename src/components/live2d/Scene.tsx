@@ -11,8 +11,9 @@ import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { BreathingCycle } from '../../avatar/breathing';
 import { resolveRenderQuality } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
-import { ChestJiggle, RIBBON_JIGGLE } from '../../avatar/chestJiggle';
+import { ChestJiggle, RIBBON_JIGGLE, SKIRT_JIGGLE } from '../../avatar/chestJiggle';
 import { ArmMotion } from '../../avatar/armMotion';
+import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
 
@@ -143,6 +144,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const sway = new IdleSway();
         const chestJiggle = new ChestJiggle();
         const ribbonJiggle = new ChestJiggle(RIBBON_JIGGLE);
+        const skirtJiggle = new ChestJiggle(SKIRT_JIGGLE);
+        const hipMotion = new HipMotion();
         const armMotion = new ArmMotion();
         const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
@@ -217,6 +220,28 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             if (index < 0) return;
             const halfRange = t.relative ? (core.getParameterMaximumValue(index) - core.getParameterMinimumValue(index)) / 2 : 1;
             addParam(t.id, t.amount * halfRange * ribbon[t.axis]);
+          });
+
+          // Skirt trails the body lean and sway, and lifts slightly with the breath.
+          const skirt = skirtJiggle.step(
+            delta,
+            pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX - swayFrame.bodyZ,
+            breath.level
+          );
+          p.skirtTargets?.forEach((t) => {
+            const index = core.getParameterIndex(t.id);
+            if (index < 0) return;
+            const halfRange = t.relative ? (core.getParameterMaximumValue(index) - core.getParameterMinimumValue(index)) / 2 : 1;
+            addParam(t.id, t.amount * halfRange * skirt[t.axis]);
+          });
+
+          // Hips shift weight slowly and rise a little with the breath.
+          const hips = hipMotion.step(delta, elapsed, breath.level, replying ? REPLY_SWAY_AMOUNT : 1);
+          p.hipTargets?.forEach((t) => {
+            const index = core.getParameterIndex(t.id);
+            if (index < 0) return;
+            const halfRange = (core.getParameterMaximumValue(index) - core.getParameterMinimumValue(index)) / 2;
+            addParam(t.id, t.amount * halfRange * hips[t.channel]);
           });
 
           // Arms sway on their own, gesture while speech is audible, and swing when the body follows the pointer.

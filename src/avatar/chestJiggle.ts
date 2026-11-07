@@ -40,6 +40,15 @@ export const RIBBON_JIGGLE: JiggleOptions = {
   gainY: 0.5
 };
 
+/** Skirt: soft and slow, so the hem trails the body and floats back with little overshoot. */
+export const SKIRT_JIGGLE: JiggleOptions = {
+  stiffness: 22,
+  dampingX: 4.2,
+  dampingY: 4.5,
+  gainX: 0.12,
+  gainY: 0.35
+};
+
 /**
  * Secondary-motion jiggle. A damped spring chases each driver signal, and the gap
  * between the driver and the spring is the swing. A steady driver gives zero offset;
