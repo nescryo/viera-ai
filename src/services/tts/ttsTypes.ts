@@ -13,6 +13,8 @@ export interface TtsChunk {
   sequence: number;
   text: string;
   reason: ChunkReason;
+  /** Silence to insert after this chunk, derived from its trailing punctuation. */
+  pauseAfterMs: number;
 }
 
 export interface TtsPlaybackItem {

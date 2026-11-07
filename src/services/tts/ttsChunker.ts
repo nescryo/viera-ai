@@ -4,8 +4,32 @@ import type { TtsChunk, ChunkReason } from './ttsTypes';
  * Punctuation sets for sentence segmentation
  */
 const HARD_PUNCTUATIONS = new Set('.。?？!！…⋯～~\n\r');
-const SOFT_PUNCTUATIONS = new Set(',，、:：;；《》「」""\'\'');
+const SOFT_PUNCTUATIONS = new Set(',，、:：;；《》「」""\'\'—–');
 const ANY_DIGIT = /\d/;
+
+/** Silence (ms) inserted after a chunk, keyed by its trailing punctuation. */
+const PAUSE_MS = {
+  comma: 180,
+  dash: 250,
+  sentence: 350,
+  ellipsis: 500,
+  newline: 450,
+} as const;
+
+/**
+ * Maps the trailing punctuation of a raw chunk to a pause duration in ms.
+ * Returns 0 when the chunk does not end on punctuation (e.g. length-limit splits).
+ */
+export function pauseForChunk(raw: string): number {
+  if (/[\n\r]\s*$/.test(raw)) return PAUSE_MS.newline;
+  const last = raw.trimEnd().slice(-1);
+  if (!last) return 0;
+  if ('…⋯'.includes(last)) return PAUSE_MS.ellipsis;
+  if ('.。?？!！～~'.includes(last)) return PAUSE_MS.sentence;
+  if ('—–-'.includes(last)) return PAUSE_MS.dash;
+  if (',，、:：;；'.includes(last)) return PAUSE_MS.comma;
+  return 0;
+}
 
 /**
  * Strips stage directions, markdown actions (*action*), emotion brackets ([happy]),
@@ -72,7 +96,9 @@ export class TtsChunker {
     for (let i = 0; i < token.length; i++) {
       const char = token[i];
       const isHard = HARD_PUNCTUATIONS.has(char);
-      const isSoft = SOFT_PUNCTUATIONS.has(char);
+      // A hyphen only counts as a dash when spaced (" - "), so "well-known" is not split.
+      const isSpacedHyphen = char === '-' && /\s/.test(this.previousChar);
+      const isSoft = SOFT_PUNCTUATIONS.has(char) || isSpacedHyphen;
 
       // Guard decimal numbers (e.g. 3.14 or 1,000) from accidental splitting
       if ((char === '.' || char === ',') && ANY_DIGIT.test(this.previousChar)) {
@@ -101,7 +127,8 @@ export class TtsChunker {
           onChunk({
             sequence: this.sequence++,
             text: cleaned,
-            reason
+            reason,
+            pauseAfterMs: pauseForChunk(this.buffer)
           });
           this.yieldCount++;
         }
@@ -120,7 +147,8 @@ export class TtsChunker {
       onChunk({
         sequence: this.sequence++,
         text: cleaned,
-        reason: 'flush'
+        reason: 'flush',
+        pauseAfterMs: 0
       });
     }
     this.buffer = '';

@@ -14,7 +14,10 @@ export class PlaybackQueue {
   private currentSource: AudioBufferSourceNode | null = null;
 
   private nextSequenceToPlay = 0;
-  private readyBuffers = new Map<number, { buffer: AudioBuffer; text?: string }>();
+  private readyBuffers = new Map<number, { buffer: AudioBuffer; text?: string; pauseAfterMs: number }>();
+  /** AudioContext time when the previous chunk ended, and the silence owed after it. */
+  private lastChunkEndTime = 0;
+  private pendingGapSec = 0;
   private activeSessionToken = 0;
   private isSessionFlushed = false;
   private isCurrentlyPlaying = false;
@@ -74,6 +77,8 @@ export class PlaybackQueue {
     this.readyBuffers.clear();
     this.isSessionFlushed = false;
     this.isCurrentlyPlaying = false;
+    this.lastChunkEndTime = 0;
+    this.pendingGapSec = 0;
     this.onPlaybackStartCallback = onStart;
     this.onPlaybackEndCallback = onEnd;
     return this.activeSessionToken;
@@ -83,10 +88,10 @@ export class PlaybackQueue {
    * Enqueues a decoded audio buffer for a given sequence.
    * If its sequence matches nextSequenceToPlay, playback starts immediately!
    */
-  public enqueue(sequence: number, buffer: AudioBuffer, sessionToken: number, text?: string): void {
+  public enqueue(sequence: number, buffer: AudioBuffer, sessionToken: number, text?: string, pauseAfterMs: number = 0): void {
     if (sessionToken !== this.activeSessionToken) return;
 
-    this.readyBuffers.set(sequence, { buffer, text });
+    this.readyBuffers.set(sequence, { buffer, text, pauseAfterMs });
     this.tryPlayNext(sessionToken);
   }
 
@@ -113,13 +118,13 @@ export class PlaybackQueue {
 
     // Remove from pending map and start playback
     this.readyBuffers.delete(this.nextSequenceToPlay);
-    this.playBuffer(nextItem.buffer, sessionToken);
+    this.playBuffer(nextItem.buffer, sessionToken, nextItem.pauseAfterMs);
   }
 
   /**
    * Routes and plays a single AudioBuffer through the Web Audio DSP graph.
    */
-  private playBuffer(audioBuffer: AudioBuffer, sessionToken: number): void {
+  private playBuffer(audioBuffer: AudioBuffer, sessionToken: number, pauseAfterMs: number = 0): void {
     try {
       const ctx = this.getAudioContext();
       const source = ctx.createBufferSource();
@@ -191,17 +196,23 @@ export class PlaybackQueue {
         this.currentSource = null;
         this.isCurrentlyPlaying = false;
         this.nextSequenceToPlay++;
-        // Play subsequent chunk in order immediately
+        // Remember when this chunk ended so the next one waits out the punctuation pause.
+        this.lastChunkEndTime = ctx.currentTime;
+        this.pendingGapSec = pauseAfterMs / 1000;
         this.tryPlayNext(sessionToken);
       };
 
-      // Start hardware audio playback scheduled 30ms ahead to prevent DAC click
-      source.start(ctx.currentTime + 0.03);
+      // Start 30ms ahead to prevent DAC click. Time already spent waiting for synthesis
+      // counts toward the pause, so slow chunks are not delayed further.
+      const now = ctx.currentTime;
+      const gapRemainingSec = Math.max(0, this.lastChunkEndTime + this.pendingGapSec - now);
+      source.start(now + 0.03 + gapRemainingSec);
     } catch (err) {
       console.warn('[Viera TTS] Error playing AudioBuffer, advancing sequence:', err);
       this.currentSource = null;
       this.isCurrentlyPlaying = false;
       this.nextSequenceToPlay++;
+      this.pendingGapSec = 0;
       this.tryPlayNext(sessionToken);
     }
   }
