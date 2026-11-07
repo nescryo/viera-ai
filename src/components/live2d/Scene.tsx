@@ -23,7 +23,7 @@ const MAX_HEAD_ANGLE = 30;
 const MAX_BODY_ANGLE = 10;
 // Head lifts slightly (degrees) while inhaling
 const BREATH_HEAD_NOD = 1.5;
-// Idle sway / saccade strength while replying (the character holds eye contact and stays calmer)
+// Idle sway / saccade strength while replying (the character stays calmer)
 const REPLY_SWAY_AMOUNT = 0.5;
 const REPLY_SACCADE_AMOUNT = 0.4;
 
@@ -157,12 +157,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const delta = Math.min(app.ticker.deltaMS / 1000, 0.1);
           elapsed += delta;
 
-          // Gaze: lock on the viewer while replying, otherwise follow the pointer.
-          const gx = replyingRef.current ? 0 : pointer.targetX;
-          const gy = replyingRef.current ? 0 : pointer.targetY;
+          // Gaze: always follow the pointer, including while replying.
           const follow = smoothFactor(4, delta);
-          pointer.x += (gx - pointer.x) * follow;
-          pointer.y += (gy - pointer.y) * follow;
+          pointer.x += (pointer.targetX - pointer.x) * follow;
+          pointer.y += (pointer.targetY - pointer.y) * follow;
 
           const p = config.params;
           const replying = replyingRef.current;
