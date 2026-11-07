@@ -22,6 +22,21 @@ export interface JiggleTarget {
   relative?: boolean;
 }
 
+/** An arm parameter driven by idle sway and speaking gestures. */
+export interface ArmTarget {
+  /** Model parameter ID. */
+  id: string;
+  /** Fraction of the parameter's half-range reached at full swing. Negative reverses the direction. */
+  amount: number;
+  /**
+   * Which signal drives it. `lift` is the smoothed head pitch (-1..1); use it with an
+   * `amount` that rotates the arm or shoulder against the tilt so the arm keeps hanging down.
+   */
+  channel: 'arm' | 'forearm' | 'wrist' | 'hand' | 'lift';
+  /** Which arm it belongs to. */
+  side: 'l' | 'r';
+}
+
 /** Logical avatar parameter names mapped to model-specific Live2D parameter IDs. */
 export interface Live2DParamMap {
   angleX: string;
@@ -49,6 +64,8 @@ export interface Live2DParamMap {
    * Added on top of physics output.
    */
   ribbonTargets?: JiggleTarget[];
+  /** Arm and hand parameters for idle sway and speaking gestures, added on top of physics output. */
+  armTargets?: ArmTarget[];
   /** Optional vowel parameters driven by lip-sync visemes. */
   visemes?: { a: string; i: string; u: string; e: string; o: string };
 }

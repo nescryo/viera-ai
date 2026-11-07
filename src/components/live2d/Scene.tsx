@@ -12,6 +12,7 @@ import { BreathingCycle } from '../../avatar/breathing';
 import { resolveRenderQuality } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
 import { ChestJiggle, RIBBON_JIGGLE } from '../../avatar/chestJiggle';
+import { ArmMotion } from '../../avatar/armMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
 
@@ -20,7 +21,9 @@ import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/
 Live2DModel.registerTicker(PIXI.Ticker);
 
 const MAX_HEAD_ANGLE = 30;
-const MAX_BODY_ANGLE = 10;
+// Pointer tracking is led by the eyes and head; the body follows only a little so the
+// shoulders and arms are not dragged along.
+const MAX_BODY_ANGLE = 5;
 // Head lifts slightly (degrees) while inhaling
 const BREATH_HEAD_NOD = 1.5;
 // Idle sway / saccade strength while replying (the character stays calmer)
@@ -140,6 +143,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const sway = new IdleSway();
         const chestJiggle = new ChestJiggle();
         const ribbonJiggle = new ChestJiggle(RIBBON_JIGGLE);
+        const armMotion = new ArmMotion();
         const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
@@ -213,6 +217,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             if (index < 0) return;
             const halfRange = t.relative ? (core.getParameterMaximumValue(index) - core.getParameterMinimumValue(index)) / 2 : 1;
             addParam(t.id, t.amount * halfRange * ribbon[t.axis]);
+          });
+
+          // Arms sway on their own, gesture while speech is audible, and swing when the body follows the pointer.
+          const arms = armMotion.step(delta, elapsed, frame.openness, 1, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX, pointer.y);
+          p.armTargets?.forEach((t) => {
+            const index = core.getParameterIndex(t.id);
+            if (index < 0) return;
+            const halfRange = (core.getParameterMaximumValue(index) - core.getParameterMinimumValue(index)) / 2;
+            addParam(t.id, t.amount * halfRange * arms[t.side][t.channel]);
           });
         };
         events.on('afterMotionUpdate', onAfterMotionUpdate);

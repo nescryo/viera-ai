@@ -43,6 +43,26 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
       ...['ribbonX1', 'ribbonX2', 'ribbonX3', 'ribbonX4', 'ribbonX5', 'ribbonX6', 'ribbonX7'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
       ...['ribbonY1', 'ribbonY2', 'ribbonY3', 'ribbonY4', 'ribbonY5', 'ribbonY6', 'ribbonY7'].map((id) => ({ id, amount: 0.25, axis: 'y' as const, relative: true }))
     ],
+    // Arm sway and speaking gestures. Amounts are fractions of each parameter's half-range;
+    // signs and sizes are a first pass and need visual tuning.
+    armTargets: [
+      { id: 'LArm', amount: 0.35, channel: 'arm', side: 'l' },
+      { id: 'LForearm', amount: 0.4, channel: 'forearm', side: 'l' },
+      { id: 'LWrist', amount: 0.4, channel: 'wrist', side: 'l' },
+      { id: 'LHand', amount: 0.3, channel: 'hand', side: 'l' },
+      { id: 'RArm', amount: 0.35, channel: 'arm', side: 'r' },
+      { id: 'RForearm', amount: 0.4, channel: 'forearm', side: 'r' },
+      { id: 'RWrist', amount: 0.4, channel: 'wrist', side: 'r' },
+      { id: 'RHand', amount: 0.3, channel: 'hand', side: 'r' },
+      // Gravity compensation: counter-rotate against head pitch (pointer.y) so the arms keep
+      // hanging down when the head and chest tilt up. Signs and sizes are guesses (the arm
+      // parameter ranges were not checked); flip the sign if the arms lift more, not less.
+      { id: 'LArm', amount: -0.5, channel: 'lift', side: 'l' },
+      { id: 'RArm', amount: -0.5, channel: 'lift', side: 'r' },
+      { id: 'LForearm', amount: -0.2, channel: 'lift', side: 'l' },
+      { id: 'RForearm', amount: -0.2, channel: 'lift', side: 'r' },
+      { id: 'ShoulderY', amount: -0.3, channel: 'lift', side: 'l' }
+    ],
     visemes: { a: 'ParamA', i: 'ParamI', u: 'ParamU', e: 'ParamE', o: 'ParamO' }
   },
   emotions: {
