@@ -97,8 +97,8 @@ export interface ApiConfig {
 }
 
 export interface UserProfile {
-  id: string;               // Google sub ID
-  email: string;            // Google email address
+  id: string;               // Supabase user ID
+  email: string;            // OAuth account email (may be private/empty)
   username: string;         // Unique handle (@username)
   nickname: string;         // Display name
   picture: string;          // Avatar URL
