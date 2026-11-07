@@ -42,7 +42,7 @@ describe('Expression Validator Suite', () => {
       const input = '[emotion: blush] T-thank you for the compliment.';
       const result = extractAndValidateExpression(input);
 
-      expect(result.emotion).toBe('blush');
+      expect(result.emotion).toBe('relaxed+blush:0.6');
       expect(result.cleanText).toBe('T-thank you for the compliment.');
       expect(result.hasTag).toBe(true);
     });
@@ -50,11 +50,11 @@ describe('Expression Validator Suite', () => {
     it('parses hyphenated emotion [blush-hardly] and underscored [blush_hardly]', () => {
       const input1 = '[blush-hardly] Wah! That was too sudden!';
       const result1 = extractAndValidateExpression(input1);
-      expect(result1.emotion).toBe('blush-hardly');
+      expect(result1.emotion).toBe('relaxed+blush:1');
 
       const input2 = '[blush_hardly] Wah! That was too sudden!';
       const result2 = extractAndValidateExpression(input2);
-      expect(result2.emotion).toBe('blush-hardly');
+      expect(result2.emotion).toBe('relaxed+blush:1');
     });
 
     it('parses front XML tag <relaxed>', () => {
@@ -73,6 +73,56 @@ describe('Expression Validator Suite', () => {
       expect(result.emotion).toBeNull();
       expect(result.hasTag).toBe(true);
       expect(result.cleanText).toBe('Look at this cool move!');
+    });
+  });
+
+  describe('Modifiers (shape-key style layering)', () => {
+    it('parses a base emotion with a named modifier level', () => {
+      const result = extractAndValidateExpression('[sad+blush:low] I... thank you.');
+      expect(result.emotion).toBe('sad+blush:0.3');
+      expect(result.cleanText).toBe('I... thank you.');
+    });
+
+    it('parses a level on the base expression', () => {
+      expect(extractAndValidateExpression('[happy:low] Hi!').emotion).toBe('happy:0.3');
+      expect(extractAndValidateExpression('[sad:0.5+blush:high] Hi!').emotion).toBe('sad:0.5+blush:1');
+    });
+
+    it('scales a macro alias by its level and lets explicit modifiers override', () => {
+      expect(extractAndValidateExpression('[blush-hardly:low] Hi!').emotion).toBe('relaxed:0.3+blush:0.3');
+      expect(extractAndValidateExpression('[blush+blush:low] Hi!').emotion).toBe('relaxed+blush:0.3');
+    });
+
+    it('parses the rig-backed modifiers', () => {
+      expect(extractAndValidateExpression('[surprised+cold-sweat:high] Hi!').emotion).toBe('surprised+cold-sweat:1');
+      expect(extractAndValidateExpression('[sad+tears+gloom:low] Hi!').emotion).toBe('sad+tears:0.6+gloom:0.3');
+    });
+
+    it('uses the default weight when no level is given', () => {
+      expect(extractAndValidateExpression('[happy+blush] Hi!').emotion).toBe('happy+blush:0.6');
+    });
+
+    it('accepts numeric levels and clamps them to 1', () => {
+      expect(extractAndValidateExpression('[happy+blush:0.4] Hi!').emotion).toBe('happy+blush:0.4');
+      expect(extractAndValidateExpression('[happy+blush:7] Hi!').emotion).toBe('happy+blush:1');
+    });
+
+    it('drops unknown modifiers but keeps the base emotion', () => {
+      const result = extractAndValidateExpression('[happy+glitter:high] Hi!');
+      expect(result.emotion).toBe('happy');
+      expect(result.cleanText).toBe('Hi!');
+    });
+
+    it('leaves non-emotion bracketed text such as [10:30] untouched', () => {
+      const result = extractAndValidateExpression('Meet me at [10:30] ok?');
+      expect(result.emotion).toBeNull();
+      expect(result.cleanText).toContain('[10:30]');
+    });
+
+    it('masks an in-flight modifier tag while streaming', () => {
+      const result = extractAndValidateExpression('[sad+bl');
+      expect(result.isStreamingTag).toBe(true);
+      expect(result.cleanText).toBe('');
     });
   });
 

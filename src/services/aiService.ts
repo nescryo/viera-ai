@@ -1,5 +1,5 @@
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
-import { generatePromptEmotionRoster } from '../data/emotionRegistry';
+import { generateExpressionPromptSection } from '../data/emotionRegistry';
 import { extractAndValidateDialogue } from './dubbingValidator';
 
 export interface ParsedDualOutput {
@@ -246,16 +246,9 @@ export async function sendStreamingChatMessage(
   }
 
   const activeEmotion = currentEmotion?.trim() || 'relaxed';
-  const emotionRoster = generatePromptEmotionRoster();
+  systemPrompt += `
 
-  systemPrompt += `\n\n[3D VISUAL EMOTIONS & EXPRESSION SYSTEM]:
-Your 3D avatar actively reflects your emotional reactions in real-time.
-Current mood: "${activeEmotion}".
-
-Whenever your feelings naturally change in reaction to the conversation—such as feeling happy, playful, shy, flustered, sulking, or startled—begin your response with the matching tag to animate your avatar:
-${emotionRoster}
-
-(If your current mood remains unchanged, simply reply directly without an emotion tag.)`;
+${generateExpressionPromptSection(activeEmotion)}`;
 
   systemPrompt += `\n\n[CONVERSATION STYLE]:
 - Express emotion and nuance organically through dialogue, tone, and character voice rather than heavy emoji decoration.

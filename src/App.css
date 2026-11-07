@@ -183,6 +183,35 @@
 }
 
 
+.modifier-slider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.modifier-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+}
+
+.modifier-slider-label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.modifier-slider-value {
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.emotion-test-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 
 /* Header Container - Floating Minimal Layout */
 .header-container {

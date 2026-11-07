@@ -87,14 +87,20 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
     relaxed: {},
     happy: { EyeSmile: 1, ParamMouthForm: 1 },
     teasing: { EyeSmile: 0.6, ParamMouthForm: 0.6, key7: 0.3 },
-    blush: { key7: 1, ParamMouthForm: 0.4 },
-    'blush-hardly': { key7: 0.6, ParamMouthForm: 0.2 },
     pouting: { key7: 0.3, ParamMouthForm: -0.5 },
     jealous: { ParamMouthForm: -0.5, ParamBrowLY: -0.5, ParamBrowRY: -0.5 },
     terrified: { key13: 1, BrowInnerUp: 1, ParamMouthForm: -0.6 },
     surprised: { ParamBrowLY: 1, ParamBrowRY: 1 },
     angry: { ParamBrowLY: -1, ParamBrowRY: -1, key1: 0.6, ParamMouthForm: -0.6 },
     sad: { key2: 1, BrowInnerUp: 1, ParamMouthForm: -0.8 }
+  },
+  // Deltas at weight 1. First pass, needs visual tuning. Rig parameters: key7 blush, key1 black
+  // face (gloom), key2 tears, key13 cold sweat. Their Exp3 files all set 1.0 with Add blend.
+  modifiers: {
+    blush: { key7: 1 },
+    gloom: { key1: 1 },
+    tears: { key2: 1 },
+    'cold-sweat': { key13: 1 }
   },
   credits: 'DeepSeek-chan: illustration & PSD by Kamiya Ryoko, Live2D rigging by 霓虹猫_NeonNeko'
 };

@@ -1,10 +1,11 @@
 import {
-  isRegisteredEmotion,
+  formatExpressionSpec,
+  parseExpressionSpec,
   type SupportedEmotion
 } from '../data/emotionRegistry';
 
 export interface ParsedExpressionResult {
-  /** Validated canonical emotion, or null if no valid state shift was emitted */
+  /** Validated canonical expression spec (base emotion plus optional modifiers, e.g. `sad+blush:0.3`), or null if no valid state shift was emitted */
   emotion: SupportedEmotion | null;
   /** Clean user-facing text with emotion tags removed */
   cleanText: string;
@@ -20,7 +21,7 @@ export interface ParsedExpressionResult {
  * Extracts and validates a visual emotion tag from the beginning of a response.
  *
  * Rules:
- * 1. Checks strictly for an opening tag at the start of the message (e.g. `[happy]` or `[emotion:blush]`).
+ * 1. Checks strictly for an opening tag at the start of the message (e.g. `[happy]`, `[emotion:blush]` or `[sad+blush:low]`).
  * 2. If the tag is in the registry: returns the canonical emotion and clean dialogue.
  * 3. If an invalid or hallucinated tag is found: strips the tag from the text (so it doesn't
  *    leak to UI/TTS) but returns emotion: null, allowing the system to maintain its current mood.
@@ -43,7 +44,7 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
 
   // 2. Identify in-flight unclosed emotion tag at the tail of stream
   // e.g. "Wait a second... <pout" or "[hap"
-  const inFlightTailRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)?|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)?)$/i;
+  const inFlightTailRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_+:.-]+)?|<(?:emotion:\s*)?\/?([a-zA-Z0-9_+:.-]+)?)$/i;
   const tailMatch = inFlightTailRegex.exec(workingText);
 
   let cleanText = workingText;
@@ -68,7 +69,7 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
   // - Square brackets: [happy], [emotion: blush], [/happy], [dancing]
   // - Angle brackets: <pouting>, </pouting>, <emotion: pouting>, <relaxed>
   // Excludes <ja>, </ja>, [ja], [/ja], <think>, and <narrative> blocks!
-  const tagRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>)/gi;
+  const tagRegex = /(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_+:.-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_+:.-]+)(?:\s+[^>]*)?>)/gi;
 
   cleanText = cleanText.replace(tagRegex, (fullMatch, sqCandidate, angleCandidate) => {
     const rawCand = sqCandidate || angleCandidate;
@@ -79,20 +80,26 @@ export function extractAndValidateExpression(rawText: string): ParsedExpressionR
       return fullMatch;
     }
 
+    const spec = parseExpressionSpec(normalized);
+    const isKnown = spec.base !== null;
+
+    // Tags carrying modifier syntax (+ : .) are only stripped when the base emotion is known,
+    // so ordinary bracketed text such as [10:30] is left alone.
+    if (/[+:.]/.test(normalized) && !isKnown) {
+      return fullMatch;
+    }
+
     // For angle brackets, only strip if it's a registered emotion or explicitly prefixed with emotion:
-    if (angleCandidate) {
-      const isExplicitEmotion = /<emotion:/i.test(fullMatch);
-      if (!isRegisteredEmotion(normalized) && !isExplicitEmotion) {
-        // Keep standard HTML tags like <b>, <span>, etc.
-        return fullMatch;
-      }
+    if (angleCandidate && !isKnown && !/<emotion:/i.test(fullMatch)) {
+      // Keep standard HTML tags like <b>, <span>, etc.
+      return fullMatch;
     }
 
     hasTag = true;
     rawTag = rawCand;
 
-    if (isRegisteredEmotion(normalized)) {
-      detectedEmotion = normalized;
+    if (isKnown) {
+      detectedEmotion = formatExpressionSpec(spec);
     }
 
     return ' ';

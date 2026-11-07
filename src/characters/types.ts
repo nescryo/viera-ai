@@ -102,6 +102,11 @@ export interface CharacterModelConfig {
   /** Emotion ID -> parameter targets. Emotions without an entry fall back to the default. */
   emotions: Record<string, EmotionParams>;
   /**
+   * Modifier ID -> parameter deltas at full weight (1.0). They are scaled by the weight and
+   * added on top of the base emotion, so `sad+blush:low` mixes both.
+   */
+  modifiers?: Record<string, EmotionParams>;
+  /**
    * Mask render textures needed by the model (default 1). Cubism fits 36 clipping masks
    * in one; each extra texture adds 32. Check the console for "not supported mask count".
    */

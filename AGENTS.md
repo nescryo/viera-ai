@@ -84,7 +84,7 @@ docs/                        Currently empty
 ## Environment and secrets
 
 - `.env` is gitignored and holds real keys. Do not read, print, commit, or copy its values. Edit `.env.example` (placeholders only) when adding a new variable.
-- Variables are listed in `.env.example`: `VITE_GOOGLE_CLIENT_ID`, plus `VITE_BENCHMARK_*` for the benchmark script. LLM and TTS API keys are not read from `.env`; they live in the Settings UI (`localStorage`).
+- Variables are listed in `.env.example`: `VITE_GOOGLE_CLIENT_ID`, plus `BENCHMARK_*` (no `VITE_` prefix, so it is never inlined into the client bundle) for the benchmark script. LLM and TTS API keys are not read from `.env`; they live in the Settings UI (`localStorage`).
 - Anything prefixed `VITE_` is inlined into the client bundle and visible to users. Never put a secret in a `VITE_` variable that you would not ship to the browser, and never deploy a build made with personal keys.
 - API keys entered through the Settings UI are user-provided. Do not log them or send them anywhere except the configured provider endpoint.
 - Only `.github/workflows/gemini-review.yml` uses CI secrets (`GEMINI_API_KEY`). Do not change the workflow trigger or permissions without being asked.
