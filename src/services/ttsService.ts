@@ -138,7 +138,7 @@ class TTSService {
 
           if (!controller.signal.aborted) {
             const audioBuffer = await ctx.decodeAudioData(rawBuffer.slice(0));
-            this.playbackQueue.enqueue(currentChunk.sequence, audioBuffer, sessionToken, currentChunk.text);
+            this.playbackQueue.enqueue(currentChunk.sequence, audioBuffer, sessionToken, currentChunk.text, currentChunk.pauseAfterMs);
           }
         } catch (err: any) {
           if (controller.signal.aborted) return;
@@ -206,7 +206,7 @@ class TTSService {
 
         if (!controller.signal.aborted) {
           const audioBuffer = await ctx.decodeAudioData(rawBuffer.slice(0));
-          this.playbackQueue.enqueue(chunk.sequence, audioBuffer, sessionToken, chunk.text);
+          this.playbackQueue.enqueue(chunk.sequence, audioBuffer, sessionToken, chunk.text, chunk.pauseAfterMs);
         }
       } catch (err: any) {
         if (!controller.signal.aborted) {

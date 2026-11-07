@@ -82,7 +82,11 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 156px;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  /* Header sits ~76px from the top; keep the card inside the viewport and scroll the content. */
+  max-height: calc(100dvh - 100px);
   background: rgba(18, 24, 46, 0.82);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -131,28 +135,41 @@
   color: var(--text-muted);
 }
 
-.testing-emotions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  max-height: min(320px, calc(100vh - 200px));
+/* Scrolls the whole menu body; the Memory link stays pinned below it. */
+.expression-dropdown-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
-  margin-top: 0;
 }
 
-.testing-emotions-list::-webkit-scrollbar {
+.expression-dropdown-scroll::-webkit-scrollbar {
   width: 4px;
 }
 
-.testing-emotions-list::-webkit-scrollbar-track {
+.expression-dropdown-scroll::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 4px;
 }
 
-.testing-emotions-list::-webkit-scrollbar-thumb {
+.expression-dropdown-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
   border-radius: 4px;
+}
+
+/* Two columns instead of one tall column. */
+.testing-emotions-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 0;
+}
+
+.testing-emotions-list .emotion-test-btn {
+  padding: 6px 8px;
+  min-height: 32px;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .emotion-test-btn {
@@ -183,6 +200,35 @@
 }
 
 
+.modifier-slider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.modifier-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+}
+
+.modifier-slider-label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.modifier-slider-value {
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.emotion-test-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 
 /* Header Container - Floating Minimal Layout */
 .header-container {
@@ -1099,7 +1145,7 @@
 
 
   .expression-dropdown-card {
-    max-height: min(280px, 45vh);
+    max-height: min(420px, calc(100dvh - 90px));
   }
 
   /* Mobile: same centered layout, a little more room for text */

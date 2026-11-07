@@ -4,7 +4,8 @@ import { signInWithGitHub, signInWithGoogle } from '../../services/authService';
 import './forms/forms.css';
 import './LoginModal.css';
 
-const LOGO_URL = '/pom-pom-circle.png';
+// Temporary logo until Viera has its own mark
+const LOGO_URL = '/viera-avatar.png';
 
 interface LoginModalProps {
   isRestoringSession: boolean;

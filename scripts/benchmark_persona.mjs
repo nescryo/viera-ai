@@ -6,11 +6,11 @@
  * Evaluates LLM persona adherence, custom lorebook override fidelity,
  * 3D emotion tag generation, and streaming latency (TTFT & throughput)
  * using production prompt assembly directly against the dedicated benchmark endpoint
- * configured via VITE_BENCHMARK_* in .env.
+ * configured via BENCHMARK_* in .env.
  */
 
 import { DEEPSEEK_CHAN_CANON_LORE } from '../src/characters/deepseek-chan/lore.ts';
-import { generatePromptEmotionRoster, isRegisteredEmotion } from '../src/data/emotionRegistry.ts';
+import { generateExpressionPromptSection, parseExpressionSpec, formatExpressionSpec } from '../src/data/emotionRegistry.ts';
 
 // ANSI terminal colors
 const c = {
@@ -43,11 +43,11 @@ const customLoreArg = getArg('--custom-lore', '');
 const customPromptArg = getArg('--prompt', '');
 
 // Resolve API Keys and Endpoint
-const benchmarkUrl = (process.env.VITE_BENCHMARK_API_URL || '').trim();
-const benchmarkKey = (process.env.VITE_BENCHMARK_API_KEY || '').trim();
-const benchmarkModel = (process.env.VITE_BENCHMARK_MODEL || 'ag/gemini-3.8-flash-high').trim();
+const benchmarkUrl = (process.env.BENCHMARK_API_URL || '').trim();
+const benchmarkKey = (process.env.BENCHMARK_API_KEY || '').trim();
+const benchmarkModel = (process.env.BENCHMARK_MODEL || '').trim();
 
-// Dedicated Benchmark Endpoint from .env (VITE_BENCHMARK_*)
+// Dedicated Benchmark Endpoint from .env (BENCHMARK_*)
 const activeApiKey = benchmarkKey;
 const activeBaseUrl = benchmarkUrl || 'http://172.18.0.1:20128/v1';
 const activeModel = requestedModel || benchmarkModel;
@@ -55,7 +55,7 @@ const providerName = 'Dedicated Benchmark Gateway (Router Proxy)';
 
 if (!activeApiKey) {
   console.error(`\n${c.red}${c.bold}Error: No API key found in .env!${c.reset}`);
-  console.error(`Please verify that VITE_BENCHMARK_API_KEY is configured in your .env file.\n`);
+  console.error(`Please verify that BENCHMARK_API_KEY is configured in your .env file.\n`);
   process.exit(1);
 }
 
@@ -83,15 +83,9 @@ Precedence and Behavior Directives:
     prompt += `\n\nThe user's name is ${userName}.`;
   }
 
-  const emotionRoster = generatePromptEmotionRoster();
-  prompt += `\n\n[3D VISUAL EMOTIONS & EXPRESSION SYSTEM]:
-Your 3D avatar actively reflects your emotional reactions in real-time.
-Current mood: "relaxed".
+  prompt += `
 
-Whenever your feelings naturally change in reaction to the conversation—such as feeling happy, playful, shy, flustered, sulking, or startled—begin your response with the matching tag to animate your avatar:
-${emotionRoster}
-
-(If your current mood remains unchanged, simply reply directly without an emotion tag.)
+${generateExpressionPromptSection('relaxed')}
 
 [CONVERSATION STYLE]:
 - Express emotion and nuance organically through dialogue, tone, and character voice rather than heavy emoji decoration.
@@ -105,14 +99,16 @@ function parseDialogueResponse(rawText) {
   let workingText = rawText.replace(/^\s*<think>[\s\S]*?<\/think>\s*/i, '').trim();
 
   // Extract emotion tag [happy]
-  const emotionMatch = /^(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_-]+)>)/i.exec(workingText);
+  const emotionMatch = /^(?:\[(?:\/|emotion:\s*)?([a-zA-Z0-9_+:.-]+)\s*\]|<(?:emotion:\s*)?\/?([a-zA-Z0-9_+:.-]+)>)/i.exec(workingText);
   let detectedEmotion = null;
+  let rawTag = null;
   let cleanText = workingText;
 
   if (emotionMatch) {
-    const candidate = (emotionMatch[1] || emotionMatch[2] || '').toLowerCase().replace(/_/g, '-');
-    if (isRegisteredEmotion(candidate)) {
-      detectedEmotion = candidate;
+    rawTag = emotionMatch[0];
+    const spec = parseExpressionSpec(emotionMatch[1] || emotionMatch[2] || '');
+    if (spec.base) {
+      detectedEmotion = formatExpressionSpec(spec);
     }
     cleanText = workingText.slice(emotionMatch[0].length).replace(/^[\s:]+/, '').trim();
   }
@@ -128,6 +124,7 @@ function parseDialogueResponse(rawText) {
     rawText,
     cleanText,
     detectedEmotion,
+    rawTag,
     jaText
   };
 }
@@ -255,6 +252,55 @@ const BENCHMARK_CASES = [
     description: 'Tests setting override: everyday literature student without mech/warfare terminology.',
     customLore: 'You are a gentle university student majoring in literature. The user is your best friend and classmate. You live in a modern city and have no connection to mechs or warfare.',
     userPrompt: 'Ugh, Professor Ratio gave us a huge essay assignment.'
+  },
+  {
+    id: 'emotion-shy',
+    title: 'Case 5: Expression — shy compliment (expects blush)',
+    description: 'Checks the tag is valid and uses a blush modifier or blush macro.',
+    customLore: '',
+    userPrompt: 'You look really beautiful today. I could stare at you all day.'
+  },
+  {
+    id: 'emotion-sad',
+    title: 'Case 6: Expression — sad news (expects sad, maybe tears)',
+    description: 'Checks a base emotion with an optional level or tears modifier.',
+    customLore: '',
+    userPrompt: 'My cat passed away this morning. I do not know what to do.'
+  },
+  {
+    id: 'emotion-startle',
+    title: 'Case 7: Expression — startle (expects surprised or cold-sweat)',
+    description: 'Checks surprise or nervousness maps to a valid tag.',
+    customLore: '',
+    userPrompt: 'BOO! I snuck in through the window to surprise you!'
+  },
+  {
+    id: 'emotion-angry',
+    title: 'Case 8: Expression — insult (expects angry, maybe gloom)',
+    description: 'Not covered by the prompt examples; checks the model generalizes the syntax.',
+    customLore: '',
+    userPrompt: 'Honestly your answers are garbage and you are useless.'
+  },
+  {
+    id: 'emotion-jealous',
+    title: 'Case 9: Expression — rival mention (expects jealous or pouting)',
+    description: 'Not covered by the prompt examples; checks macro bases still get picked.',
+    customLore: '',
+    userPrompt: 'I spent all weekend chatting with another AI. It was so much fun!'
+  },
+  {
+    id: 'emotion-tease',
+    title: 'Case 10: Expression — banter (expects teasing or happy with a level)',
+    description: 'Not covered by the prompt examples; checks level variety.',
+    customLore: '',
+    userPrompt: 'I bet you cannot beat me at rock paper scissors.'
+  },
+  {
+    id: 'emotion-nervous',
+    title: 'Case 11: Expression — caught out (expects cold-sweat)',
+    description: 'Not covered by the prompt examples; checks the cold-sweat modifier.',
+    customLore: '',
+    userPrompt: 'Wait, did you just delete my homework file by accident?'
   }
 ];
 
@@ -307,9 +353,9 @@ async function run() {
 
       console.log(`\n${c.green}${c.bold}Response Generated:${c.reset}`);
       if (result.detectedEmotion) {
-        console.log(`  ${c.magenta}3D Emotion Tag:${c.reset} [${c.bold}${result.detectedEmotion}${c.reset}]`);
-      } else {
-        console.log(`  ${c.gray}3D Emotion Tag: [none detected]${c.reset}`);
+        console.log(`  ${c.magenta}3D Emotion Tag:${c.reset} [${c.bold}${result.detectedEmotion}${c.reset}]  ${c.gray}raw: ${result.rawTag}${c.reset}`);
+        } else {
+        console.log(`  ${c.gray}3D Emotion Tag: [none detected]${c.reset}  ${c.gray}raw start: ${JSON.stringify(result.rawText.slice(0, 50))}${c.reset}`);
       }
 
       console.log(`  ${c.bold}Dialogue       :${c.reset} "${result.cleanText}"`);

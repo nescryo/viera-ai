@@ -102,6 +102,24 @@ export interface CharacterModelConfig {
   /** Emotion ID -> parameter targets. Emotions without an entry fall back to the default. */
   emotions: Record<string, EmotionParams>;
   /**
+   * Modifier ID -> parameter deltas at full weight (1.0). They are scaled by the weight and
+   * added on top of the base emotion, so `sad+blush:low` mixes both.
+   */
+  modifiers?: Record<string, EmotionParams>;
+  /** Eye symbol ID -> parameter deltas at full weight. Resolved like modifiers, but exclusive. */
+  eyes?: Record<string, EmotionParams>;
+  /**
+   * Narrows the eyelids by scaling the eyelid-open parameters after the automatic blink wrote
+   * them. These must not be driven through `emotions` or `modifiers`: the blender relaxes unused
+   * parameters to 0, which would close the eyes for good.
+   */
+  eyelid?: {
+    /** Eyelid-open parameter IDs (the model's EyeBlink group). */
+    paramIds: string[];
+    /** Modifier ID -> fraction of closure at weight 1. */
+    closeBy: Record<string, number>;
+  };
+  /**
    * Mask render textures needed by the model (default 1). Cubism fits 36 clipping masks
    * in one; each extra texture adds 32. Check the console for "not supported mask count".
    */

@@ -6,7 +6,7 @@ import { getCharacterPackage } from '../../characters/registry';
 import type { CharacterPackage } from '../../characters/types';
 import { ttsService } from '../../services/ttsService';
 import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../services/tts/lipSyncSolver';
-import { DEFAULT_EMOTION_ID } from '../../data/emotionRegistry';
+import { DEFAULT_EMOTION_ID, parseExpressionSpec } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { BreathingCycle } from '../../avatar/breathing';
 import { resolveRenderQuality } from '../../avatar/renderQuality';
@@ -15,7 +15,7 @@ import { ChestJiggle, RIBBON_JIGGLE, SKIRT_JIGGLE } from '../../avatar/chestJigg
 import { ArmMotion } from '../../avatar/armMotion';
 import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
-import { ParamBlender, resolveEmotionTargets, smoothFactor } from '../../avatar/paramBlender';
+import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -47,9 +47,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Refs so state changes do not reload the model
-  const emotionRef = useRef(currentEmotion);
+  const emotionRef = useRef(parseExpressionSpec(currentEmotion));
   const replyingRef = useRef(isReplying);
-  useEffect(() => { emotionRef.current = currentEmotion; }, [currentEmotion]);
+  useEffect(() => { emotionRef.current = parseExpressionSpec(currentEmotion); }, [currentEmotion]);
   useEffect(() => { replyingRef.current = isReplying; }, [isReplying]);
 
   const personaId = currentPersona.id;
@@ -150,6 +150,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
+        let eyelidScale = 1;
 
         // Physics reads ParamBreath, and it runs before `beforeModelUpdate`. Set the value
         // right after the motion update so hair, skirt, ribbons and ears react to the breath.
@@ -183,8 +184,20 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           setParam(p.eyeBallY, pointer.y + eyeJitter.y);
           p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
-          const targets = resolveEmotionTargets(config.emotions, emotionRef.current, DEFAULT_EMOTION_ID);
+          const spec = emotionRef.current;
+          const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
+          const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
           blender.step(targets, delta).forEach((value, id) => setParam(id, value));
+
+          // Lower the eyelids by multiplying the value the automatic blink already wrote this
+          // frame, so blinking keeps working (the blender cannot do this, see CharacterModelConfig).
+          const eyelid = config.eyelid;
+          if (eyelid) {
+            eyelidScale += (resolveEyelidScale(weights, eyelid.closeBy) - eyelidScale) * smoothFactor(7, delta);
+            eyelid.paramIds.forEach((id) => {
+              if (core.getParameterIndex(id) >= 0) setParam(id, core.getParameterValueById(id) * eyelidScale);
+            });
+          }
 
           const source = resolveLipSyncSource({
             isWebAudioPlaying: ttsService.isWebAudioPlaying(),

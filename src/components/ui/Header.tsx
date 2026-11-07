@@ -2,6 +2,7 @@ import React from 'react';
 import type { UserProfile } from '../../types';
 import { MessagesSquare, Settings, User } from 'lucide-react';
 import { ExpressionMenu } from './ExpressionMenu';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -27,18 +28,20 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Left: App Brand (Pom-Pom Logo + VIERA) */}
       <div className="header-left">
         <div className="brand-badge">
-          <img src="/pom-pom-circle.png" alt="Viera Logo" className="brand-logo-img" />
+          <img src="/viera-avatar.png" alt="Viera Logo" className="brand-logo-img" />
           <span className="brand-title">VIERA</span>
         </div>
       </div>
 
       {/* Right: Settings & Profile (⚙ ◉) */}
       <div className="header-right">
-        <ExpressionMenu
-          currentEmotion={currentEmotion}
-          onSelectEmotion={onSelectEmotion}
-          onOpenLorebook={onOpenLorebook}
-        />
+        <ErrorBoundary>
+          <ExpressionMenu
+            currentEmotion={currentEmotion}
+            onSelectEmotion={onSelectEmotion}
+            onOpenLorebook={onOpenLorebook}
+          />
+        </ErrorBoundary>
 
         <button
           type="button"

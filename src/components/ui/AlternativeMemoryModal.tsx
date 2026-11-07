@@ -61,7 +61,9 @@ export const AlternativeMemoryModal: React.FC<AlternativeMemoryModalProps> = ({
           </p>
 
           <div className="memory-persona">
-            <img src={persona.avatarUrl} alt="" className="memory-persona-avatar" />
+            {persona.avatarUrl ? (
+              <img src={persona.avatarUrl} alt={persona.name} className="memory-persona-avatar" />
+            ) : null}
             <div className="memory-persona-meta">
               <span className="memory-persona-name">{persona.name}</span>
               <span className="memory-persona-tagline">{persona.tagline}</span>
