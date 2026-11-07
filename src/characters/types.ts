@@ -10,6 +10,18 @@ export interface BreathTarget {
   channel: 'chest' | 'shoulder' | 'head';
 }
 
+/** A parameter nudged by a jiggle spring. */
+export interface JiggleTarget {
+  /** Model parameter ID. */
+  id: string;
+  /** Scales the -1..1 jiggle sample. Negative values reverse the direction. */
+  amount: number;
+  /** Which jiggle axis drives it. */
+  axis: 'x' | 'y';
+  /** When true, `amount` is a fraction of the parameter's half-range instead of raw units. */
+  relative?: boolean;
+}
+
 /** Logical avatar parameter names mapped to model-specific Live2D parameter IDs. */
 export interface Live2DParamMap {
   angleX: string;
@@ -27,6 +39,16 @@ export interface Live2DParamMap {
    * already set this frame (so physics-driven bounce is kept).
    */
   breathTargets?: BreathTarget[];
+  /**
+   * Parameters driven by the chest jiggle spring, added on top of physics output.
+   * `amount` scales the -1..1 jiggle sample (negative reverses the direction).
+   */
+  jiggleTargets?: JiggleTarget[];
+  /**
+   * Ribbon and bow parameters swung by a looser spring that trails the head.
+   * Added on top of physics output.
+   */
+  ribbonTargets?: JiggleTarget[];
   /** Optional vowel parameters driven by lip-sync visemes. */
   visemes?: { a: string; i: string; u: string; e: string; o: string };
 }

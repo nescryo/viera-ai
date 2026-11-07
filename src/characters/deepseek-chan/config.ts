@@ -7,8 +7,8 @@ import type { CharacterModelConfig } from '../types';
  */
 export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
   modelUrl: '/models/deepseek-chan/%E5%A4%A7%E8%82%A5%E9%B1%BC.model3.json',
-  scale: 1.35,
-  anchor: [0.5, 0.62],
+  scale: 1.70,
+  anchor: [0.5, 0.76],
   maskRenderTextures: 2, // the model has 49 clipping masks (> 36)
   params: {
     angleX: 'ParamAngleX',
@@ -27,6 +27,21 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
       { id: 'ParamBodyAngleY', amount: 3, channel: 'chest' },
       { id: 'ShoulderY', amount: 6, channel: 'shoulder' },
       { id: 'ShoulderYy', amount: 8, channel: 'shoulder' }
+    ],
+    // Chest jiggle on top of physics. Ranges: ChestX*/ChestY* -1..1.
+    jiggleTargets: [
+      { id: 'ChestX1', amount: 0.3, axis: 'x' },
+      { id: 'ChestX2', amount: 0.3, axis: 'x' },
+      { id: 'ChestY1', amount: 0.4, axis: 'y' },
+      { id: 'ChestY2', amount: 0.3, axis: 'y' },
+      { id: 'ChestY3', amount: 0.3, axis: 'y' }
+    ],
+    // Ribbon swing on top of physics. Amounts are fractions of each parameter's half-range.
+    ribbonTargets: [
+      ...['LRibbonX1', 'LRibbonX2', 'LRibbonX3', 'LRibbonX4'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
+      ...['RRibbonX1', 'RRibbonX2', 'RRibbonX3', 'RRibbonX4'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
+      ...['ribbonX1', 'ribbonX2', 'ribbonX3', 'ribbonX4', 'ribbonX5', 'ribbonX6', 'ribbonX7'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
+      ...['ribbonY1', 'ribbonY2', 'ribbonY3', 'ribbonY4', 'ribbonY5', 'ribbonY6', 'ribbonY7'].map((id) => ({ id, amount: 0.25, axis: 'y' as const, relative: true }))
     ],
     visemes: { a: 'ParamA', i: 'ParamI', u: 'ParamU', e: 'ParamE', o: 'ParamO' }
   },
