@@ -15,7 +15,7 @@ import { ChestJiggle, RIBBON_JIGGLE, SKIRT_JIGGLE } from '../../avatar/chestJigg
 import { ArmMotion } from '../../avatar/armMotion';
 import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
-import { ParamBlender, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
+import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -150,6 +150,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
+        let eyelidScale = 1;
 
         // Physics reads ParamBreath, and it runs before `beforeModelUpdate`. Set the value
         // right after the motion update so hair, skirt, ribbons and ears react to the breath.
@@ -184,8 +185,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
           const spec = emotionRef.current;
-          const targets = resolveExpressionTargets(config.emotions, config.modifiers, spec.base ?? DEFAULT_EMOTION_ID, spec.modifiers, DEFAULT_EMOTION_ID, spec.baseWeight);
+          const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
+          const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
           blender.step(targets, delta).forEach((value, id) => setParam(id, value));
+
+          // Lower the eyelids by multiplying the value the automatic blink already wrote this
+          // frame, so blinking keeps working (the blender cannot do this, see CharacterModelConfig).
+          const eyelid = config.eyelid;
+          if (eyelid) {
+            eyelidScale += (resolveEyelidScale(weights, eyelid.closeBy) - eyelidScale) * smoothFactor(7, delta);
+            eyelid.paramIds.forEach((id) => {
+              if (core.getParameterIndex(id) >= 0) setParam(id, core.getParameterValueById(id) * eyelidScale);
+            });
+          }
 
           const source = resolveLipSyncSource({
             isWebAudioPlaying: ttsService.isWebAudioPlaying(),

@@ -98,6 +98,27 @@ describe('Expression Validator Suite', () => {
       expect(extractAndValidateExpression('[sad+tears+gloom:low] Hi!').emotion).toBe('sad+tears:0.6+gloom:0.3');
     });
 
+    it('parses an eye symbol as an exclusive slot where the last one wins', () => {
+      expect(extractAndValidateExpression('[happy+heart-eyes] Hi!').emotion).toBe('happy+heart-eyes');
+      expect(extractAndValidateExpression('[happy+heart-eyes+smug-eyes:0.5] Hi!').emotion).toBe('happy+smug-eyes:0.5');
+      expect(extractAndValidateExpression('[happy+blush:low+spiral-eyes] Hi!').emotion).toBe('happy+blush:0.3+spiral-eyes');
+    });
+
+    it('parses the eye shape modifiers alongside an eye symbol', () => {
+      expect(extractAndValidateExpression('[angry+eye-squint:high] Hi!').emotion).toBe('angry+eye-squint:1');
+      expect(extractAndValidateExpression('[surprised+shock-eyes:low+heart-eyes] Hi!').emotion).toBe('surprised+shock-eyes:0.3+heart-eyes');
+    });
+
+    it('maps near-miss spellings of the eye modifiers to the canonical ID', () => {
+      expect(extractAndValidateExpression('[angry+squint:high] Hi!').emotion).toBe('angry+eye-squint:1');
+      expect(extractAndValidateExpression('[surprised+shocked-eyes] Hi!').emotion).toBe('surprised+shock-eyes:0.6');
+      expect(extractAndValidateExpression('[happy+wide_eyes:low] Hi!').emotion).toBe('happy+shock-eyes:0.3');
+    });
+
+    it('does not let an alias lookup resolve inherited object keys', () => {
+      expect(extractAndValidateExpression('[happy+constructor] Hi!').emotion).toBe('happy');
+    });
+
     it('uses the default weight when no level is given', () => {
       expect(extractAndValidateExpression('[happy+blush] Hi!').emotion).toBe('happy+blush:0.6');
     });

@@ -166,6 +166,10 @@ Examples:
 [sad:mid+tears:mid] hurt and close to crying
 [relaxed+blush:mid] flattered and a little shy
 [surprised+cold-sweat:low] startled and slightly nervous
+[relaxed+eye-squint:mid] doubtful, side-eyeing a questionable claim
+[surprised+shock-eyes:high] stunned by news that is hard to believe
+
+These only illustrate the syntax. Pick tags from the actual moment, not from the examples.
 
 (If your current mood remains unchanged, simply reply directly without a tag.)`;
 }
@@ -198,11 +202,51 @@ export const MODIFIER_REGISTRY: ModifierCapability[] = [
     id: 'cold-sweat',
     label: 'Cold Sweat',
     description: 'A bead of cold sweat: nervous, awkward, caught out, anxious'
+  },
+  {
+    id: 'eye-squint',
+    label: 'Eye Squint',
+    description: 'Eyes narrowed: suspicious, scrutinizing, smug, annoyed. Pairs well with angry, teasing or relaxed'
+  },
+  {
+    id: 'shock-eyes',
+    label: 'Shock Eyes',
+    description: 'Eyes shocked wide: startled, stunned, disbelief. Pairs well with surprised or terrified'
   }
 ];
 
 export const MODIFIER_MAP = new Map<string, ModifierCapability>(
   MODIFIER_REGISTRY.map(m => [m.id, m])
+);
+
+/**
+ * Near-miss spellings an LLM is likely to write for the eye modifiers. The parser maps them to
+ * the canonical ID instead of dropping the modifier. They are not listed in the prompt.
+ */
+const MODIFIER_ALIASES = new Map<string, string>([
+  ['squint', 'eye-squint'],
+  ['squint-eyes', 'eye-squint'],
+  ['eyes-squint', 'eye-squint'],
+  ['narrow-eyes', 'eye-squint'],
+  ['shock', 'shock-eyes'],
+  ['shocked-eyes', 'shock-eyes'],
+  ['eyes-shock', 'shock-eyes'],
+  ['wide-eyes', 'shock-eyes']
+]);
+
+/**
+ * Eye symbols (rig keys 3 to 6). They replace the eyes, so at most one is active, and the
+ * LLM prompt does not list them: they are set from the expression menu.
+ */
+export const EYE_REGISTRY: ModifierCapability[] = [
+  { id: 'spiral-eyes', label: 'Spiral', description: 'Spiral eyes: dizzy, confused' },
+  { id: 'heart-eyes', label: 'Heart', description: 'Heart eyes: smitten, adoring' },
+  { id: 'squeeze-eyes', label: '> <', description: '> < eyes: squeezed shut, straining' },
+  { id: 'smug-eyes', label: 'Smug', description: 'Smug sneering eyes' }
+];
+
+export const EYE_MAP = new Map<string, ModifierCapability>(
+  EYE_REGISTRY.map(e => [e.id, e])
 );
 
 /** Named strengths. Numbers between 0 and 1 are also accepted. */
@@ -216,6 +260,8 @@ export interface ExpressionSpec {
   baseWeight: number;
   /** Modifier ID -> weight in 0..1 (zero weights are dropped). */
   modifiers: Record<string, number>;
+  /** Active eye symbol, if any. Exclusive: only one at a time. */
+  eye?: { id: string; weight: number };
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -257,16 +303,25 @@ export function parseExpressionSpec(raw?: string | null): ExpressionSpec {
     baseWeight = level ?? 1;
   }
 
+  let eye: ExpressionSpec['eye'];
   for (const part of parts.slice(1)) {
     const [modRaw, modLevelRaw] = part.split(':');
-    const id = modRaw.trim().replace(/_/g, '-');
+    const normalized = modRaw.trim().replace(/_/g, '-');
+    const id = MODIFIER_ALIASES.get(normalized) ?? normalized;
+    if (EYE_MAP.has(id)) {
+      // Exclusive slot: the last eye symbol wins.
+      const eyeWeight = modLevelRaw?.trim() ? parseLevel(modLevelRaw) : 1;
+      if (eyeWeight === null) continue;
+      eye = eyeWeight > 0 ? { id, weight: round2(eyeWeight) } : undefined;
+      continue;
+    }
     if (!MODIFIER_MAP.has(id)) continue;
     const weight = modLevelRaw?.trim() ? parseLevel(modLevelRaw) : DEFAULT_MODIFIER_WEIGHT;
     if (weight === null) continue;
     if (weight > 0) modifiers[id] = round2(weight);
     else delete modifiers[id];
   }
-  return { base, baseWeight: round2(baseWeight), modifiers };
+  return { base, baseWeight: round2(baseWeight), modifiers, ...(eye ? { eye } : {}) };
 }
 
 /** Canonical string form of a spec, e.g. `sad:0.3+blush:0.6`. Inverse of `parseExpressionSpec`. */
@@ -277,5 +332,8 @@ export function formatExpressionSpec(spec: ExpressionSpec): string {
   const mods = Object.entries(spec.modifiers)
     .filter(([, w]) => w > 0)
     .map(([id, w]) => `${id}:${round2(w)}`);
+  if (spec.eye && spec.eye.weight > 0) {
+    mods.push(spec.eye.weight < 1 ? `${spec.eye.id}:${round2(spec.eye.weight)}` : spec.eye.id);
+  }
   return [head, ...mods].filter(Boolean).join('+');
 }

@@ -3,6 +3,7 @@ import { BookOpen, Smile } from 'lucide-react';
 import {
   EMOTION_REGISTRY,
   MODIFIER_REGISTRY,
+  EYE_REGISTRY,
   DEFAULT_EMOTION_ID,
   formatExpressionSpec,
   parseExpressionSpec
@@ -32,6 +33,11 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
 
   const selectBase = (id: string) => {
     onSelectEmotion(formatExpressionSpec({ ...spec, base: id }));
+  };
+
+  /** Picks an eye symbol, or clears it with `null`. Clicking the active symbol clears it. */
+  const selectEye = (id: string | null) => {
+    onSelectEmotion(formatExpressionSpec({ ...spec, base: activeBase, eye: id ? { id, weight: 1 } : undefined }));
   };
 
   const setBaseWeight = (weight: number) => {
@@ -83,6 +89,7 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
 
       {isOpen && (
         <div className="expression-dropdown-card">
+          <div className="expression-dropdown-scroll">
           <div className="expression-dropdown-header">Expression</div>
           <div className="expression-dropdown-divider" />
           <div className="testing-emotions-list">
@@ -104,14 +111,14 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
             <label className="modifier-slider">
               <span className="modifier-slider-label">
                 Intensity
-                <span className="modifier-slider-value">{spec.baseWeight.toFixed(2)}</span>
+                <span className="modifier-slider-value">{(spec.baseWeight ?? 1).toFixed(2)}</span>
               </span>
               <input
                 type="range"
                 min={0.05}
                 max={1}
                 step={0.05}
-                value={spec.baseWeight}
+                value={spec.baseWeight ?? 1}
                 onChange={(event) => setBaseWeight(Number(event.target.value))}
                 aria-label="Expression intensity"
               />
@@ -148,6 +155,23 @@ export const ExpressionMenu: React.FC<ExpressionMenuProps> = ({
             >
               Reset modifiers
             </button>
+          </div>
+          <div className="expression-dropdown-divider expression-dropdown-divider-section" />
+          <div className="expression-dropdown-header">Eyes</div>
+          <div className="testing-emotions-list">
+            {EYE_REGISTRY.map((eye) => (
+              <button
+                key={eye.id}
+                type="button"
+                className={`emotion-test-btn ${spec.eye?.id === eye.id ? 'active' : ''}`}
+                onClick={() => selectEye(spec.eye?.id === eye.id ? null : eye.id)}
+                aria-pressed={spec.eye?.id === eye.id}
+                aria-label={`Eye symbol: ${eye.label}`}
+              >
+                {eye.label}
+              </button>
+            ))}
+          </div>
           </div>
           <div className="expression-dropdown-divider expression-dropdown-divider-section" />
           <button

@@ -100,7 +100,25 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
     blush: { key7: 1 },
     gloom: { key1: 1 },
     tears: { key2: 1 },
-    'cold-sweat': { key13: 1 }
+    'cold-sweat': { key13: 1 },
+    // Eye shape axes. Not in the EyeBlink group, so safe to add. Direction and range unchecked.
+    'eye-squint': { LEyeSquint: 1, REyeSquint: 1 },
+    // ShockL/ShockR barely show at 1.0, so the brows lift too (same parameters as `surprised`).
+    'shock-eyes': { ShockL: 1, ShockR: 1, ParamBrowLY: 0.5, ParamBrowRY: 0.5 }
+  },
+  // The squint parameters only narrow the eyes a little at 1.0, so eye-squint also lowers the
+  // eyelids. First pass, needs visual tuning.
+  eyelid: {
+    paramIds: ['ParamEyeLOpen', 'ParamEyeROpen'],
+    closeBy: { 'eye-squint': 0.4 }
+  },
+  // Eye symbols, one at a time. key3 spiral, key4 heart, key5 > <, key6 smug. Their Exp3 files set
+  // 1.0 with Add blend and zero the other three; the blender relaxes the others to 0 here.
+  eyes: {
+    'spiral-eyes': { key3: 1 },
+    'heart-eyes': { key4: 1 },
+    'squeeze-eyes': { key5: 1 },
+    'smug-eyes': { key6: 1 }
   },
   credits: 'DeepSeek-chan: illustration & PSD by Kamiya Ryoko, Live2D rigging by 霓虹猫_NeonNeko'
 };
@@ -111,7 +129,7 @@ export const DEEPSEEK_CHAN_METADATA = {
   name: 'DeepSeek-chan',
   tagline: '',
   greeting: '',
-  avatarUrl: '',
+  avatarUrl: '/viera-avatar.png',
   voice: { pitch: 1, rate: 1, lang: 'en-US' },
   category: 'Original' as const
 };

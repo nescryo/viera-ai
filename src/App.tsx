@@ -18,6 +18,7 @@ import { SetupOnboardingModal } from './components/ui/SetupOnboardingModal';
 import { ConversationHistoryModal } from './components/ui/ConversationHistoryModal';
 import { UserProfileModal } from './components/ui/UserProfileModal';
 import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/Toast';
 import { Scene } from './components/live2d/Scene';
 
@@ -375,60 +376,62 @@ export function App() {
         onErrorToast={(title, msg) => addToast('warning', title, msg)}
       />
 
-      {/* 1. Google OAuth Auth Gate Modal */}
-      {!userProfile && !pendingGooglePayload && (
-        <LoginModal onGoogleLoginSuccess={handleGoogleLoginSuccess} />
-      )}
+      <ErrorBoundary>
+        {/* 1. Google OAuth Auth Gate Modal */}
+        {!userProfile && !pendingGooglePayload && (
+          <LoginModal onGoogleLoginSuccess={handleGoogleLoginSuccess} />
+        )}
 
-      {/* 2. First-run profile setup modal */}
-      {pendingGooglePayload && (
-        <SetupOnboardingModal
-          initialProfile={pendingGooglePayload}
-          onCompleteSetup={handleCompleteSetup}
-        />
-      )}
+        {/* 2. First-run profile setup modal */}
+        {pendingGooglePayload && (
+          <SetupOnboardingModal
+            initialProfile={pendingGooglePayload}
+            onCompleteSetup={handleCompleteSetup}
+          />
+        )}
 
-      {/* 3. Settings Modal */}
-      {activeModal === 'settings' && (
-        <SettingsModal
-          apiConfig={apiConfig}
-          onSaveConfig={handleSaveConfig}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+        {/* 3. Settings Modal */}
+        {activeModal === 'settings' && (
+          <SettingsModal
+            apiConfig={apiConfig}
+            onSaveConfig={handleSaveConfig}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
 
-      {/* 4. Alternative Memory & Custom Lore Modal */}
-      {activeModal === 'alternativeMemory' && (
-        <AlternativeMemoryModal
-          persona={currentPersona}
-          onSaveCustomLore={handleUpdateCustomLore}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+        {/* 4. Alternative Memory & Custom Lore Modal */}
+        {activeModal === 'alternativeMemory' && (
+          <AlternativeMemoryModal
+            persona={currentPersona}
+            onSaveCustomLore={handleUpdateCustomLore}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
 
-      {/* 5. Conversation History Modal */}
-      {activeModal === 'history' && (
-        <ConversationHistoryModal
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onSelectSession={(id) => { selectSession(id); setActiveModal(null); }}
-          onCreateNewChat={() => { createNewChat(); setActiveModal(null); }}
-          onRenameSession={renameSession}
-          onDeleteSession={deleteSession}
-          onClearAllSessions={clearAllSessions}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+        {/* 5. Conversation History Modal */}
+        {activeModal === 'history' && (
+          <ConversationHistoryModal
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={(id) => { selectSession(id); setActiveModal(null); }}
+            onCreateNewChat={() => { createNewChat(); setActiveModal(null); }}
+            onRenameSession={renameSession}
+            onDeleteSession={deleteSession}
+            onClearAllSessions={clearAllSessions}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
 
-      {/* 6. User Profile Modal */}
-      {activeModal === 'profile' && userProfile && (
-        <UserProfileModal
-          userProfile={userProfile}
-          onUpdateProfile={handleUpdateProfile}
-          onLogout={handleLogout}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+        {/* 6. User Profile Modal */}
+        {activeModal === 'profile' && userProfile && (
+          <UserProfileModal
+            userProfile={userProfile}
+            onUpdateProfile={handleUpdateProfile}
+            onLogout={handleLogout}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
+      </ErrorBoundary>
 
       {/* 7. In-App Glass Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

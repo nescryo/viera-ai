@@ -41,6 +41,21 @@ export function resolveExpressionTargets(
   return targets;
 }
 
+/**
+ * Multiplier for the eyelid-open parameters (1 = untouched, 0 = fully closed). Each active
+ * modifier closes the lids by `closeBy[id] * weight`; the result is clamped to 0..1. It is applied
+ * as a multiplication on top of the automatic blink, so blinking keeps working.
+ * @param weights Modifier ID -> weight in 0..1.
+ * @param closeBy Modifier ID -> fraction of closure at weight 1.
+ */
+export function resolveEyelidScale(weights: Record<string, number>, closeBy: Record<string, number>): number {
+  let closed = 0;
+  for (const [id, amount] of Object.entries(closeBy)) {
+    closed += amount * (weights[id] ?? 0);
+  }
+  return Math.max(0, Math.min(1, 1 - closed));
+}
+
 /** Frame-rate independent exponential smoothing factor. */
 export function smoothFactor(rate: number, delta: number): number {
   return 1 - Math.exp(-rate * delta);
