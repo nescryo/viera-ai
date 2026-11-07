@@ -111,7 +111,7 @@ export interface UserProfile {
 export interface ChatSession {
   id: string;               // Session UUID / Timestamp
   title: string;            // Conversation Title
-  characterId: string;      // Character ID ('firefly')
+  characterId: string;      // Character ID ('deepseek-chan')
   provider?: string;        // Active model or provider tag
   createdAt: number;
   updatedAt: number;

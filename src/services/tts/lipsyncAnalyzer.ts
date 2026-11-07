@@ -24,7 +24,7 @@ export interface VisemeWeights {
 const SILENT_WEIGHTS: VisemeWeights = { a: 0, i: 0, u: 0, e: 0, o: 0, closed: 0, volume: 0 };
 
 /**
- * Maps a wawa-lipsync VISEME to Firefly's あいうえお morph weights.
+ * Maps a wawa-lipsync VISEME to the character's あいうえお vowel weights.
  * Vowel visemes map directly; plosives/fricatives bias toward a closed/narrow
  * mouth so consonants read as brief closures rather than an open vowel.
  */

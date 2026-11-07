@@ -1,18 +1,18 @@
 import type { CharacterPackage } from './types';
-import { FIREFLY_PACKAGE } from './firefly';
+import { DEEPSEEK_CHAN_PACKAGE } from './deepseek-chan';
 
 export * from './types';
-export { FIREFLY_PACKAGE } from './firefly';
+export { DEEPSEEK_CHAN_PACKAGE } from './deepseek-chan';
 
 /**
- * Official Registry of Installed 3D Characters
+ * Official Registry of Installed Live2D Characters
  * In the future, characters installed from GitHub Release tags are registered here.
  */
 export const INSTALLED_CHARACTERS: CharacterPackage[] = [
-  FIREFLY_PACKAGE
+  DEEPSEEK_CHAN_PACKAGE
 ];
 
-export const DEFAULT_CHARACTER_PACKAGE: CharacterPackage = FIREFLY_PACKAGE;
+export const DEFAULT_CHARACTER_PACKAGE: CharacterPackage = DEEPSEEK_CHAN_PACKAGE;
 
 const CHARACTER_MAP = new Map<string, CharacterPackage>(
   INSTALLED_CHARACTERS.map((char) => [char.id.toLowerCase().trim(), char])

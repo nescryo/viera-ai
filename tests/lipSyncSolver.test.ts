@@ -4,8 +4,8 @@ import {
   MOUTH_MORPH_RATE,
   resolveLipSyncSource,
   SILENT_VISEMES
-} from '../src/components/3d/animation/lipSyncSolver';
-import type { LipSyncFrame, LipSyncSource, VisemeInput } from '../src/components/3d/animation/lipSyncSolver';
+} from '../src/services/tts/lipSyncSolver';
+import type { LipSyncFrame, LipSyncSource, VisemeInput } from '../src/services/tts/lipSyncSolver';
 
 const FPS = 60;
 const DT = 1 / FPS;

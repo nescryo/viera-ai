@@ -9,7 +9,7 @@
  * configured via VITE_BENCHMARK_* in .env.
  */
 
-import { FIREFLY_CANON_LORE } from '../src/characters/firefly/lore.ts';
+import { DEEPSEEK_CHAN_CANON_LORE } from '../src/characters/deepseek-chan/lore.ts';
 import { generatePromptEmotionRoster, isRegisteredEmotion } from '../src/data/emotionRegistry.ts';
 
 // ANSI terminal colors
@@ -70,14 +70,14 @@ ${customLore.trim()}
 Precedence and Behavior Directives:
 - The details, relationship dynamics, memories, and setting established in this Lorebook represent the absolute ground truth for your interaction with ${userName || 'the user'}.
 - Whenever any detail in this Lorebook conflicts with your default backstory, relationship assumptions, or baseline behavior, this Lorebook strictly takes precedence.
-- Fully adopt the established dynamic while naturally expressing it through Firefly's distinctive vocal cadence, mannerisms, and speech style.
+- Fully adopt the established dynamic while naturally expressing it through DeepSeek-chan's distinctive vocal cadence, mannerisms, and speech style.
 
 ---
 
 `;
   }
 
-  prompt += `[CHARACTER BASELINE]:\n${FIREFLY_CANON_LORE}`;
+  prompt += `[CHARACTER BASELINE]:\n${DEEPSEEK_CHAN_CANON_LORE}`;
 
   if (userName) {
     prompt += `\n\nThe user's name is ${userName}.`;

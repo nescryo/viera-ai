@@ -7,9 +7,50 @@
   display: flex;
   flex-direction: column;
   background-color: var(--bg-tertiary);
+  /* Deep-sea gradient: navy at the top, dark teal at the bottom */
+  background-image: linear-gradient(180deg, #080c22 0%, #09132b 45%, #081f2d 80%, #09262f 100%);
 }
 
-/* 3D Scene Background */
+/* Soft radial glow behind the character */
+.app-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 38% 55% at 50% 42%, rgba(70, 150, 255, 0.14) 0%, rgba(40, 110, 200, 0.06) 45%, transparent 75%),
+    radial-gradient(ellipse 60% 25% at 50% 100%, rgba(0, 200, 210, 0.08) 0%, transparent 80%);
+}
+
+/* Drifting bubbles (CSS only) */
+.app-container::after {
+  content: '';
+  position: absolute;
+  inset: -20% 0 0 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(170, 225, 255, 0.35) 0 2px, transparent 3px),
+    radial-gradient(circle, rgba(170, 225, 255, 0.25) 0 3px, transparent 4px),
+    radial-gradient(circle, rgba(170, 225, 255, 0.2) 0 1.5px, transparent 2.5px);
+  background-size: 260px 320px, 410px 470px, 170px 230px;
+  background-position: 20px 0, 140px 90px, 60px 40px;
+  opacity: 0.4;
+  animation: bubble-rise 40s linear infinite;
+}
+
+/* Each layer moves up by exactly one tile height, so the loop is seamless */
+@keyframes bubble-rise {
+  from { background-position: 20px 0, 140px 90px, 60px 40px; }
+  to { background-position: 20px -320px, 140px -380px, 60px -190px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-container::after { animation: none; }
+}
+
+/* Live2D Scene Background */
 .scene-container {
   position: absolute;
   top: 0;
@@ -19,7 +60,7 @@
   z-index: 1;
 }
 
-.three-canvas-container {
+.live2d-canvas-container {
   width: 100%;
   height: 100%;
 }

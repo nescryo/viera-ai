@@ -19,7 +19,7 @@ import { ConversationHistoryModal } from './components/ui/ConversationHistoryMod
 import { UserProfileModal } from './components/ui/UserProfileModal';
 import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ToastContainer } from './components/ui/Toast';
-import { Scene } from './components/3d/Scene';
+import { Scene } from './components/live2d/Scene';
 
 import './App.css';
 
@@ -350,7 +350,6 @@ export function App() {
       <Scene 
         currentPersona={currentPersona}
         currentEmotion={currentEmotion}
-        onSelectEmotion={handleSelectEmotion}
         isReplying={isLoading || isSpeaking}
       />
 

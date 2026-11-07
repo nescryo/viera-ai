@@ -15,13 +15,13 @@ describe('Narrative Exposition & Speech Sanitizer Suite', () => {
     });
 
     it('handles multiple narrative blocks mixed with dialogue', () => {
-      const input = `"...Hello." <narrative>Brief pause.</narrative> "I'm Firefly." <narrative>A small genuine smile.</narrative> "...What brings you here?"`;
+      const input = `"...Hello." <narrative>Brief pause.</narrative> "I'm DeepSeek-chan." <narrative>A small genuine smile.</narrative> "...What brings you here?"`;
       const sanitized = sanitizeTextForSpeech(input);
 
       expect(sanitized).not.toContain('Brief pause.');
       expect(sanitized).not.toContain('A small genuine smile.');
       expect(sanitized).toContain('"...Hello."');
-      expect(sanitized).toContain('"I\'m Firefly."');
+      expect(sanitized).toContain('"I\'m DeepSeek-chan."');
       expect(sanitized).toContain('"...What brings you here?"');
     });
 

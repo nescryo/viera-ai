@@ -1,17 +1,19 @@
 # Viera AI
 
-Viera is an interactive web application that brings a 3D anime character to life as a virtual companion directly inside your web browser. This project features the character **Firefly** from the game *Honkai: Star Rail*.
+Viera is an interactive web application that brings a Live2D anime character to life as a virtual companion directly inside your web browser. The bundled character is **DeepSeek-chan**, a free Live2D model by Kamiya Ryoko (see [Credits](#credits)).
 
-You can chat with Firefly, listen to her voice (optionally dubbed in Japanese while the chat stays in your language), and watch her expressive facial animations and natural movements as she follows your cursor or finger.
+You can chat with the character, listen to her voice (optionally dubbed in Japanese while the chat stays in your language), and watch her expressive facial animations and natural movements as she follows your cursor or finger.
+
+Built with React 19, TypeScript, Vite, PixiJS, and the Live2D Cubism runtime.
 
 ---
 
 ## What Can It Do?
 
-- **Lifelike 3D Character**: The character moves naturally on your screen—breathing, blinking, and following your cursor or finger with her gaze and head movement.
+- **Lifelike Live2D Character**: The character moves naturally on your screen: breathing, blinking, body sway, eye saccades, and following your cursor or finger with her gaze and head movement.
 - **Conversational AI**: Chat freely about any topic. The character responds warmly like a companion with an expressive and friendly personality. Bring your own AI provider (OpenRouter, DeepSeek, Groq, OpenAI, Google Gemini, LM Studio, Ollama, or any OpenAI-compatible endpoint).
 - **Expressive Anime Voice**: Responses can be spoken out loud, complete with mouth movements synchronized to her speech. Pick a voice engine in Settings (see below), or let the browser's built-in speech be the fallback.
-- **Japanese Dubbing Mode**: Firefly speaks in Japanese while the chat text stays in the language you are using.
+- **Japanese Dubbing Mode**: The character speaks in Japanese while the chat text stays in the language you are using.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
 - **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth to save your chat sessions locally, customize your display name, and set your profile avatar.
 
@@ -114,8 +116,22 @@ npm run benchmark  # Run the persona benchmark (needs BENCHMARK_* in .env)
 
 ---
 
+## Credits
+
+**Live2D model: DeepSeek-chan**
+
+| Role | Credit |
+| :--- | :--- |
+| Illustration & PSD layer separation | Kamiya Ryoko |
+| Live2D rigging | 霓虹猫_NeonNeko |
+| Model release | Free model distributed by Kamiya Ryoko |
+
+Creator links: [VGen](https://vgen.co/KAMIYA) and [X (Twitter)](https://x.com/kamiya_ryoko).
+
+The model files are in `public/models/deepseek-chan/`, together with the creator's original terms of use.
+
 ## Disclaimer & License
 
-- The 3D character and *Honkai: Star Rail* are trademarks and intellectual property of **miHoYo / HoYoverse**. The 3D model was edited by **流云景** and is used under its own terms: **no redistribution, no commercial use, and no adult, extreme, gore, or harassment content** (see `public/models/firefly/使用规则.txt`). Please respect these terms if you fork this project.
+- DeepSeek-chan is used under the creator's free-model terms of use (`public/models/deepseek-chan/`). Those terms allow personal use and content creation, and require credit to the creators. They prohibit reselling the model, re-uploading the complete model files for others to download, claiming the model as your own work, and brand or commercial use without the creator's prior approval. Read them before you fork, redistribute, or deploy this project.
 - Heavily inspired by [AIRI (Moeru AI)](https://github.com/moeru-ai/airi)
 - The source code of this project is released under the [MIT License](LICENSE). The MIT license covers the code only, not the model and texture assets.
