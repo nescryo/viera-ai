@@ -15,7 +15,7 @@ Built with React 19, TypeScript, Vite, PixiJS, and the Live2D Cubism runtime.
 - **Expressive Anime Voice**: Responses can be spoken out loud, complete with mouth movements synchronized to her speech. Pick a voice engine in Settings (see below), or let the browser's built-in speech be the fallback.
 - **Japanese Dubbing Mode**: The character speaks in Japanese while the chat text stays in the language you are using.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
-- **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth to save your chat sessions locally, customize your display name, and set your profile avatar.
+- **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth, or continue as a guest. Chat sessions are saved locally on your device, and you can customize your display name and avatar. Guests never touch Supabase.
 
 ---
 
@@ -33,22 +33,16 @@ Before you begin, make sure you have the following installed on your computer:
    npm install
    ```
 
-2. **Set up configuration**:
-   Copy the example environment file:
+2. **Set up configuration (optional)**:
+   Sign-in with GitHub or Google needs a Supabase project. You can skip this and use **Continue as guest** on the login screen, where chats stay on your device and nothing is sent to Supabase.
+
+   To enable sign-in, copy the example environment file:
    ```bash
    cp .env.example .env
    ```
-   Open `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from your Supabase project's Connect/API Keys settings. Use the **publishable key**, never a secret or `service_role` key. AI chat and voice API keys are entered later in the in-app Settings.
+   Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`. Use the **publishable key**, never a secret or `service_role` key. Then enable the GitHub and Google providers and allow your redirect URLs. See [docs/supabase-setup.md](docs/supabase-setup.md) for the full walkthrough.
 
-   **Configure GitHub and Google authentication**:
-   - In Supabase → Authentication → Sign In / Providers → GitHub, copy the OAuth callback URL (usually `https://YOUR_PROJECT.supabase.co/auth/v1/callback`).
-   - In GitHub → Settings → Developer settings → OAuth Apps, create an OAuth App. Set its Homepage URL to your app URL and its Authorization callback URL to the **Supabase callback URL** above.
-   - Enter the GitHub Client ID and Client Secret in the **Supabase dashboard only**, then enable GitHub. Keep Email and any unused sign-in providers disabled.
-   - To enable Google, create an OAuth client ID of type **Web application** in Google Cloud Console → Google Auth Platform / APIs & Services → Credentials. Configure the consent screen (add test users while in Testing), add your app origin as an Authorized JavaScript origin, and add the **Supabase callback URL** as an Authorized redirect URI. Enter the Google Client ID and Client Secret in Supabase → Authentication → Sign In / Providers → Google, enable it, and save. Keep the client secret out of frontend environment variables.
-   - In Supabase → Authentication → URL Configuration, set Site URL to your production app URL and add `http://localhost:5173/` plus your production app URL to the allowed Redirect URLs. Include the path if you host the app under a subpath.
-   - Restart Vite after changing `.env`. For production hosting, set the same two public variables in the hosting environment and rebuild.
-
-   Supabase manages the authentication session; profile preferences and chat history remain on this device. Existing Google profiles/history are not automatically migrated to GitHub accounts. No Supabase database tables are required.
+   AI chat and voice API keys are entered later in the in-app Settings, not in `.env`. Restart Vite after changing `.env`.
 
 3. **Start the application**:
    ```bash
@@ -112,7 +106,32 @@ npm test           # Run the unit tests (vitest)
 npm run benchmark  # Run the persona benchmark (needs BENCHMARK_* in .env)
 ```
 
-> Note: Fish Audio requests go through a proxy built into the Vite dev server (`/fish_audio_api`). It works with `npm run dev` and `npm run preview`, but a plain static deployment has no such proxy.
+---
+
+## Use on Mobile or Deploy
+
+**Quick test on your phone (same WiFi):**
+```bash
+npm run dev -- --host
+```
+Open `http://<your-computer-IP>:5173` on the phone. If you use sign-in, add `http://<your-computer-IP>:5173/**` to the Supabase Redirect URLs. This is plain HTTP, so features that need a secure context (microphone, PWA install) may not work.
+
+**Static hosting (Vercel, Netlify, Cloudflare Pages):**
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as build environment variables on the host, then rebuild. They are inlined at build time.
+- Add your domain (`https://your-domain/**`) to the Supabase Redirect URLs.
+- Fish Audio requests go through a proxy built into the Vite dev server (`/fish_audio_api`). It works with `npm run dev` and `npm run preview`, but a static deployment has no such proxy, so Fish Audio will not work there. Other voice engines are not affected.
+- The PWA precache is large (about 62 MB because of the model textures), so the first load on a phone is heavy.
+
+---
+
+## Troubleshooting
+
+| Message | Cause and fix |
+| :--- | :--- |
+| `Sign-in isn't configured yet` | `VITE_SUPABASE_URL` or `VITE_SUPABASE_PUBLISHABLE_KEY` is empty, or Vite was not restarted after editing `.env`. |
+| `No API key found in request` | `VITE_SUPABASE_URL` is malformed. Use exactly `https://YOUR_PROJECT.supabase.co`, with no path, quotes, or trailing slash. |
+| `Unsupported provider: provider is not enabled` | Enable the provider in Supabase → Authentication → Sign In / Providers and save its Client ID and Secret. |
+| Login returns to the wrong page or fails after redirect | The origin is missing from Supabase → Authentication → URL Configuration → Redirect URLs. |
 
 ---
 
