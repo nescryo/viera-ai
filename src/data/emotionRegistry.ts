@@ -144,6 +144,7 @@ export function generateExpressionPromptSection(currentMood: string): string {
     .map(e => `- ${e.id}: ${e.description}`)
     .join('\n');
   const modifiers = MODIFIER_REGISTRY.map(m => `- ${m.id}: ${m.description}`).join('\n');
+  const eyes = EYE_REGISTRY.map(e => `- ${e.id}: ${e.description}`).join('\n');
   const levels = Object.keys(LEVELS).join(', ');
 
   return `[3D VISUAL EMOTIONS & EXPRESSION SYSTEM]:
@@ -161,6 +162,9 @@ ${base}
 Modifiers:
 ${modifiers}
 
+Eye symbols (optional, at most one per tag, no level). They replace the normal eyes, so use them rarely, only for exaggerated, cartoonish moments:
+${eyes}
+
 Examples:
 [happy:low] a small, quiet smile
 [sad:mid+tears:mid] hurt and close to crying
@@ -168,6 +172,8 @@ Examples:
 [surprised+cold-sweat:low] startled and slightly nervous
 [relaxed+eye-squint:mid] doubtful, side-eyeing a questionable claim
 [surprised+shock-eyes:high] stunned by news that is hard to believe
+[relaxed+deadpan-eyes] deadpan reaction to a bad joke
+[happy+blush:mid+heart-eyes] smitten by a compliment
 
 These only illustrate the syntax. Pick tags from the actual moment, not from the examples.
 
@@ -206,7 +212,7 @@ export const MODIFIER_REGISTRY: ModifierCapability[] = [
   {
     id: 'eye-squint',
     label: 'Eye Squint',
-    description: 'Eyes narrowed: suspicious, scrutinizing, smug, annoyed. Pairs well with angry, teasing or relaxed'
+    description: 'Eyes narrowed: suspicious, scrutinizing, annoyed. Pairs well with angry, teasing or relaxed'
   },
   {
     id: 'shock-eyes',
@@ -231,18 +237,26 @@ const MODIFIER_ALIASES = new Map<string, string>([
   ['shock', 'shock-eyes'],
   ['shocked-eyes', 'shock-eyes'],
   ['eyes-shock', 'shock-eyes'],
-  ['wide-eyes', 'shock-eyes']
+  ['wide-eyes', 'shock-eyes'],
+  // `smug-eyes` was the first ID of the key6 symbol; keep it valid for old sessions and the LLM.
+  ['smug-eyes', 'deadpan-eyes'],
+  ['smug', 'deadpan-eyes'],
+  ['deadpan', 'deadpan-eyes'],
+  ['dizzy-eyes', 'spiral-eyes'],
+  ['love-eyes', 'heart-eyes'],
+  ['><-eyes', 'squeeze-eyes']
 ]);
 
 /**
- * Eye symbols (rig keys 3 to 6). They replace the eyes, so at most one is active, and the
- * LLM prompt does not list them: they are set from the expression menu.
+ * Eye symbols (rig keys 3 to 6). They replace the eyes, so at most one is active. They are
+ * listed in the LLM prompt (with a rarity hint) and can also be set from the expression menu.
  */
 export const EYE_REGISTRY: ModifierCapability[] = [
-  { id: 'spiral-eyes', label: 'Spiral', description: 'Spiral eyes: dizzy, confused' },
-  { id: 'heart-eyes', label: 'Heart', description: 'Heart eyes: smitten, adoring' },
-  { id: 'squeeze-eyes', label: '> <', description: '> < eyes: squeezed shut, straining' },
-  { id: 'smug-eyes', label: 'Smug', description: 'Smug sneering eyes' }
+  { id: 'spiral-eyes', label: 'Spiral', description: 'Spiral eyes: dizzy, overwhelmed, so confused the mind short-circuits' },
+  { id: 'heart-eyes', label: 'Heart', description: 'Heart eyes: smitten, adoring, infatuated' },
+  { id: 'squeeze-eyes', label: '> <', description: '> < eyes: squeezed shut from strain, pain, frustration or a cringing laugh' },
+  // The rig symbol (key6) renders as a flat half-lidded stare, so it reads as deadpan, not as a smirk.
+  { id: 'deadpan-eyes', label: 'Smug', description: 'Flat, half-lidded stare: deadpan, unimpressed, speechless, "are you serious?". Not for teasing or gloating' }
 ];
 
 export const EYE_MAP = new Map<string, ModifierCapability>(

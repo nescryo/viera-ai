@@ -100,8 +100,13 @@ describe('Expression Validator Suite', () => {
 
     it('parses an eye symbol as an exclusive slot where the last one wins', () => {
       expect(extractAndValidateExpression('[happy+heart-eyes] Hi!').emotion).toBe('happy+heart-eyes');
-      expect(extractAndValidateExpression('[happy+heart-eyes+smug-eyes:0.5] Hi!').emotion).toBe('happy+smug-eyes:0.5');
+      expect(extractAndValidateExpression('[happy+heart-eyes+deadpan-eyes:0.5] Hi!').emotion).toBe('happy+deadpan-eyes:0.5');
       expect(extractAndValidateExpression('[happy+blush:low+spiral-eyes] Hi!').emotion).toBe('happy+blush:0.3+spiral-eyes');
+    });
+
+    it('maps the old smug-eyes ID and near-miss spellings to the canonical eye symbol', () => {
+      expect(extractAndValidateExpression('[relaxed+smug-eyes] Hi!').emotion).toBe('relaxed+deadpan-eyes');
+      expect(extractAndValidateExpression('[happy+love-eyes] Hi!').emotion).toBe('happy+heart-eyes');
     });
 
     it('parses the eye shape modifiers alongside an eye symbol', () => {
