@@ -9,9 +9,10 @@ const LOGO_URL = '/viera-avatar.png';
 
 interface LoginModalProps {
   isRestoringSession: boolean;
+  onGuestLogin: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isRestoringSession }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isRestoringSession, onGuestLogin }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [signingInProvider, setSigningInProvider] = useState<'GitHub' | 'Google' | null>(null);
   const isConfigured = Boolean(import.meta.env.VITE_SUPABASE_URL?.trim() && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim());
@@ -71,8 +72,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isRestoringSession }) =>
                 : signingInProvider === provider ? `Redirecting to ${provider}…` : `Continue with ${provider}`}
             </button>
           ))}
+          <button
+            type="button"
+            className="login-guest-button"
+            disabled={isRestoringSession || signingInProvider !== null}
+            onClick={onGuestLogin}
+          >
+            Continue as guest
+          </button>
         </div>
-        <p className="login-note">Your chats are saved on this device.</p>
+        <p className="login-note">Your chats are saved on this device. Guests are not added to the sign-in database.</p>
       </div>
     </div>
   );

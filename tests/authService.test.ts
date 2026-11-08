@@ -145,4 +145,21 @@ describe('Supabase OAuth authentication', () => {
     subscribeToAuth(listener);
     expect(listener).toHaveBeenCalledWith(null);
   });
+
+  it('starts a local guest session without calling Supabase', async () => {
+    const { startGuestSession, getGuestSession, GUEST_USER_ID } = await import('../src/services/authService');
+    expect(getGuestSession()).toBeNull();
+    expect(startGuestSession()).toMatchObject({ id: GUEST_USER_ID, isSetupComplete: true });
+    expect(getGuestSession()).toMatchObject({ id: GUEST_USER_ID });
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it('keeps guest profile edits and ends the guest session on logout', async () => {
+    const { startGuestSession, saveCurrentUser, getGuestSession, logoutUser } = await import('../src/services/authService');
+    saveCurrentUser({ ...startGuestSession(), nickname: 'Nes' });
+    expect(getGuestSession()?.nickname).toBe('Nes');
+    auth.signOut.mockResolvedValueOnce({ error: null });
+    await logoutUser();
+    expect(getGuestSession()).toBeNull();
+  });
 });

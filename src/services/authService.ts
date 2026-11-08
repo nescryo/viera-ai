@@ -3,6 +3,9 @@ import type { User } from '@supabase/supabase-js';
 import type { UserProfile } from '../types';
 
 const AUTH_USER_KEY = 'viera_auth_user';
+const GUEST_KEY = 'viera_guest';
+/** Fixed ID for the guest profile; chats are stored on this device under it. */
+export const GUEST_USER_ID = 'guest';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 const supabase = supabaseUrl && publishableKey
@@ -54,6 +57,35 @@ export function profileFromAuthUser(user: User): UserProfile | null {
   };
 }
 
+/** Build the guest profile. Guests skip Supabase entirely, so nothing is sent to the auth database. */
+function guestProfile(): UserProfile {
+  const saved = getCurrentUser();
+  if (saved?.id === GUEST_USER_ID) return saved;
+  return {
+    id: GUEST_USER_ID, email: '', username: '', nickname: 'Guest', picture: '',
+    gender: 'unspecified', bio: '', isSetupComplete: true, createdAt: Date.now(),
+  };
+}
+
+/** Start a local-only guest session that survives reloads until sign-out. */
+export function startGuestSession(): UserProfile {
+  try {
+    localStorage.setItem(GUEST_KEY, '1');
+  } catch {
+    console.warn('[Viera Auth] Could not remember the guest session.');
+  }
+  return guestProfile();
+}
+
+/** Return the guest profile if a guest session was started on this device. */
+export function getGuestSession(): UserProfile | null {
+  try {
+    return localStorage.getItem(GUEST_KEY) ? guestProfile() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Restore and observe Supabase sessions, including OAuth redirects and cross-tab logout. */
 export function subscribeToAuth(onChange: (profile: UserProfile | null) => void): () => void {
   if (!supabase) {
@@ -85,8 +117,9 @@ async function signInWithProvider(provider: 'github' | 'google'): Promise<void> 
   if (error) throw error;
 }
 
-/** Sign out of this browser's Supabase session before clearing the local profile. */
+/** Sign out of this browser's Supabase session before clearing the local profile. Also ends any guest session. */
 export async function logoutUser(): Promise<void> {
+  localStorage.removeItem(GUEST_KEY);
   if (supabase) {
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;

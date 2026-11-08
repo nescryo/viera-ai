@@ -3,7 +3,7 @@ import type { ChatMessage, Persona, ApiConfig, UserProfile } from './types';
 import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
-import { subscribeToAuth, saveCurrentUser, logoutUser } from './services/authService';
+import { subscribeToAuth, saveCurrentUser, logoutUser, getGuestSession, startGuestSession } from './services/authService';
 import { soundService } from './services/soundService';
 
 import { useToasts } from './hooks/useToasts';
@@ -41,12 +41,15 @@ export function App() {
   const [pendingProfile, setPendingProfile] = useState<UserProfile | null>(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
 
-  useEffect(() => subscribeToAuth((profile) => {
+  useEffect(() => subscribeToAuth((authProfile) => {
+    const profile = authProfile ?? getGuestSession();
     setUserProfile(profile?.isSetupComplete ? profile : null);
     setPendingProfile(profile && !profile.isSetupComplete ? profile : null);
     setIsRestoringSession(false);
     if (!profile) setActiveModal(null);
   }), []);
+
+  const handleGuestLogin = () => setUserProfile(startGuestSession());
 
   // 3. Consolidated Modal State (Replaces scattered boolean flags)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -380,8 +383,8 @@ export function App() {
 
       <ErrorBoundary>
         {/* 1. Supabase OAuth Auth Gate Modal */}
-        {!userProfile && !pendingProfile && (
-          <LoginModal isRestoringSession={isRestoringSession} />
+        {!isRestoringSession && !userProfile && !pendingProfile && (
+          <LoginModal isRestoringSession={isRestoringSession} onGuestLogin={handleGuestLogin} />
         )}
 
         {/* 2. First-run profile setup modal */}
