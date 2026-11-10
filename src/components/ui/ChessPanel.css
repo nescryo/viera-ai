@@ -354,6 +354,47 @@
   gap: 8px;
 }
 
+.chess-promotion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chess-promotion-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  color: var(--text-normal);
+  background: var(--field-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.chess-promotion-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-cyan);
+}
+
+.chess-promotion-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.chess-promotion-btn .chess-piece {
+  width: 44px;
+  height: 44px;
+}
+
+.chess-promotion-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 /* Scene moves to the right half while chess is open; Scene's ResizeObserver re-centers the model */
 .app-container.chess-active .scene-container {
   left: 50%;

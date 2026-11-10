@@ -5,6 +5,8 @@ import type { ChessResult } from './gameResult';
 
 export type ChessSide = 'user' | 'deepseek';
 
+export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
+
 export interface ChessHistoryEntry {
   san: string;
   by: ChessSide;
@@ -65,11 +67,21 @@ export class ChessSession {
   legalTargets(square: Square): Square[] {
     if (this.isOver() || this.game.turn() !== this.color) return [];
     if (this.game.get(square)?.color !== this.color) return [];
-    return this.game.moves({ square, verbose: true }).map((move) => move.to);
+    const targets = this.game.moves({ square, verbose: true }).map((move) => move.to);
+    return [...new Set(targets)];
+  }
+
+  /** True when moving from `from` to `to` is a legal pawn promotion for the user. */
+  isPromotionMove(from: Square, to: Square): boolean {
+    if (this.isOver() || this.game.turn() !== this.color) return false;
+    if (this.game.get(from)?.color !== this.color) return false;
+    return this.game
+      .moves({ square: from, verbose: true })
+      .some((move) => move.to === to && Boolean(move.promotion));
   }
 
   /** Plays the user's move. Promotions default to a queen. Returns null if the move is not allowed. */
-  userMove(from: Square, to: Square, promotion = 'q'): ChessHistoryEntry | null {
+  userMove(from: Square, to: Square, promotion: PromotionPiece = 'q'): ChessHistoryEntry | null {
     if (this.isOver() || this.game.turn() !== this.color) return null;
     return this.play(from, to, promotion, 'user');
   }

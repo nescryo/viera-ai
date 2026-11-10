@@ -4,7 +4,7 @@ import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
 import { sendStreamingChatMessage } from '../services/aiService';
 import { extractAndValidateDialogue } from '../services/dubbingValidator';
 import { ChessSession } from '../services/chess/chessSession';
-import type { ChessHistoryEntry, ChessSnapshot } from '../services/chess/chessSession';
+import type { ChessHistoryEntry, ChessSnapshot, PromotionPiece } from '../services/chess/chessSession';
 import {
   CHESS_SYSTEM_PROMPT_ADDENDUM,
   buildChessTurnPrompt,
@@ -38,7 +38,8 @@ export interface UseChessGame extends ChessSnapshot {
   reaction: ChessReaction | null;
   canUndo: boolean;
   legalMovesFrom(square: Square): Square[];
-  tryUserMove(from: Square, to: Square, promotion?: string): boolean;
+  isPromotionMove(from: Square, to: Square): boolean;
+  tryUserMove(from: Square, to: Square, promotion?: PromotionPiece): boolean;
   newGame(userColor?: Color): void;
   resign(): void;
   undo(): void;
@@ -273,7 +274,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   }, []);
 
   const tryUserMove = useCallback(
-    (from: Square, to: Square, promotion?: string): boolean => {
+    (from: Square, to: Square, promotion?: PromotionPiece): boolean => {
       const entry = session.userMove(from, to, promotion);
       if (!entry) return false;
       const next = afterMove(entry);
@@ -336,6 +337,10 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   }, []);
 
   const legalMovesFrom = useCallback((square: Square) => session.legalTargets(square), [session]);
+  const isPromotionMove = useCallback(
+    (from: Square, to: Square) => session.isPromotionMove(from, to),
+    [session]
+  );
 
   const status: ChessStatus = snapshot.result ? 'finished' : thinking ? 'thinking' : 'playing';
   const canUndo =
@@ -351,6 +356,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     reaction,
     canUndo,
     legalMovesFrom,
+    isPromotionMove,
     tryUserMove,
     newGame,
     resign,

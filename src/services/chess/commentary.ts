@@ -27,11 +27,9 @@ export interface BuildChessPromptInput {
 
 export const CHESS_SYSTEM_PROMPT_ADDENDUM = `[CHESS MINIGAME COMMENTARY MODE]:
 You are currently playing a live game of chess against the user.
-- React ONLY to the latest board event described in the turn update.
+- React ONLY to the latest board event described in the turn update, staying fully in character.
 - Keep your reaction to 1 or 2 short, punchy spoken sentences suitable for a speech bubble next to the board.
-- STRICT RULE: NEVER invent, suggest, or mention specific chess squares, algebraic notation (such as "e4", "Nf3", "Qxf7"), or hypothetical move variations. Speak naturally about the moment (capturing a big piece, getting checked, making a mistake, winning, or losing).
-- Do not use <narrative> tags during chess commentary; output only your direct spoken line (with your leading [emotion] tag, and <ja>...</ja> tag if Japanese dubbing mode is active).
-- If you are losing or lose the match, react playfully in character (cute frustration, pouting, or asking for a rematch) and never accuse the user of cheating.`;
+- Do not use <narrative> tags during chess commentary; output only your direct spoken line (with your leading [emotion] tag, and <ja>...</ja> tag if Japanese dubbing mode is active).`;
 
 /** Maps a centipawn evaluation (from DeepSeek-chan's perspective) into a qualitative category. */
 export function categorizeEval(evalCp?: number): EvalCategory {
@@ -66,8 +64,8 @@ export function formatRecentMoves(entries: readonly ChessHistoryEntry[], maxPlie
 
 /**
  * Decides whether the current turn warrants calling the LLM for spoken commentary.
- * High-priority events always trigger; tactical events (`check`, `major-capture`, `eval-swing`)
- * are throttled by `minPlyGap`; ordinary moves and minor captures stay local.
+ * High-priority events always trigger; tactical events (`check`, `major-capture`, `capture`, `eval-swing`)
+ * are throttled by `minPlyGap`; ordinary moves stay local.
  */
 export function shouldRequestLlmCommentary(input: ShouldCommentInput): boolean {
   const { event, plyCount, lastCommentedPly, minPlyGap = 4 } = input;
@@ -89,6 +87,7 @@ export function shouldRequestLlmCommentary(input: ShouldCommentInput): boolean {
   if (
     event.kind === 'eval-swing' ||
     event.kind === 'major-capture' ||
+    event.kind === 'capture' ||
     event.kind === 'check'
   ) {
     return lastCommentedPly === null || plyCount - lastCommentedPly >= minPlyGap;
@@ -131,6 +130,6 @@ export function buildChessTurnPrompt(input: BuildChessPromptInput): string {
     lines.push(`Game result: ${outcomeText}`);
   }
 
-  lines.push('Give your short in-character reaction now (1-2 sentences, no chess notation):');
+  lines.push('Give your short in-character reaction now (1-2 sentences):');
   return lines.join('\n');
 }

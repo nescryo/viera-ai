@@ -97,9 +97,14 @@ describe('ChessSession', () => {
     expect(snap.turn).toBe('deepseek');
   });
 
-  it('promotes to a queen by default', () => {
+  it('promotes to a queen by default and supports choosing promotion pieces', () => {
     const s = new ChessSession('w', '8/P6k/8/8/8/8/8/K7 w - - 0 1');
+    expect(s.isPromotionMove('a7', 'a8')).toBe(true);
+    expect(s.isPromotionMove('a1', 'a2')).toBe(false);
     expect(s.userMove('a7', 'a8')?.san).toMatch(/^a8=Q/);
+
+    const underPromote = new ChessSession('w', '8/P6k/8/8/8/8/8/K7 w - - 0 1');
+    expect(underPromote.userMove('a7', 'a8', 'n')?.san).toMatch(/^a8=N/);
   });
 });
 

@@ -26,7 +26,7 @@ describe('categorizeEval & parseUciScoreToCp', () => {
 });
 
 describe('shouldRequestLlmCommentary', () => {
-  it('stays silent on ordinary moves and minor captures', () => {
+  it('stays silent on ordinary moves', () => {
     expect(
       shouldRequestLlmCommentary({
         event: { kind: 'ordinary', phase: 'opening', mover: 'deepseek', san: 'e5' },
@@ -34,12 +34,23 @@ describe('shouldRequestLlmCommentary', () => {
         lastCommentedPly: null
       })
     ).toBe(false);
+  });
 
+  it('triggers on captures subject to minPlyGap throttling', () => {
     expect(
       shouldRequestLlmCommentary({
         event: { kind: 'capture', phase: 'opening', mover: 'user', san: 'exd5' },
         plyCount: 6,
         lastCommentedPly: null
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRequestLlmCommentary({
+        event: { kind: 'capture', phase: 'opening', mover: 'deepseek', san: 'Nxd5' },
+        plyCount: 8,
+        lastCommentedPly: 6,
+        minPlyGap: 4
       })
     ).toBe(false);
   });

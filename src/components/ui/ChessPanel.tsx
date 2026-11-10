@@ -3,8 +3,10 @@ import type { Square } from 'chess.js';
 import { ArrowLeft, ChevronDown, Flag, ListOrdered, RotateCcw, Undo2 } from 'lucide-react';
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../../types';
 import { useChessGame } from '../../hooks/useChessGame';
+import type { PromotionPiece } from '../../services/chess/chessSession';
 import { DIFFICULTY_PRESETS } from '../../services/chess/difficulty';
 import { ChessBoard } from './ChessBoard';
+import { ChessPiece } from './ChessPiece';
 import './ChessPanel.css';
 
 interface ChessPanelProps {
@@ -24,6 +26,13 @@ const RESULT_TEXT = {
   'deepseek-win': 'You lose',
   draw: 'Draw'
 } as const;
+
+const PROMOTION_OPTIONS: { piece: PromotionPiece; label: string }[] = [
+  { piece: 'q', label: 'Queen' },
+  { piece: 'r', label: 'Rook' },
+  { piece: 'b', label: 'Bishop' },
+  { piece: 'n', label: 'Knight' }
+];
 
 /** Pairs plain move entries into numbered rows: [1, 'e4', 'e5']. */
 function toMoveRows(sans: string[]): { number: number; white: string; black: string }[] {
@@ -46,6 +55,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
 }) => {
   const game = useChessGame({ persona, apiConfig, userProfile, onSpeakReaction });
   const [selected, setSelected] = useState<Square | null>(null);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square } | null>(null);
   const [showMoves, setShowMoves] = useState(false);
   const [showDifficulty, setShowDifficulty] = useState(false);
   const [confirm, setConfirm] = useState<'leave' | 'resign' | null>(null);
@@ -84,11 +94,23 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   const handleSquare = (square: Square) => {
     if (game.status !== 'playing' || game.turn !== 'user') return;
     if (selected && targets.includes(square)) {
+      if (game.isPromotionMove(selected, square)) {
+        setPendingPromotion({ from: selected, to: square });
+        return;
+      }
       game.tryUserMove(selected, square);
       setSelected(null);
       return;
     }
+    setPendingPromotion(null);
     setSelected(game.legalMovesFrom(square).length > 0 && square !== selected ? square : null);
+  };
+
+  const handlePromotionSelect = (piece: PromotionPiece) => {
+    if (!pendingPromotion) return;
+    game.tryUserMove(pendingPromotion.from, pendingPromotion.to, piece);
+    setPendingPromotion(null);
+    setSelected(null);
   };
 
   const isActiveGame = game.status !== 'finished' && game.entries.length > 0;
@@ -170,7 +192,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           <button
             type="button"
             className="chess-icon-btn"
-            onClick={() => { game.undo(); setSelected(null); }}
+            onClick={() => { game.undo(); setSelected(null); setPendingPromotion(null); }}
             disabled={!game.canUndo}
             aria-label="Undo your last move"
             title="Undo"
@@ -180,7 +202,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           <button
             type="button"
             className="chess-icon-btn"
-            onClick={() => setConfirm('resign')}
+            onClick={() => { setPendingPromotion(null); setConfirm('resign'); }}
             disabled={game.status === 'finished'}
             aria-label="Resign"
             title="Resign"
@@ -190,7 +212,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           <button
             type="button"
             className="chess-icon-btn"
-            onClick={() => { game.newGame(); setSelected(null); }}
+            onClick={() => { game.newGame(); setSelected(null); setPendingPromotion(null); }}
             aria-label="Start a new game"
             title="New game"
           >
@@ -236,6 +258,29 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           </div>
         )}
       </div>
+
+      {pendingPromotion && (
+        <div className="chess-confirm chess-promotion" role="dialog" aria-modal="true" aria-label="Promote pawn">
+          <p>Choose promotion piece</p>
+          <div className="chess-promotion-grid">
+            {PROMOTION_OPTIONS.map(({ piece, label }) => (
+              <button
+                key={piece}
+                type="button"
+                className="chess-promotion-btn"
+                aria-label={`Promote to ${label}`}
+                onClick={() => handlePromotionSelect(piece)}
+              >
+                <ChessPiece color={game.userColor} type={piece} />
+                <span className="chess-promotion-label">{label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="chess-confirm-actions">
+            <button type="button" className="btn" onClick={() => setPendingPromotion(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {confirm && (
         <div className="chess-confirm" role="alertdialog" aria-modal="true" aria-label="Confirm">
