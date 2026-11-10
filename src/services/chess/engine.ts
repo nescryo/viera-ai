@@ -16,9 +16,28 @@ import type { DifficultyPreset } from './difficulty';
 export interface ChessEngine {
   /** Updates the difficulty preset for subsequent moves. */
   setDifficulty?(preset: DifficultyPreset): void;
+  /** Latest evaluation in centipawns from the engine's (DeepSeek-chan's) perspective. */
+  getLastEvalCp?(): number | undefined;
   /** Resolves with a move in UCI form, e.g. `e2e4` or `e7e8q`. */
   getBestMove(fen: string): Promise<string>;
   dispose(): void;
+}
+
+/**
+ * Parses a UCI `info ... score cp <n>` or `info ... score mate <n>` line into centipawns
+ * from the side-to-move's perspective. Returns null if the line has no score token.
+ */
+export function parseUciScoreToCp(line: string): number | null {
+  const cpMatch = /\bscore\s+cp\s+(-?\d+)/.exec(line);
+  if (cpMatch) {
+    return Number.parseInt(cpMatch[1], 10);
+  }
+  const mateMatch = /\bscore\s+mate\s+(-?\d+)/.exec(line);
+  if (mateMatch) {
+    const movesToMate = Number.parseInt(mateMatch[1], 10);
+    return movesToMate >= 0 ? 10000 - movesToMate * 10 : -10000 - movesToMate * 10;
+  }
+  return null;
 }
 
 /** Minimal message port abstraction over a Web Worker for UCI communication and testing. */
@@ -105,6 +124,7 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
 
   let port: UciPort | null = null;
   let uciReadyPromise: Promise<void> | null = null;
+  let lastEvalCp: number | undefined;
   let disposed = false;
   let broken = false;
 
@@ -134,6 +154,10 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
         port = createPort();
         port.onMessage((raw) => {
           const line = raw.trim();
+          const parsedScore = parseUciScoreToCp(line);
+          if (parsedScore !== null) {
+            lastEvalCp = parsedScore;
+          }
           for (const listener of [...lineListeners]) listener(line);
         });
         port.onError?.((err) => {
@@ -158,6 +182,10 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
   return {
     setDifficulty(nextPreset: DifficultyPreset) {
       preset = nextPreset;
+    },
+
+    getLastEvalCp() {
+      return lastEvalCp;
     },
 
     async getBestMove(fen: string): Promise<string> {

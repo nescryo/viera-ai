@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import { ArrowLeft, ChevronDown, Flag, ListOrdered, RotateCcw, Undo2 } from 'lucide-react';
+import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../../types';
 import { useChessGame } from '../../hooks/useChessGame';
 import { DIFFICULTY_PRESETS } from '../../services/chess/difficulty';
 import { ChessBoard } from './ChessBoard';
@@ -9,7 +10,11 @@ import './ChessPanel.css';
 interface ChessPanelProps {
   /** Display name of the opponent, taken from the active character. */
   opponentName: string;
-  /** Called when DeepSeek-chan reacts, so the Live2D model can show the emotion. */
+  persona?: Persona;
+  apiConfig?: ApiConfig;
+  userProfile?: UserProfile | null;
+  onSpeakReaction?: (message: ChatMessage) => void;
+  /** Called when DeepSeek-chan's mood changes, so the Live2D model can show the emotion. */
   onEmotion: (emotion: string) => void;
   onClose: () => void;
 }
@@ -30,8 +35,16 @@ function toMoveRows(sans: string[]): { number: number; white: string; black: str
 }
 
 /** Full-screen chess layout: board on the left, the Live2D character shows on the right. */
-export const ChessPanel: React.FC<ChessPanelProps> = ({ opponentName, onEmotion, onClose }) => {
-  const game = useChessGame();
+export const ChessPanel: React.FC<ChessPanelProps> = ({
+  opponentName,
+  persona,
+  apiConfig,
+  userProfile,
+  onSpeakReaction,
+  onEmotion,
+  onClose
+}) => {
+  const game = useChessGame({ persona, apiConfig, userProfile, onSpeakReaction });
   const [selected, setSelected] = useState<Square | null>(null);
   const [showMoves, setShowMoves] = useState(false);
   const [showDifficulty, setShowDifficulty] = useState(false);
@@ -43,8 +56,8 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({ opponentName, onEmotion,
   const rows = useMemo(() => toMoveRows(game.entries.map((entry) => entry.san)), [game.entries]);
 
   useEffect(() => {
-    if (game.reaction) onEmotion(game.reaction.emotion);
-  }, [game.reaction, onEmotion]);
+    onEmotion(game.reaction?.emotion ?? game.mood);
+  }, [game.reaction, game.mood, onEmotion]);
 
   useEffect(() => {
     backRef.current?.focus();

@@ -391,6 +391,10 @@ export function App() {
         <ErrorBoundary>
           <ChessPanel
             opponentName={currentPersona.name}
+            persona={currentPersona}
+            apiConfig={apiConfig}
+            userProfile={userProfile}
+            onSpeakReaction={(msg) => speakMessage(msg, currentPersona, apiConfig)}
             onEmotion={setChessEmotion}
             onClose={handleCloseChess}
           />

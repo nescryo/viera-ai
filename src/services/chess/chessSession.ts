@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import type { Color, Square } from 'chess.js';
+import type { Color, PieceSymbol, Square } from 'chess.js';
 import { computeResult } from './gameResult';
 import type { ChessResult } from './gameResult';
 
@@ -12,6 +12,8 @@ export interface ChessHistoryEntry {
   to: Square;
   /** chess.js move flags, e.g. `c` capture, `p` promotion. */
   flags: string;
+  /** Piece symbol captured on this move, if any (`p`, `n`, `b`, `r`, `q`). */
+  captured?: PieceSymbol;
 }
 
 /** Plain, immutable view of a session. Safe to keep in React state. */
@@ -114,7 +116,14 @@ export class ChessSession {
   private play(from: Square, to: Square, promotion: string | undefined, by: ChessSide): ChessHistoryEntry | null {
     try {
       const move = this.game.move({ from, to, promotion });
-      const entry: ChessHistoryEntry = { san: move.san, by, from: move.from, to: move.to, flags: move.flags };
+      const entry: ChessHistoryEntry = {
+        san: move.san,
+        by,
+        from: move.from,
+        to: move.to,
+        flags: move.flags,
+        ...(move.captured ? { captured: move.captured } : {})
+      };
       this.entries.push(entry);
       return entry;
     } catch {
