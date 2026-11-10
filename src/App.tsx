@@ -20,11 +20,14 @@ import { UserProfileModal } from './components/ui/UserProfileModal';
 import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/Toast';
+import type { MinigameId } from './data/minigames';
+import { MinigameModal } from './components/ui/MinigameModal';
+import { ChessPanel } from './components/ui/ChessPanel';
 import { Scene } from './components/live2d/Scene';
 
 import './App.css';
 
-type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | null;
+type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | 'minigames' | null;
 
 export function App() {
   // 1. Active 3D Roleplay Character Package with persistent custom lore
@@ -345,15 +348,31 @@ export function App() {
     );
   };
 
+  // 9. Chess minigame: a local emotion override, so game reactions never touch chat history
+  const [isChessOpen, setIsChessOpen] = useState(false);
+  const [chessEmotion, setChessEmotion] = useState<string | null>(null);
+
+  const handleSelectMinigame = (id: MinigameId) => {
+    if (id === 'chess') {
+      setIsChessOpen(true);
+      setActiveModal(null);
+    }
+  };
+
+  const handleCloseChess = useCallback(() => {
+    setIsChessOpen(false);
+    setChessEmotion(null);
+  }, []);
+
   const handleSelectEmotion = useCallback((emotion: string) => {
     updateSessionEmotion(emotion);
   }, [updateSessionEmotion]);
 
   return (
-    <div className="app-container">
-      <Scene 
+    <div className={`app-container${isChessOpen ? ' chess-active' : ''}`}>
+      <Scene
         currentPersona={currentPersona}
-        currentEmotion={currentEmotion}
+        currentEmotion={isChessOpen && chessEmotion ? chessEmotion : currentEmotion}
         isReplying={isLoading || isSpeaking}
       />
 
@@ -365,7 +384,18 @@ export function App() {
         onSelectEmotion={handleSelectEmotion}
         onOpenHistory={() => setActiveModal('history')}
         onOpenLorebook={() => setActiveModal('alternativeMemory')}
+        onOpenMinigames={() => setActiveModal('minigames')}
       />
+
+      {isChessOpen && (
+        <ErrorBoundary>
+          <ChessPanel
+            opponentName={currentPersona.name}
+            onEmotion={setChessEmotion}
+            onClose={handleCloseChess}
+          />
+        </ErrorBoundary>
+      )}
 
       <ChatOverlay
         messages={messages}
@@ -424,6 +454,14 @@ export function App() {
             onRenameSession={renameSession}
             onDeleteSession={deleteSession}
             onClearAllSessions={clearAllSessions}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
+
+        {/* 5b. Minigames list */}
+        {activeModal === 'minigames' && (
+          <MinigameModal
+            onSelect={handleSelectMinigame}
             onClose={() => setActiveModal(null)}
           />
         )}

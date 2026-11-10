@@ -1,6 +1,6 @@
 import React from 'react';
 import type { UserProfile } from '../../types';
-import { MessagesSquare, Settings, User } from 'lucide-react';
+import { Gamepad2, MessagesSquare, Settings, User } from 'lucide-react';
 import { ExpressionMenu } from './ExpressionMenu';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   onSelectEmotion: (emotion: string) => void;
   onOpenHistory: () => void;
   onOpenLorebook: () => void;
+  onOpenMinigames: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,7 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   currentEmotion,
   onSelectEmotion,
   onOpenHistory,
-  onOpenLorebook
+  onOpenLorebook,
+  onOpenMinigames
 }) => {
   return (
     <header className="header-container floating-header">
@@ -35,6 +37,16 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Settings & Profile (⚙ ◉) */}
       <div className="header-right">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onOpenMinigames}
+          title="Minigames"
+          aria-label="Open Minigames"
+        >
+          <Gamepad2 size={23} strokeWidth={2} />
+        </button>
+
         <ErrorBoundary>
           <ExpressionMenu
             currentEmotion={currentEmotion}
