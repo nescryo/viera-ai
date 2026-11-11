@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile } from './types';
 import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
+import { getSavedView, saveView } from './services/viewStateService';
 import { subscribeToAuth, saveCurrentUser, logoutUser, getGuestSession, startGuestSession } from './services/authService';
 import { soundService } from './services/soundService';
 
@@ -356,13 +357,18 @@ export function App() {
   const [chessEmotion, setChessEmotion] = useState<string | null>(null);
   const [chessInitialGame, setChessInitialGame] = useState<ChessGameRecord | undefined>(undefined);
 
+  const openChess = () => {
+    // Resume the newest unfinished game of this conversation, otherwise start fresh
+    const games = sessions.find((s) => s.id === activeSessionId)?.chessGames ?? [];
+    const unfinished = [...games].reverse().find((g) => !g.result);
+    setChessInitialGame(unfinished);
+    setIsChessOpen(true);
+    saveView(userProfile?.id, 'chess');
+  };
+
   const handleSelectMinigame = (id: MinigameId) => {
     if (id === 'chess') {
-      // Resume the newest unfinished game of this conversation, otherwise start fresh
-      const games = sessions.find((s) => s.id === activeSessionId)?.chessGames ?? [];
-      const unfinished = [...games].reverse().find((g) => !g.result);
-      setChessInitialGame(unfinished);
-      setIsChessOpen(true);
+      openChess();
       setActiveModal(null);
     }
   };
@@ -370,17 +376,37 @@ export function App() {
   const handleCloseChess = useCallback(() => {
     setIsChessOpen(false);
     setChessEmotion(null);
-  }, []);
+    saveView(userProfile?.id, 'chat');
+  }, [userProfile?.id]);
+
+  // After a refresh, return to the chess screen once the conversation has loaded (once per user)
+  const restoredViewForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const userId = userProfile?.id;
+    if (!userId || restoredViewForRef.current === userId) return;
+    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) return;
+    restoredViewForRef.current = userId;
+    if (getSavedView(userId) === 'chess') openChess();
+    // openChess reads the loaded sessions; this must run only once per user
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.id, activeSessionId, sessions]);
 
   const handleSelectEmotion = useCallback((emotion: string) => {
+    // While chess is open the scene shows the chess emotion, so a manual pick must go there
+    if (isChessOpen) {
+      setChessEmotion(emotion);
+      return;
+    }
     updateSessionEmotion(emotion);
-  }, [updateSessionEmotion]);
+  }, [isChessOpen, updateSessionEmotion]);
+
+  const shownEmotion = isChessOpen && chessEmotion ? chessEmotion : currentEmotion;
 
   return (
     <div className={`app-container${isChessOpen ? ' chess-active' : ''}`}>
       <Scene
         currentPersona={currentPersona}
-        currentEmotion={isChessOpen && chessEmotion ? chessEmotion : currentEmotion}
+        currentEmotion={shownEmotion}
         isReplying={isLoading || isSpeaking}
       />
 
@@ -388,7 +414,7 @@ export function App() {
         onOpenSettings={() => setActiveModal('settings')}
         onOpenProfile={() => setActiveModal('profile')}
         userProfile={userProfile}
-        currentEmotion={currentEmotion}
+        currentEmotion={shownEmotion}
         onSelectEmotion={handleSelectEmotion}
         onOpenHistory={() => setActiveModal('history')}
         onOpenLorebook={() => setActiveModal('alternativeMemory')}
