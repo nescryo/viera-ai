@@ -16,8 +16,11 @@ import { createStockfishEngine } from '../services/chess/engine';
 import type { ChessEngine } from '../services/chess/engine';
 import { resolveChessMood } from '../services/chess/evalMood';
 import { detectGameEvent } from '../services/chess/gameEvents';
-import { reactToMove, reactToResult } from '../services/chess/reactions';
-import type { ChessReaction } from '../services/chess/reactions';
+
+export interface ChessReaction {
+  text: string;
+  emotion: string;
+}
 
 export type ChessStatus = 'playing' | 'thinking' | 'finished';
 
@@ -62,6 +65,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   const engineRef = useRef<ChessEngine | null>(null);
   // Bumped to invalidate an engine reply that is still pending (new game, resign, unmount)
   const tokenRef = useRef(0);
+  // Bumped to invalidate an in-flight LLM stream when a newer LLM comment starts or game resets
+  const llmTokenRef = useRef(0);
   // Multi-turn in-memory context window for the active chess game (cleared on newGame)
   const chessMessagesRef = useRef<ChatMessage[]>([]);
   const lastCommentedPlyRef = useRef<number | null>(null);
@@ -78,6 +83,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     });
     return () => {
       tokenRef.current += 1;
+      llmTokenRef.current += 1;
       engineRef.current?.dispose();
       engineRef.current = null;
     };
@@ -114,7 +120,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       }
 
       lastCommentedPlyRef.current = plyCount;
-      const requestToken = tokenRef.current;
+      const requestToken = ++llmTokenRef.current;
 
       const promptText = buildChessTurnPrompt({
         event,
@@ -145,7 +151,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         chessPersona,
         activeConfig,
         (_token, fullTextSoFar) => {
-          if (requestToken !== tokenRef.current) return;
+          if (requestToken !== llmTokenRef.current) return;
           const parsed = extractAndValidateDialogue(fullTextSoFar);
           const clean = parsed.cleanText.replace(/<narrative>[\s\S]*?<\/narrative>/gi, '').trim();
           const nextEmotion = parsed.emotion ?? fallbackMood;
@@ -155,7 +161,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
           }
         },
         (fullText, emotions) => {
-          if (requestToken !== tokenRef.current) return;
+          if (requestToken !== llmTokenRef.current) return;
           const parsed = extractAndValidateDialogue(fullText);
           const clean = parsed.cleanText.replace(/<narrative>[\s\S]*?<\/narrative>/gi, '').trim();
           const finalEmotion = emotions[0] ?? parsed.emotion ?? fallbackMood;
@@ -177,7 +183,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
           }
         },
         () => {
-          // Keep the local reaction fallback on network/API errors
+          // Ignore network/API errors during chess commentary
         },
         activeUser,
         undefined,
@@ -230,17 +236,6 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       });
       setMood(resolvedMood);
 
-      const variant = next.entries.length;
-      const localReaction = next.result
-        ? reactToResult(next.result, variant)
-        : reactToMove(entry, variant);
-
-      if (localReaction) {
-        setReaction({ text: localReaction.text, emotion: resolvedMood });
-      } else if (entry.by === 'user') {
-        setReaction(null);
-      }
-
       // Trigger LLM commentary after DeepSeek-chan's reply or when the game ends
       if (entry.by === 'deepseek' || next.result) {
         triggerLlmCommentary(next, event, currentEvalCp, resolvedMood);
@@ -287,6 +282,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   const newGame = useCallback(
     (userColor?: Color) => {
       cancelPending();
+      llmTokenRef.current += 1;
       chessMessagesRef.current = [];
       lastCommentedPlyRef.current = null;
       evalCpRef.current = undefined;
@@ -319,14 +315,18 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         result: next.result
       });
       setMood(resolvedMood);
-      setReaction(reactToResult(next.result, next.entries.length));
       triggerLlmCommentary(next, event, evalCpRef.current, resolvedMood);
     }
   }, [session, cancelPending, triggerLlmCommentary]);
 
   const undo = useCallback(() => {
     if (!session.undo()) return;
-    setSnapshot(session.snapshot());
+    llmTokenRef.current += 1;
+    const next = session.snapshot();
+    if (lastCommentedPlyRef.current !== null && next.entries.length < lastCommentedPlyRef.current) {
+      lastCommentedPlyRef.current = next.entries.length > 0 ? next.entries.length : null;
+    }
+    setSnapshot(next);
     setReaction(null);
   }, [session]);
 

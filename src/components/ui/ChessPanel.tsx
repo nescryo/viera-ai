@@ -250,9 +250,13 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           <p className="chess-bubble" role="status" aria-live="polite">{game.reaction.text}</p>
         )}
         {game.status === 'finished' && game.result && (
-          <div className="chess-result">
-            <strong>{RESULT_TEXT[game.result.outcome]}</strong>
-            <button type="button" className="btn btn--primary" onClick={() => { game.newGame(); setSelected(null); }}>
+          <div className={`chess-result chess-result--${game.result.outcome}`}>
+            <strong className="chess-result-label">{RESULT_TEXT[game.result.outcome]}</strong>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => { game.newGame(); setSelected(null); setPendingPromotion(null); }}
+            >
               Play again
             </button>
           </div>
