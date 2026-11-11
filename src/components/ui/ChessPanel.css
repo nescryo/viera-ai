@@ -13,7 +13,9 @@
   --chess-piece-b-fill: #303438;
   --chess-piece-b-stroke: #17191b;
   --chess-piece-b-detail: #e8e6dc;
-  --chess-board-size: min(464px, 92vw, calc(100dvh - 190px));
+  /* Move strip height (36px) + column gap (12px) */
+  --chess-moves-space: 48px;
+  --chess-board-size: min(464px, 92vw, calc(100dvh - 190px - var(--chess-moves-space)));
 }
 
 .chess-panel {
@@ -284,22 +286,30 @@
 .chess-coord--rank { left: 3px; top: 2px; }
 
 /* Move list drawer */
+/* One horizontal strip; the board size reserves its height (--chess-moves-space) so the board never jumps */
 .chess-moves {
-  max-height: 140px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  height: 36px;
   margin: 0;
-  padding: 8px 12px;
-  overflow-y: auto;
+  padding: 0 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
   list-style: none;
   font-size: 0.85rem;
+  white-space: nowrap;
   background: var(--glass-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
+  scrollbar-width: thin;
 }
 
 .chess-moves li {
-  display: grid;
-  grid-template-columns: 2.5em 1fr 1fr;
-  gap: 4px;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 5px;
 }
 
 .chess-move-number { color: var(--text-subtle); }
@@ -470,7 +480,7 @@
 .app-container.chess-active .chat-overlay-container { display: none; }
 
 @media (max-width: 768px) {
-  :root { --chess-board-size: min(92vw, calc(100dvh - 330px)); }
+  :root { --chess-board-size: min(92vw, calc(100dvh - 330px - var(--chess-moves-space))); }
 
   .chess-panel {
     grid-template-columns: 1fr;

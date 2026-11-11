@@ -62,6 +62,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   const [showDifficulty, setShowDifficulty] = useState(false);
   const [confirm, setConfirm] = useState<'leave' | 'resign' | null>(null);
   const backRef = useRef<HTMLButtonElement>(null);
+  const movesRef = useRef<HTMLOListElement>(null);
   const difficultyRef = useRef<HTMLDivElement>(null);
 
   const targets = useMemo(() => (selected ? game.legalMovesFrom(selected) : []), [selected, game]);
@@ -74,6 +75,12 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   useEffect(() => {
     backRef.current?.focus();
   }, []);
+
+  // Keep the newest move visible in the horizontal strip
+  useEffect(() => {
+    const strip = movesRef.current;
+    if (strip) strip.scrollLeft = strip.scrollWidth;
+  }, [showMoves, game.entries.length]);
 
   useEffect(() => {
     if (!showDifficulty) return;
@@ -234,7 +241,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
         </div>
 
         {showMoves && (
-          <ol id="chess-moves" className="chess-moves" aria-label="Moves played">
+          <ol ref={movesRef} id="chess-moves" className="chess-moves" aria-label="Moves played">
             {rows.length === 0 && <li className="chess-moves-empty">No moves yet</li>}
             {rows.map((row) => (
               <li key={row.number}>
