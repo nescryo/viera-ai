@@ -332,26 +332,39 @@
   align-items: center;
   gap: 8px;
   width: min(420px, 100%);
-  padding: 6px 8px 6px 14px;
-  background: var(--glass-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
+  padding: 4px 6px 4px 16px;
+  background: rgba(10, 14, 28, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  transition: border-color 0.2s ease;
+}
+
+.chess-chat:focus-within {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-ring-soft);
 }
 
 .chess-chat-input {
   flex: 1;
   min-width: 0;
+  padding: 8px 0;
   color: var(--text-normal);
   font: inherit;
   background: transparent;
   border: 0;
 }
 
+.chess-chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* The pill shows focus, so the inner field needs no ring of its own */
+.chess-chat-input:focus,
 .chess-chat-input:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 4px;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .chess-result {
