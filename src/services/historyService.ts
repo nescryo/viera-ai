@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatSession } from '../types';
+import type { ChessGameRecord } from './chess/chessSession';
 import { DEFAULT_CHARACTER_PACKAGE } from '../characters/registry';
 
 function getSessionsKey(userId: string): string {
@@ -159,6 +160,40 @@ export function updateSessionEmotion(
       return updatedSession;
     }
     return s;
+  });
+
+  if (updatedSession) {
+    saveSessions(userId, newSessions);
+  }
+  return updatedSession;
+}
+
+/** Inserts or updates a chess game in a conversation. A game with no moves is removed. */
+export function updateSessionChessGame(
+  userId: string,
+  sessionId: string,
+  game: ChessGameRecord
+): ChatSession | null {
+  if (!userId || !sessionId) return null;
+  const sessions = getSessions(userId);
+  let updatedSession: ChatSession | null = null;
+
+  const newSessions = sessions.map((s) => {
+    if (s.id !== sessionId) return s;
+    const others = (s.chessGames ?? []).filter((g) => g.id !== game.id);
+    const hasMoves = game.entries.length > 0;
+    const existing = (s.chessGames ?? []).some((g) => g.id === game.id);
+    if (!hasMoves && !existing) {
+      updatedSession = s;
+      return s;
+    }
+    const chessGames = hasMoves
+      ? (existing
+          ? (s.chessGames ?? []).map((g) => (g.id === game.id ? game : g))
+          : [...others, game])
+      : others;
+    updatedSession = { ...s, chessGames, updatedAt: Date.now() };
+    return updatedSession;
   });
 
   if (updatedSession) {

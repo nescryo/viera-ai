@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { ChatSession } from '../../types';
-import { Plus, Trash2, Pencil, Check, X, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, MessageSquare, AlertTriangle, Gamepad2 } from 'lucide-react';
 import { groupByDay } from '../../services/dateGrouping';
 import './forms/forms.css';
 import './ConversationHistoryModal.css';
@@ -135,6 +135,9 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
                           onClick={() => onSelectSession(s.id)}
                           aria-current={isActive ? 'true' : undefined}
                         >
+                          {s.chessGames && s.chessGames.length > 0 && (
+                            <Gamepad2 className="history-row-game" size={14} aria-label="Contains chess games" />
+                          )}
                           <span className="history-row-title">{title}</span>
                           <span className="history-row-time">{formatShortTime(s.updatedAt)}</span>
                         </button>

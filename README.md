@@ -15,6 +15,7 @@ Built with React 19, TypeScript, Vite, PixiJS, and the Live2D Cubism runtime.
 - **Expressive Anime Voice**: Responses can be spoken out loud, complete with mouth movements synchronized to her speech. Pick a voice engine in Settings (see below), or let the browser's built-in speech be the fallback.
 - **Japanese Dubbing Mode**: The character speaks in Japanese while the chat text stays in the language you are using.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
+- **Chess Minigame**: Play chess against the character from the minigames button in the header. She reacts to the game in character, you can chat with her during play, and games are saved in the conversation so you can resume them later.
 - **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth, or continue as a guest. Chat sessions are saved locally on your device, and you can customize your display name and avatar. Guests never touch Supabase.
 
 ---
@@ -148,6 +149,13 @@ Open `http://<your-computer-IP>:5173` on the phone. If you use sign-in, add `htt
 Creator links: [VGen](https://vgen.co/KAMIYA) and [X (Twitter)](https://x.com/kamiya_ryoko).
 
 The model files are in `public/models/deepseek-chan/`, together with the creator's original terms of use.
+
+**Chess minigame**
+
+| Component | Credit |
+| :--- | :--- |
+| Chess engine | [Stockfish](https://stockfishchess.org/), run in the browser through [stockfish.js](https://github.com/nmrugg/stockfish.js) (GPL-3.0) |
+| Rules and move generation | [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause) |
 
 ## Disclaimer & License
 

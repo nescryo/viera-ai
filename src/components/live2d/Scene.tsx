@@ -120,6 +120,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         app.stage.addChild(model);
 
         const layout = (): void => {
+          app.resize();
           const { width, height } = app.screen;
           const s = (height * config.scale) / internal.originalHeight;
           model.scale.set(s);

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChatMessage, ChatSession } from '../types';
+import type { ChessGameRecord } from '../services/chess/chessSession';
 import { DEFAULT_EMOTION_ID } from '../data/emotionRegistry';
 import * as historyService from '../services/historyService';
 
@@ -12,6 +13,12 @@ export function useChatSessions(
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentEmotion, setCurrentEmotion] = useState<string>(DEFAULT_EMOTION_ID);
+
+  // Always-current messages, so callers outside the render cycle can append safely
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Initialize and synchronize sessions when user profile or active persona changes
   useEffect(() => {
@@ -52,6 +59,21 @@ export function useChatSessions(
       if (updatedSess) {
         setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
       }
+    }
+  }, [userId, activeSessionId]);
+
+  const appendMessages = useCallback((added: ChatMessage[]) => {
+    if (added.length === 0) return;
+    const next = [...messagesRef.current, ...added];
+    messagesRef.current = next;
+    syncMessagesToSession(next);
+  }, [syncMessagesToSession]);
+
+  const saveChessGame = useCallback((game: ChessGameRecord) => {
+    if (!userId || !activeSessionId) return;
+    const updatedSess = historyService.updateSessionChessGame(userId, activeSessionId, game);
+    if (updatedSess) {
+      setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSess : s)));
     }
   }, [userId, activeSessionId]);
 
@@ -143,6 +165,8 @@ export function useChatSessions(
     currentEmotion,
     setCurrentEmotion,
     syncMessagesToSession,
+    appendMessages,
+    saveChessGame,
     selectSession,
     createNewChat,
     renameSession,

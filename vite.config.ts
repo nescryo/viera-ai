@@ -13,7 +13,7 @@ export default defineConfig({
       // instead of the network.
       workbox: {
         globPatterns: [
-          '**/*.{js,css,html,ico,png,jpg,jpeg,svg,webp}',
+          '**/*.{js,css,html,ico,png,jpg,jpeg,svg,webp,wasm}',
           'models/deepseek-chan/**/*.{moc3,json}'
         ],
         globIgnores: [

@@ -1,3 +1,4 @@
+import type { ChessGameRecord } from '../services/chess/chessSession';
 export type SenderType = 'user' | 'ai';
 
 export interface ChatMessage {
@@ -10,6 +11,8 @@ export interface ChatMessage {
   jaText?: string;
   emotions?: string[];
   actions?: string[];
+  /** Set on messages produced during a chess game (`ChessGameRecord.id`). */
+  gameId?: string;
   timestamp: string;
 }
 
@@ -119,6 +122,7 @@ export interface ChatSession {
   summary?: string;         // Episodic personal memory reflection
   lastSummarizedIndex?: number; // Last message index consolidated into summary
   currentEmotion?: string;  // Active persistent mood / emotional state
+  chessGames?: ChessGameRecord[]; // Chess games played in this conversation, oldest first
 }
 
 

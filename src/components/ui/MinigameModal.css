@@ -1,0 +1,37 @@
+/* Minigame list modal. Two classes per selector so App.css cannot override. */
+
+.modal-container.minigame-modal {
+  width: 460px;
+  max-width: 92vw;
+}
+
+.minigame-modal .minigame-list {
+  margin: 0;
+  padding: 4px 16px 20px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.minigame-modal .minigame-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  background: var(--field-bg);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+}
+
+.minigame-modal .minigame-card-icon { color: var(--accent-light); flex-shrink: 0; }
+
+.minigame-modal .minigame-card-text { flex: 1; min-width: 0; }
+
+.minigame-modal .minigame-card-text h4 { margin: 0 0 2px; }
+
+.minigame-modal .minigame-card-text p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

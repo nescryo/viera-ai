@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage, Persona, ApiConfig, UserProfile } from './types';
 import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
+import { getSavedView, saveView } from './services/viewStateService';
 import { subscribeToAuth, saveCurrentUser, logoutUser, getGuestSession, startGuestSession } from './services/authService';
 import { soundService } from './services/soundService';
 
@@ -20,11 +21,15 @@ import { UserProfileModal } from './components/ui/UserProfileModal';
 import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/Toast';
+import type { MinigameId } from './data/minigames';
+import type { ChessGameRecord } from './services/chess/chessSession';
+import { MinigameModal } from './components/ui/MinigameModal';
+import { ChessPanel } from './components/ui/ChessPanel';
 import { Scene } from './components/live2d/Scene';
 
 import './App.css';
 
-type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | null;
+type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | 'minigames' | null;
 
 export function App() {
   // 1. Active 3D Roleplay Character Package with persistent custom lore
@@ -110,6 +115,8 @@ export function App() {
     setMessages,
     currentEmotion,
     syncMessagesToSession,
+    appendMessages,
+    saveChessGame,
     selectSession,
     createNewChat,
     renameSession,
@@ -345,15 +352,61 @@ export function App() {
     );
   };
 
+  // 9. Chess minigame: a local emotion override, so game reactions never touch chat history
+  const [isChessOpen, setIsChessOpen] = useState(false);
+  const [chessEmotion, setChessEmotion] = useState<string | null>(null);
+  const [chessInitialGame, setChessInitialGame] = useState<ChessGameRecord | undefined>(undefined);
+
+  const openChess = () => {
+    // Resume the newest unfinished game of this conversation, otherwise start fresh
+    const games = sessions.find((s) => s.id === activeSessionId)?.chessGames ?? [];
+    const unfinished = [...games].reverse().find((g) => !g.result);
+    setChessInitialGame(unfinished);
+    setIsChessOpen(true);
+    saveView(userProfile?.id, 'chess');
+  };
+
+  const handleSelectMinigame = (id: MinigameId) => {
+    if (id === 'chess') {
+      openChess();
+      setActiveModal(null);
+    }
+  };
+
+  const handleCloseChess = useCallback(() => {
+    setIsChessOpen(false);
+    setChessEmotion(null);
+    saveView(userProfile?.id, 'chat');
+  }, [userProfile?.id]);
+
+  // After a refresh, return to the chess screen once the conversation has loaded (once per user)
+  const restoredViewForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const userId = userProfile?.id;
+    if (!userId || restoredViewForRef.current === userId) return;
+    if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) return;
+    restoredViewForRef.current = userId;
+    if (getSavedView(userId) === 'chess') openChess();
+    // openChess reads the loaded sessions; this must run only once per user
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.id, activeSessionId, sessions]);
+
   const handleSelectEmotion = useCallback((emotion: string) => {
+    // While chess is open the scene shows the chess emotion, so a manual pick must go there
+    if (isChessOpen) {
+      setChessEmotion(emotion);
+      return;
+    }
     updateSessionEmotion(emotion);
-  }, [updateSessionEmotion]);
+  }, [isChessOpen, updateSessionEmotion]);
+
+  const shownEmotion = isChessOpen && chessEmotion ? chessEmotion : currentEmotion;
 
   return (
-    <div className="app-container">
-      <Scene 
+    <div className={`app-container${isChessOpen ? ' chess-active' : ''}`}>
+      <Scene
         currentPersona={currentPersona}
-        currentEmotion={currentEmotion}
+        currentEmotion={shownEmotion}
         isReplying={isLoading || isSpeaking}
       />
 
@@ -361,11 +414,29 @@ export function App() {
         onOpenSettings={() => setActiveModal('settings')}
         onOpenProfile={() => setActiveModal('profile')}
         userProfile={userProfile}
-        currentEmotion={currentEmotion}
+        currentEmotion={shownEmotion}
         onSelectEmotion={handleSelectEmotion}
         onOpenHistory={() => setActiveModal('history')}
         onOpenLorebook={() => setActiveModal('alternativeMemory')}
+        onOpenMinigames={() => setActiveModal('minigames')}
       />
+
+      {isChessOpen && (
+        <ErrorBoundary>
+          <ChessPanel
+            opponentName={currentPersona.name}
+            persona={currentPersona}
+            apiConfig={apiConfig}
+            userProfile={userProfile}
+            onSpeakReaction={(msg) => speakMessage(msg, currentPersona, apiConfig)}
+            initialGame={chessInitialGame}
+            onGameChange={saveChessGame}
+            onChatMessages={appendMessages}
+            onEmotion={setChessEmotion}
+            onClose={handleCloseChess}
+          />
+        </ErrorBoundary>
+      )}
 
       <ChatOverlay
         messages={messages}
@@ -419,11 +490,19 @@ export function App() {
           <ConversationHistoryModal
             sessions={sessions}
             activeSessionId={activeSessionId}
-            onSelectSession={(id) => { selectSession(id); setActiveModal(null); }}
-            onCreateNewChat={() => { createNewChat(); setActiveModal(null); }}
+            onSelectSession={(id) => { handleCloseChess(); selectSession(id); setActiveModal(null); }}
+            onCreateNewChat={() => { handleCloseChess(); createNewChat(); setActiveModal(null); }}
             onRenameSession={renameSession}
             onDeleteSession={deleteSession}
             onClearAllSessions={clearAllSessions}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
+
+        {/* 5b. Minigames list */}
+        {activeModal === 'minigames' && (
+          <MinigameModal
+            onSelect={handleSelectMinigame}
             onClose={() => setActiveModal(null)}
           />
         )}

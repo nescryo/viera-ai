@@ -237,7 +237,7 @@
   left: 24px;
   right: 24px;
   height: 48px;
-  z-index: 11; /* above the chat scrim so header dropdowns are not covered */
+  z-index: 13; /* above the chat scrim and the chess panel (z-index 12) so header buttons stay clickable */
   display: flex;
   align-items: center;
   justify-content: space-between;
