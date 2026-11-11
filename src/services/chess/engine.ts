@@ -20,6 +20,8 @@ export interface ChessEngine {
   getLastEvalCp?(): number | undefined;
   /** Resolves with a move in UCI form, e.g. `e2e4` or `e7e8q`. */
   getBestMove(fen: string): Promise<string>;
+  /** Resolves with a fast Stockfish hint move in UCI form for the side to move in `fen`, or null if unavailable. */
+  getHintMove?(fen: string): Promise<string | null>;
   dispose(): void;
 }
 
@@ -75,6 +77,12 @@ export function createRandomEngine({ delayMs = 600, random = Math.random }: Rand
         timers.add(timer);
       });
     },
+    getHintMove(fen) {
+      const moves = new Chess(fen).moves({ verbose: true });
+      if (moves.length === 0) return Promise.resolve(null);
+      const move = moves[Math.floor(random() * moves.length)];
+      return Promise.resolve(`${move.from}${move.to}${move.promotion ?? ''}`);
+    },
     dispose() {
       timers.forEach(clearTimeout);
       timers.clear();
@@ -124,7 +132,9 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
 
   let port: UciPort | null = null;
   let uciReadyPromise: Promise<void> | null = null;
+  let searchQueue: Promise<unknown> = Promise.resolve();
   let lastEvalCp: number | undefined;
+  let recordEvalScore = true;
   let disposed = false;
   let broken = false;
 
@@ -155,7 +165,7 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
         port.onMessage((raw) => {
           const line = raw.trim();
           const parsedScore = parseUciScoreToCp(line);
-          if (parsedScore !== null) {
+          if (parsedScore !== null && recordEvalScore) {
             lastEvalCp = parsedScore;
           }
           for (const listener of [...lineListeners]) listener(line);
@@ -179,6 +189,36 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
     return uciReadyPromise;
   };
 
+  const runUciSearch = (
+    fen: string,
+    configureCommands: readonly string[],
+    goCommand: string,
+    shouldRecordEval: boolean
+  ): Promise<string | null> => {
+    const task = searchQueue.then(async () => {
+      await ensureInitialized();
+      if (disposed || !port) throw new Error('Engine disposed');
+
+      recordEvalScore = shouldRecordEval;
+      for (const cmd of configureCommands) {
+        port.postMessage(cmd);
+      }
+      const readyPromise = waitForLine((line) => line === 'readyok');
+      port.postMessage('isready');
+      await readyPromise;
+
+      const bestMovePromise = waitForLine((line) => line.startsWith('bestmove '));
+      port.postMessage(`position fen ${fen}`);
+      port.postMessage(goCommand);
+
+      const bestLine = await bestMovePromise;
+      const match = /^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/.exec(bestLine);
+      return match ? match[1] : null;
+    });
+    searchQueue = task.catch(() => undefined);
+    return task;
+  };
+
   return {
     setDifficulty(nextPreset: DifficultyPreset) {
       preset = nextPreset;
@@ -199,26 +239,16 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
       }
 
       try {
-        await ensureInitialized();
-        if (disposed || !port) throw new Error('Engine disposed');
-
         const activePreset = preset;
         const startTime = Date.now();
 
-        for (const cmd of toUciConfigureCommands(activePreset)) {
-          port.postMessage(cmd);
-        }
-        const readyPromise = waitForLine((line) => line === 'readyok');
-        port.postMessage('isready');
-        await readyPromise;
-
-        const bestMovePromise = waitForLine((line) => line.startsWith('bestmove '));
-        port.postMessage(`position fen ${fen}`);
-        port.postMessage(toUciGoCommand(activePreset));
-
-        const bestLine = await bestMovePromise;
-        const match = /^bestmove\s+([a-h][1-8][a-h][1-8][qrbn]?)/.exec(bestLine);
-        if (!match) {
+        const uci = await runUciSearch(
+          fen,
+          toUciConfigureCommands(activePreset),
+          toUciGoCommand(activePreset),
+          true
+        );
+        if (!uci) {
           return fallback.getBestMove(fen);
         }
 
@@ -237,10 +267,35 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
           });
         }
 
-        return match[1];
+        return uci;
       } catch {
         broken = true;
         return fallback.getBestMove(fen);
+      }
+    },
+
+    async getHintMove(fen: string): Promise<string | null> {
+      const legalMoves = new Chess(fen).moves({ verbose: true });
+      if (legalMoves.length === 0) {
+        return null;
+      }
+
+      // A random fallback move would be presented to the user as a "best move", so report no hint instead.
+      if (broken) return null;
+
+      try {
+        return await runUciSearch(
+          fen,
+          [
+            'setoption name Skill Level value 20',
+            'setoption name UCI_LimitStrength value false'
+          ],
+          'go depth 6',
+          false
+        );
+      } catch {
+        broken = true;
+        return null;
       }
     },
 

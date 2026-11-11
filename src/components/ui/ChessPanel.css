@@ -327,6 +327,33 @@
   border-radius: var(--radius-lg);
 }
 
+.chess-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(420px, 100%);
+  padding: 6px 8px 6px 14px;
+  background: var(--glass-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+}
+
+.chess-chat-input {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-normal);
+  font: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.chess-chat-input:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
 .chess-result {
   display: flex;
   align-items: center;

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
-import { ArrowLeft, ChevronDown, Flag, ListOrdered, RotateCcw, Undo2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Flag, ListOrdered, RotateCcw, Send, Undo2 } from 'lucide-react';
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../../types';
 import { useChessGame } from '../../hooks/useChessGame';
 import type { PromotionPiece } from '../../services/chess/chessSession';
+import { MAX_CHESS_CHAT_CHARS } from '../../services/chess/commentary';
 import { DIFFICULTY_PRESETS } from '../../services/chess/difficulty';
 import { ChessBoard } from './ChessBoard';
 import { ChessPiece } from './ChessPiece';
@@ -56,6 +57,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   const game = useChessGame({ persona, apiConfig, userProfile, onSpeakReaction });
   const [selected, setSelected] = useState<Square | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square } | null>(null);
+  const [chatText, setChatText] = useState('');
   const [showMoves, setShowMoves] = useState(false);
   const [showDifficulty, setShowDifficulty] = useState(false);
   const [confirm, setConfirm] = useState<'leave' | 'resign' | null>(null);
@@ -248,6 +250,35 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
       <div className="chess-side">
         {game.reaction && (
           <p className="chess-bubble" role="status" aria-live="polite">{game.reaction.text}</p>
+        )}
+        {game.chatEnabled && (
+          <form
+            className="chess-chat"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (game.sendUserChat(chatText)) setChatText('');
+            }}
+          >
+            <input
+              type="text"
+              className="chess-chat-input"
+              value={chatText}
+              maxLength={MAX_CHESS_CHAT_CHARS}
+              onChange={(event) => setChatText(event.target.value)}
+              placeholder={`Talk to ${opponentName}...`}
+              aria-label={`Message ${opponentName}`}
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="chess-icon-btn"
+              disabled={!chatText.trim()}
+              aria-label="Send message"
+              title="Send"
+            >
+              <Send size={18} />
+            </button>
+          </form>
         )}
         {game.status === 'finished' && game.result && (
           <div className={`chess-result chess-result--${game.result.outcome}`}>

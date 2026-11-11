@@ -100,6 +100,25 @@ describe('createStockfishEngine', () => {
     expect(move2).toBe('e7e5');
     expect(sent).toContain('setoption name UCI_Elo value 1600');
     expect(sent).toContain('go movetime 650');
+    expect(engine.getLastEvalCp?.()).toBe(18);
+
+    // Hint search uses full strength depth 6 without overwriting DeepSeek-chan's lastEvalCp
+    const originalPost = fakePort.postMessage.bind(fakePort);
+    fakePort.postMessage = (cmd: string) => {
+      if (cmd === 'go depth 6') {
+        sent.push(cmd);
+        queueMicrotask(() => {
+          emit('info depth 6 score cp -150 pv g1f3');
+          emit('bestmove g1f3');
+        });
+        return;
+      }
+      originalPost(cmd);
+    };
+
+    const hintMove = await engine.getHintMove?.(startFen);
+    expect(hintMove).toBe('g1f3');
+    expect(engine.getLastEvalCp?.()).toBe(18);
 
     engine.dispose();
     expect(terminated).toBe(true);

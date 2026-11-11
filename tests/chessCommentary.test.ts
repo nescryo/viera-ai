@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHESS_SYSTEM_PROMPT_ADDENDUM,
+  MAX_CHESS_CHAT_CHARS,
+  buildChessChatPrompt,
   buildChessTurnPrompt,
   categorizeEval,
+  formatLegalMoves,
   formatRecentMoves,
-  shouldRequestLlmCommentary
+  shouldRequestLlmCommentary,
+  trimChessContext,
+  uciToSan
 } from '../src/services/chess/commentary';
 import { parseUciScoreToCp } from '../src/services/chess/engine';
 
@@ -130,5 +136,64 @@ describe('buildChessTurnPrompt & formatRecentMoves', () => {
     expect(prompt).toContain('Phase: opening');
     expect(prompt).toContain('Your position evaluation: losing');
     expect(prompt).toContain('The user won the game (checkmate).');
+  });
+});
+
+describe('buildChessChatPrompt & move helpers', () => {
+  const base = {
+    fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+    entries: [{ san: 'e4', by: 'user' }] as never,
+    evalCp: 400,
+    difficultyLabel: 'Casual (~900)'
+  };
+
+  it('includes board context, legal moves, and the eval category without the raw number', () => {
+    const prompt = buildChessChatPrompt({ ...base, text: 'nice weather' });
+    expect(prompt).toContain('[Chess Player Message]');
+    expect(prompt).toContain(`Position (FEN): ${base.fen}`);
+    expect(prompt).toContain('Your position evaluation: clearly-winning');
+    expect(prompt).toContain('Legal moves available to the user:');
+    expect(prompt).toContain('e5');
+    expect(prompt).toContain('nice weather');
+    expect(prompt).not.toContain('400');
+  });
+
+  it('converts a valid Stockfish UCI suggestedMove to SAN and ignores illegal moves', () => {
+    expect(uciToSan(base.fen, 'g8f6')).toBe('Nf6');
+    expect(uciToSan(base.fen, 'e2e4')).toBeUndefined();
+    expect(formatLegalMoves(base.fen, 5)).toContain('Na6');
+
+    const withHint = buildChessChatPrompt({ ...base, text: 'what should I play?', suggestedMove: 'g8f6' });
+    expect(withHint).toContain('Engine best move hint for current turn: Nf6');
+
+    const withIllegalHint = buildChessChatPrompt({ ...base, text: 'what should I play?', suggestedMove: 'e2e4' });
+    expect(withIllegalHint).not.toContain('Engine best move hint');
+  });
+
+  it('omits the hint and legal moves on DeepSeek-chan\'s turn', () => {
+    const prompt = buildChessChatPrompt({ ...base, text: 'hi', suggestedMove: 'g8f6', userToMove: false });
+    expect(prompt).not.toContain('Engine best move hint');
+    expect(prompt).not.toContain('Legal moves available');
+  });
+
+  it('caps the user text length', () => {
+    const prompt = buildChessChatPrompt({ ...base, text: 'x'.repeat(MAX_CHESS_CHAT_CHARS + 200) });
+    expect(prompt).toContain('x'.repeat(MAX_CHESS_CHAT_CHARS));
+    expect(prompt).not.toContain('x'.repeat(MAX_CHESS_CHAT_CHARS + 1));
+  });
+
+  it('addendum allows natural tactical discussion and move hints without raw engine numbers', () => {
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('share a move hint when asked');
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('never invent notation or illegal moves');
+  });
+});
+
+describe('trimChessContext', () => {
+  it('keeps the newest messages and starts on a user turn', () => {
+    const msgs = Array.from({ length: 10 }, (_, i) => ({ id: i, sender: i % 2 === 0 ? 'user' : 'ai' }));
+    const out = trimChessContext(msgs, 5);
+    expect(out[0].sender).toBe('user');
+    expect(out[out.length - 1].id).toBe(9);
+    expect(out.length).toBeLessThanOrEqual(5);
   });
 });

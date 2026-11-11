@@ -7,8 +7,10 @@ import { ChessSession } from '../services/chess/chessSession';
 import type { ChessHistoryEntry, ChessSnapshot, PromotionPiece } from '../services/chess/chessSession';
 import {
   CHESS_SYSTEM_PROMPT_ADDENDUM,
+  buildChessChatPrompt,
   buildChessTurnPrompt,
-  shouldRequestLlmCommentary
+  shouldRequestLlmCommentary,
+  trimChessContext
 } from '../services/chess/commentary';
 import { DEFAULT_DIFFICULTY_ID, getDifficultyPreset } from '../services/chess/difficulty';
 import type { DifficultyId, DifficultyPreset } from '../services/chess/difficulty';
@@ -40,6 +42,10 @@ export interface UseChessGame extends ChessSnapshot {
   /** Latest notable spoken reaction from DeepSeek-chan, or null on ordinary quiet moves. */
   reaction: ChessReaction | null;
   canUndo: boolean;
+  /** True when persona and API config allow free-form chat with the opponent. */
+  chatEnabled: boolean;
+  /** Sends a free-form user message with board context. Returns false if empty or no LLM is configured. */
+  sendUserChat(text: string): boolean;
   legalMovesFrom(square: Square): Square[];
   isPromotionMove(from: Square, to: Square): boolean;
   tryUserMove(from: Square, to: Square, promotion?: PromotionPiece): boolean;
@@ -71,6 +77,10 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   const chessMessagesRef = useRef<ChatMessage[]>([]);
   const lastCommentedPlyRef = useRef<number | null>(null);
   const evalCpRef = useRef<number | undefined>(undefined);
+  const moodRef = useRef('relaxed');
+  useEffect(() => {
+    moodRef.current = mood;
+  }, [mood]);
 
   const optionsRef = useRef({ persona, apiConfig, userProfile, onSpeakReaction, difficulty });
   useEffect(() => {
@@ -89,56 +99,42 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     };
   }, []);
 
-  const triggerLlmCommentary = useCallback(
+  /**
+   * Streams one in-character LLM reply for `promptText` and appends both turns to the chess context.
+   * The newest request wins: starting one invalidates any stream still in flight (commentary or chat).
+   * Returns false when no LLM is configured.
+   */
+  const requestReply = useCallback(
     (
-      next: ChessSnapshot,
-      event: ReturnType<typeof detectGameEvent>,
-      currentEvalCp: number | undefined,
-      fallbackMood: string
-    ) => {
+      promptText: string,
+      idTag: string,
+      fallbackMood: string,
+      notifyError: boolean,
+      preallocatedToken?: number
+    ): boolean => {
       const {
         persona: activePersona,
         apiConfig: activeConfig,
         userProfile: activeUser,
-        onSpeakReaction: speakFn,
-        difficulty: activeDifficulty
+        onSpeakReaction: speakFn
       } = optionsRef.current;
 
       if (!activePersona || !activeConfig?.baseUrl?.trim() || !activeConfig?.model?.trim()) {
-        return;
+        return false;
       }
 
-      const plyCount = next.entries.length;
-      if (
-        !shouldRequestLlmCommentary({
-          event,
-          plyCount,
-          lastCommentedPly: lastCommentedPlyRef.current
-        })
-      ) {
-        return;
-      }
-
-      lastCommentedPlyRef.current = plyCount;
-      const requestToken = ++llmTokenRef.current;
-
-      const promptText = buildChessTurnPrompt({
-        event,
-        entries: next.entries,
-        evalCp: currentEvalCp,
-        difficultyLabel: `${activeDifficulty.label} (${activeDifficulty.displayElo})`,
-        result: next.result
-      });
+      const requestToken = preallocatedToken ?? ++llmTokenRef.current;
+      const clock = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const userTurnMsg: ChatMessage = {
-        id: `chess-turn-${plyCount}-${Date.now()}`,
+        id: `chess-${idTag}-${Date.now()}`,
         characterId: activePersona.id,
         sender: 'user',
         text: promptText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: clock()
       };
 
-      const historyForLlm = [...chessMessagesRef.current, userTurnMsg];
+      const historyForLlm = trimChessContext([...chessMessagesRef.current, userTurnMsg]);
       chessMessagesRef.current = historyForLlm;
 
       const chessPersona: Persona = {
@@ -169,28 +165,127 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
           if (clean) {
             setReaction({ text: clean, emotion: finalEmotion });
             const aiMsg: ChatMessage = {
-              id: `chess-ai-${plyCount}-${Date.now()}`,
+              id: `chess-ai-${idTag}-${Date.now()}`,
               characterId: activePersona.id,
               sender: 'ai',
               text: clean,
               rawText: fullText,
               jaText: parsed.jaText ?? undefined,
               emotions: [finalEmotion],
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              timestamp: clock()
             };
-            chessMessagesRef.current = [...chessMessagesRef.current, aiMsg];
+            chessMessagesRef.current = trimChessContext([...chessMessagesRef.current, aiMsg]);
             speakFn?.(aiMsg);
           }
         },
         () => {
-          // Ignore network/API errors during chess commentary
+          // Commentary errors stay silent; a chat message the user typed gets visible feedback.
+          if (!notifyError || requestToken !== llmTokenRef.current) return;
+          setReaction({ text: 'Connection problem. Try sending that again.', emotion: fallbackMood });
         },
         activeUser,
         undefined,
         fallbackMood
       );
+      return true;
     },
     []
+  );
+
+  const triggerLlmCommentary = useCallback(
+    (
+      next: ChessSnapshot,
+      event: ReturnType<typeof detectGameEvent>,
+      currentEvalCp: number | undefined,
+      fallbackMood: string
+    ) => {
+      const {
+        persona: activePersona,
+        apiConfig: activeConfig,
+        difficulty: activeDifficulty
+      } = optionsRef.current;
+
+      if (!activePersona || !activeConfig?.baseUrl?.trim() || !activeConfig?.model?.trim()) {
+        return;
+      }
+
+      const plyCount = next.entries.length;
+      if (
+        !shouldRequestLlmCommentary({
+          event,
+          plyCount,
+          lastCommentedPly: lastCommentedPlyRef.current
+        })
+      ) {
+        return;
+      }
+
+      lastCommentedPlyRef.current = plyCount;
+
+      const promptText = buildChessTurnPrompt({
+        event,
+        entries: next.entries,
+        evalCp: currentEvalCp,
+        difficultyLabel: `${activeDifficulty.label} (${activeDifficulty.displayElo})`,
+        result: next.result
+      });
+
+      requestReply(promptText, `turn-${plyCount}`, fallbackMood, false);
+    },
+    [requestReply]
+  );
+
+  const sendUserChat = useCallback(
+    (rawText: string): boolean => {
+      const text = rawText.trim();
+      if (!text) return false;
+      const { persona: activePersona, apiConfig: activeConfig } = optionsRef.current;
+      if (!activePersona || !activeConfig?.baseUrl?.trim() || !activeConfig?.model?.trim()) {
+        return false;
+      }
+
+      const next = session.snapshot();
+      const difficultyLabel = `${optionsRef.current.difficulty.label} (${optionsRef.current.difficulty.displayElo})`;
+      const currentEvalCp = evalCpRef.current;
+      const fallbackMood = moodRef.current;
+      const engine = engineRef.current;
+
+      // Hint only on the user's turn: on DeepSeek-chan's turn it would be her own pending move,
+      // and the search queues behind her move so the FEN would be stale by the time it resolves.
+      if (!next.result && next.turn === 'user' && engine?.getHintMove) {
+        const token = ++llmTokenRef.current;
+        void engine
+          .getHintMove(next.fen)
+          .catch(() => null)
+          .then((hintUci) => {
+            if (token !== llmTokenRef.current) return;
+            const promptText = buildChessChatPrompt({
+              text,
+              fen: next.fen,
+              entries: next.entries,
+              evalCp: currentEvalCp,
+              difficultyLabel,
+              result: next.result,
+              suggestedMove: hintUci ?? undefined,
+              userToMove: true
+            });
+            requestReply(promptText, 'chat', fallbackMood, true, token);
+          });
+        return true;
+      }
+
+      const promptText = buildChessChatPrompt({
+        text,
+        fen: next.fen,
+        entries: next.entries,
+        evalCp: currentEvalCp,
+        difficultyLabel,
+        result: next.result,
+        userToMove: next.turn === 'user'
+      });
+      return requestReply(promptText, 'chat', fallbackMood, true);
+    },
+    [session, requestReply]
   );
 
   const afterMove = useCallback(
@@ -347,6 +442,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     status === 'playing' &&
     snapshot.turn === 'user' &&
     snapshot.entries.some((entry) => entry.by === 'user');
+  const chatEnabled = Boolean(persona && apiConfig?.baseUrl?.trim() && apiConfig?.model?.trim());
 
   return {
     ...snapshot,
@@ -355,6 +451,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     mood,
     reaction,
     canUndo,
+    chatEnabled,
+    sendUserChat,
     legalMovesFrom,
     isPromotionMove,
     tryUserMove,
