@@ -21,6 +21,7 @@ import { AlternativeMemoryModal } from './components/ui/AlternativeMemoryModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/Toast';
 import type { MinigameId } from './data/minigames';
+import type { ChessGameRecord } from './services/chess/chessSession';
 import { MinigameModal } from './components/ui/MinigameModal';
 import { ChessPanel } from './components/ui/ChessPanel';
 import { Scene } from './components/live2d/Scene';
@@ -113,6 +114,8 @@ export function App() {
     setMessages,
     currentEmotion,
     syncMessagesToSession,
+    appendMessages,
+    saveChessGame,
     selectSession,
     createNewChat,
     renameSession,
@@ -351,9 +354,14 @@ export function App() {
   // 9. Chess minigame: a local emotion override, so game reactions never touch chat history
   const [isChessOpen, setIsChessOpen] = useState(false);
   const [chessEmotion, setChessEmotion] = useState<string | null>(null);
+  const [chessInitialGame, setChessInitialGame] = useState<ChessGameRecord | undefined>(undefined);
 
   const handleSelectMinigame = (id: MinigameId) => {
     if (id === 'chess') {
+      // Resume the newest unfinished game of this conversation, otherwise start fresh
+      const games = sessions.find((s) => s.id === activeSessionId)?.chessGames ?? [];
+      const unfinished = [...games].reverse().find((g) => !g.result);
+      setChessInitialGame(unfinished);
       setIsChessOpen(true);
       setActiveModal(null);
     }
@@ -395,6 +403,9 @@ export function App() {
             apiConfig={apiConfig}
             userProfile={userProfile}
             onSpeakReaction={(msg) => speakMessage(msg, currentPersona, apiConfig)}
+            initialGame={chessInitialGame}
+            onGameChange={saveChessGame}
+            onChatMessages={appendMessages}
             onEmotion={setChessEmotion}
             onClose={handleCloseChess}
           />
@@ -453,8 +464,8 @@ export function App() {
           <ConversationHistoryModal
             sessions={sessions}
             activeSessionId={activeSessionId}
-            onSelectSession={(id) => { selectSession(id); setActiveModal(null); }}
-            onCreateNewChat={() => { createNewChat(); setActiveModal(null); }}
+            onSelectSession={(id) => { handleCloseChess(); selectSession(id); setActiveModal(null); }}
+            onCreateNewChat={() => { handleCloseChess(); createNewChat(); setActiveModal(null); }}
             onRenameSession={renameSession}
             onDeleteSession={deleteSession}
             onClearAllSessions={clearAllSessions}

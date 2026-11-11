@@ -323,3 +323,8 @@
     min-width: 36px;
   }
 }
+
+.history-modal .history-row-game {
+  flex-shrink: 0;
+  color: var(--text-subtle);
+}

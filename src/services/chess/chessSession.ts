@@ -2,6 +2,7 @@ import { Chess } from 'chess.js';
 import type { Color, PieceSymbol, Square } from 'chess.js';
 import { computeResult } from './gameResult';
 import type { ChessResult } from './gameResult';
+import type { DifficultyId } from './difficulty';
 
 export type ChessSide = 'user' | 'deepseek';
 
@@ -30,6 +31,22 @@ export interface ChessSnapshot {
   result: ChessResult | undefined;
 }
 
+/** Serializable state of a game, enough to rebuild a `ChessSession`. */
+export interface ChessSessionState {
+  userColor: Color;
+  entries: ChessHistoryEntry[];
+  resigned: boolean;
+}
+
+/** A game saved inside a conversation. */
+export interface ChessGameRecord extends ChessSessionState {
+  id: string;
+  difficultyId: DifficultyId;
+  result?: ChessResult;
+  startedAt: number;
+  updatedAt: number;
+}
+
 const UCI_PATTERN = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
 /**
@@ -45,6 +62,33 @@ export class ChessSession {
   constructor(userColor: Color = 'w', fen?: string) {
     this.color = userColor;
     this.game = new Chess(fen);
+  }
+
+  /**
+   * Rebuilds a session by replaying the saved moves.
+   * Falls back to a fresh game when the saved moves are not legal.
+   */
+  static restore(state: ChessSessionState): ChessSession {
+    const session = new ChessSession(state.userColor);
+    try {
+      for (const entry of state.entries) {
+        session.game.move(entry.san);
+        session.entries.push({ ...entry });
+      }
+      session.resigned = state.resigned;
+      return session;
+    } catch {
+      return new ChessSession(state.userColor);
+    }
+  }
+
+  /** Plain copy of the state, safe to store as JSON. */
+  serialize(): ChessSessionState {
+    return {
+      userColor: this.color,
+      entries: this.entries.map((entry) => ({ ...entry })),
+      resigned: this.resigned
+    };
   }
 
   get fen(): string {

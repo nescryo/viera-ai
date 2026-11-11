@@ -4,7 +4,7 @@ import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../types';
 import { sendStreamingChatMessage } from '../services/aiService';
 import { extractAndValidateDialogue } from '../services/dubbingValidator';
 import { ChessSession } from '../services/chess/chessSession';
-import type { ChessHistoryEntry, ChessSnapshot, PromotionPiece } from '../services/chess/chessSession';
+import type { ChessGameRecord, ChessHistoryEntry, ChessSnapshot, PromotionPiece } from '../services/chess/chessSession';
 import {
   CHESS_SYSTEM_PROMPT_ADDENDUM,
   buildChessChatPrompt,
@@ -32,6 +32,12 @@ export interface UseChessGameOptions {
   userProfile?: UserProfile | null;
   /** Optional callback to speak a completed LLM reaction via TTS. */
   onSpeakReaction?: (message: ChatMessage) => void;
+  /** Saved game to resume. Read once, when the hook mounts. */
+  initialGame?: ChessGameRecord;
+  /** Called with the full game record after every change, so it can be stored in the conversation. */
+  onGameChange?: (record: ChessGameRecord) => void;
+  /** Called with chat lines (typed chat and spoken replies) to append to the conversation, tagged with the game id. */
+  onChatMessages?: (messages: ChatMessage[]) => void;
 }
 
 export interface UseChessGame extends ChessSnapshot {
@@ -57,13 +63,16 @@ export interface UseChessGame extends ChessSnapshot {
 
 /** State for one chess game against DeepSeek-chan. The opponent is created with the hook and disposed on unmount. */
 export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
-  const { persona, apiConfig, userProfile, onSpeakReaction } = options;
+  const { persona, apiConfig, userProfile, onSpeakReaction, initialGame, onGameChange, onChatMessages } = options;
 
-  const [session] = useState(() => new ChessSession('w'));
+  const [session] = useState(() => (initialGame ? ChessSession.restore(initialGame) : new ChessSession('w')));
   const [snapshot, setSnapshot] = useState<ChessSnapshot>(() => session.snapshot());
   const [difficulty, setDifficultyState] = useState<DifficultyPreset>(() =>
-    getDifficultyPreset(DEFAULT_DIFFICULTY_ID)
+    getDifficultyPreset(initialGame?.difficultyId ?? DEFAULT_DIFFICULTY_ID)
   );
+  const initialDifficultyIdRef = useRef<DifficultyId>(initialGame?.difficultyId ?? DEFAULT_DIFFICULTY_ID);
+  const gameIdRef = useRef(initialGame?.id ?? `chess-${Date.now()}`);
+  const startedAtRef = useRef(initialGame?.startedAt ?? Date.now());
   const [thinking, setThinking] = useState(false);
   const [mood, setMood] = useState<string>('relaxed');
   const [reaction, setReaction] = useState<ChessReaction | null>(null);
@@ -82,14 +91,14 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     moodRef.current = mood;
   }, [mood]);
 
-  const optionsRef = useRef({ persona, apiConfig, userProfile, onSpeakReaction, difficulty });
+  const optionsRef = useRef({ persona, apiConfig, userProfile, onSpeakReaction, difficulty, onGameChange, onChatMessages });
   useEffect(() => {
-    optionsRef.current = { persona, apiConfig, userProfile, onSpeakReaction, difficulty };
-  }, [persona, apiConfig, userProfile, onSpeakReaction, difficulty]);
+    optionsRef.current = { persona, apiConfig, userProfile, onSpeakReaction, difficulty, onGameChange, onChatMessages };
+  }, [persona, apiConfig, userProfile, onSpeakReaction, difficulty, onGameChange, onChatMessages]);
 
   useEffect(() => {
     engineRef.current = createStockfishEngine({
-      initialDifficulty: getDifficultyPreset(DEFAULT_DIFFICULTY_ID)
+      initialDifficulty: getDifficultyPreset(initialDifficultyIdRef.current)
     });
     return () => {
       tokenRef.current += 1;
@@ -110,7 +119,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       idTag: string,
       fallbackMood: string,
       notifyError: boolean,
-      preallocatedToken?: number
+      preallocatedToken?: number,
+      persistUserText?: string
     ): boolean => {
       const {
         persona: activePersona,
@@ -133,6 +143,10 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         text: promptText,
         timestamp: clock()
       };
+
+      if (persistUserText) {
+        optionsRef.current.onChatMessages?.([{ ...userTurnMsg, text: persistUserText, gameId: gameIdRef.current }]);
+      }
 
       const historyForLlm = trimChessContext([...chessMessagesRef.current, userTurnMsg]);
       chessMessagesRef.current = historyForLlm;
@@ -175,6 +189,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
               timestamp: clock()
             };
             chessMessagesRef.current = trimChessContext([...chessMessagesRef.current, aiMsg]);
+            optionsRef.current.onChatMessages?.([{ ...aiMsg, gameId: gameIdRef.current }]);
             speakFn?.(aiMsg);
           }
         },
@@ -269,7 +284,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
               suggestedMove: hintUci ?? undefined,
               userToMove: true
             });
-            requestReply(promptText, 'chat', fallbackMood, true, token);
+            requestReply(promptText, 'chat', fallbackMood, true, token, text);
           });
         return true;
       }
@@ -283,7 +298,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         result: next.result,
         userToMove: next.turn === 'user'
       });
-      return requestReply(promptText, 'chat', fallbackMood, true);
+      return requestReply(promptText, 'chat', fallbackMood, true, undefined, text);
     },
     [session, requestReply]
   );
@@ -358,6 +373,15 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     if (token === tokenRef.current) setThinking(false);
   }, [session, afterMove]);
 
+  // A resumed game may be waiting on DeepSeek-chan's move
+  useEffect(() => {
+    if (initialGame && session.snapshot().turn === 'deepseek' && !session.isOver()) {
+      void runEngine();
+    }
+    // Runs once on mount; initialGame is only read at start
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cancelPending = useCallback(() => {
     tokenRef.current += 1;
     setThinking(false);
@@ -378,6 +402,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     (userColor?: Color) => {
       cancelPending();
       llmTokenRef.current += 1;
+      gameIdRef.current = `chess-${Date.now()}`;
+      startedAtRef.current = Date.now();
       chessMessagesRef.current = [];
       lastCommentedPlyRef.current = null;
       evalCpRef.current = undefined;
@@ -430,6 +456,23 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     setDifficultyState(nextPreset);
     engineRef.current?.setDifficulty?.(nextPreset);
   }, []);
+
+  // Save the game into the conversation after every change (moves, resign, undo, difficulty)
+  const savedOnceRef = useRef(false);
+  useEffect(() => {
+    if (!savedOnceRef.current) {
+      savedOnceRef.current = true;
+      return;
+    }
+    optionsRef.current.onGameChange?.({
+      ...session.serialize(),
+      id: gameIdRef.current,
+      difficultyId: difficulty.id,
+      result: snapshot.result,
+      startedAt: startedAtRef.current,
+      updatedAt: Date.now()
+    });
+  }, [session, snapshot, difficulty.id]);
 
   const legalMovesFrom = useCallback((square: Square) => session.legalTargets(square), [session]);
   const isPromotionMove = useCallback(

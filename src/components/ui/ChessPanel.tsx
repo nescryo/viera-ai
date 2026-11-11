@@ -3,7 +3,7 @@ import type { Square } from 'chess.js';
 import { ArrowLeft, ChevronDown, Flag, ListOrdered, RotateCcw, Send, Undo2 } from 'lucide-react';
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../../types';
 import { useChessGame } from '../../hooks/useChessGame';
-import type { PromotionPiece } from '../../services/chess/chessSession';
+import type { ChessGameRecord, PromotionPiece } from '../../services/chess/chessSession';
 import { MAX_CHESS_CHAT_CHARS } from '../../services/chess/commentary';
 import { DIFFICULTY_PRESETS } from '../../services/chess/difficulty';
 import { ChessBoard } from './ChessBoard';
@@ -17,6 +17,10 @@ interface ChessPanelProps {
   apiConfig?: ApiConfig;
   userProfile?: UserProfile | null;
   onSpeakReaction?: (message: ChatMessage) => void;
+  /** Saved game to resume when the panel opens. */
+  initialGame?: ChessGameRecord;
+  onGameChange?: (record: ChessGameRecord) => void;
+  onChatMessages?: (messages: ChatMessage[]) => void;
   /** Called when DeepSeek-chan's mood changes, so the Live2D model can show the emotion. */
   onEmotion: (emotion: string) => void;
   onClose: () => void;
@@ -51,10 +55,13 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   apiConfig,
   userProfile,
   onSpeakReaction,
+  initialGame,
+  onGameChange,
+  onChatMessages,
   onEmotion,
   onClose
 }) => {
-  const game = useChessGame({ persona, apiConfig, userProfile, onSpeakReaction });
+  const game = useChessGame({ persona, apiConfig, userProfile, onSpeakReaction, initialGame, onGameChange, onChatMessages });
   const [selected, setSelected] = useState<Square | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square } | null>(null);
   const [chatText, setChatText] = useState('');
@@ -302,44 +309,63 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
       </div>
 
       {pendingPromotion && (
-        <div className="chess-confirm chess-promotion" role="dialog" aria-modal="true" aria-label="Promote pawn">
-          <p>Choose promotion piece</p>
-          <div className="chess-promotion-grid">
-            {PROMOTION_OPTIONS.map(({ piece, label }) => (
-              <button
-                key={piece}
-                type="button"
-                className="chess-promotion-btn"
-                aria-label={`Promote to ${label}`}
-                onClick={() => handlePromotionSelect(piece)}
-              >
-                <ChessPiece color={game.userColor} type={piece} />
-                <span className="chess-promotion-label">{label}</span>
-              </button>
-            ))}
-          </div>
-          <div className="chess-confirm-actions">
-            <button type="button" className="btn" onClick={() => setPendingPromotion(null)}>Cancel</button>
+        <div className="chess-confirm-scrim">
+          <div className="chess-confirm" role="dialog" aria-modal="true" aria-labelledby="chess-promotion-title">
+            <h3 id="chess-promotion-title" className="chess-confirm-title">Promote pawn</h3>
+            <div className="chess-promotion-grid">
+              {PROMOTION_OPTIONS.map(({ piece, label }) => (
+                <button
+                  key={piece}
+                  type="button"
+                  className="chess-promotion-btn"
+                  aria-label={`Promote to ${label}`}
+                  onClick={() => handlePromotionSelect(piece)}
+                >
+                  <ChessPiece color={game.userColor} type={piece} />
+                  <span className="chess-promotion-label">{label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="chess-confirm-actions">
+              <button type="button" className="btn btn--secondary" onClick={() => setPendingPromotion(null)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}
 
       {confirm && (
-        <div className="chess-confirm" role="alertdialog" aria-modal="true" aria-label="Confirm">
-          <p>{confirm === 'leave' ? 'Leave the game? Your progress will be lost.' : 'Resign this game?'}</p>
-          <div className="chess-confirm-actions">
-            <button type="button" className="btn" onClick={() => setConfirm(null)}>Keep playing</button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => {
-                if (confirm === 'leave') onClose();
-                else game.resign();
-                setConfirm(null);
-              }}
-            >
-              {confirm === 'leave' ? 'Leave' : 'Resign'}
-            </button>
+        <div className="chess-confirm-scrim">
+          <div
+            className="chess-confirm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="chess-confirm-title"
+            aria-describedby="chess-confirm-desc"
+          >
+            <h3 id="chess-confirm-title" className="chess-confirm-title">
+              {confirm === 'leave' ? 'Leave game?' : 'Resign this game?'}
+            </h3>
+            <p id="chess-confirm-desc" className="chess-confirm-text">
+              {confirm === 'leave'
+                ? 'Your game is saved in this conversation. Resume it anytime.'
+                : 'You will lose this game. The conversation stays the same.'}
+            </p>
+            <div className="chess-confirm-actions">
+              <button type="button" className="btn btn--secondary" onClick={() => setConfirm(null)} autoFocus>
+                Keep playing
+              </button>
+              <button
+                type="button"
+                className={`btn ${confirm === 'resign' ? 'btn--danger' : 'btn--primary'}`}
+                onClick={() => {
+                  if (confirm === 'leave') onClose();
+                  else game.resign();
+                  setConfirm(null);
+                }}
+              >
+                {confirm === 'leave' ? 'Leave' : 'Resign'}
+              </button>
+            </div>
           </div>
         </div>
       )}

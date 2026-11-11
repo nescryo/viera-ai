@@ -122,4 +122,42 @@ describe('createRandomEngine', () => {
     await expect(engine.getBestMove('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1')).rejects.toThrow();
     engine.dispose();
   });
+
+  describe('serialize / restore', () => {
+    it('round-trips moves, color, and position through JSON', () => {
+      const s = new ChessSession('w');
+      s.userMove('e2', 'e4');
+      s.engineMove('e7e5');
+      const copy = ChessSession.restore(JSON.parse(JSON.stringify(s.serialize())));
+      expect(copy.fen).toBe(s.fen);
+      expect(copy.snapshot().entries).toEqual(s.snapshot().entries);
+      expect(copy.snapshot().turn).toBe('user');
+    });
+
+    it('keeps a resignation', () => {
+      const s = new ChessSession('w');
+      s.userMove('e2', 'e4');
+      s.resign();
+      const copy = ChessSession.restore(s.serialize());
+      expect(copy.snapshot().result).toEqual({ outcome: 'deepseek-win', reason: 'resign' });
+    });
+
+    it('restores a black game where the engine moved first', () => {
+      const s = new ChessSession('b');
+      s.engineMove('e2e4');
+      const copy = ChessSession.restore(s.serialize());
+      expect(copy.snapshot().userColor).toBe('b');
+      expect(copy.snapshot().turn).toBe('user');
+    });
+
+    it('falls back to a fresh game when saved moves are illegal', () => {
+      const bad = {
+        userColor: 'w' as const,
+        resigned: false,
+        entries: [{ san: 'Qh5', by: 'user' as const, from: 'd1' as const, to: 'h5' as const, flags: 'n' }]
+      };
+      const copy = ChessSession.restore(bad);
+      expect(copy.snapshot().entries).toEqual([]);
+    });
+  });
 });
