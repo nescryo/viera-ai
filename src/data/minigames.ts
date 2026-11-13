@@ -1,5 +1,6 @@
-import type { LucideIcon } from 'lucide-react';
-import { Crown } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { ChessBoardIcon } from '../components/ui/ChessBoardIcon';
+import type { MinigameIconProps } from '../components/ui/ChessBoardIcon';
 
 export type MinigameId = 'chess';
 
@@ -7,7 +8,8 @@ export interface MinigameEntry {
   id: MinigameId;
   title: string;
   description: string;
-  icon: LucideIcon;
+  /** Lucide icons and custom SVG components both fit this shape. */
+  icon: ComponentType<MinigameIconProps>;
   /** `coming-soon` entries are listed but cannot be started. */
   status: 'available' | 'coming-soon';
 }
@@ -18,7 +20,7 @@ export const MINIGAMES: MinigameEntry[] = [
     id: 'chess',
     title: 'Chess',
     description: 'Play a game of chess against DeepSeek-chan.',
-    icon: Crown,
+    icon: ChessBoardIcon,
     status: 'available'
   }
 ];

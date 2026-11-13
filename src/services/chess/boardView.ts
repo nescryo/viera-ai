@@ -4,6 +4,22 @@ export const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] as const;
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
+export interface MoveAnimationStep {
+  from: Square;
+  to: Square;
+  /** Initial X offset in square units from `to` back to `from`. */
+  dx: number;
+  /** Initial Y offset in square units from `to` back to `from`. */
+  dy: number;
+}
+
+const CASTLING_ROOK_MOVES: Record<string, { from: Square; to: Square }> = {
+  'e1-g1': { from: 'h1', to: 'f1' },
+  'e1-c1': { from: 'a1', to: 'd1' },
+  'e8-g8': { from: 'h8', to: 'f8' },
+  'e8-c8': { from: 'a8', to: 'd8' }
+};
+
 const PIECE_NAMES: Record<PieceSymbol, string> = {
   k: 'king',
   q: 'queen',
@@ -51,4 +67,43 @@ export function stepSquare(square: Square, direction: Direction, orientation: Co
   const rank = Number(square[1]) + dRank;
   if (file < 0 || file > 7 || rank < 1 || rank > 8) return square;
   return `${FILES[file]}${rank}` as Square;
+}
+
+function squareGridPos(square: Square, orientation: Color): { col: number; row: number } {
+  const file = FILES.indexOf(square[0] as (typeof FILES)[number]);
+  const rank = Number(square[1]);
+  return orientation === 'w'
+    ? { col: file, row: 8 - rank }
+    : { col: 7 - file, row: rank - 1 };
+}
+
+/**
+ * Visual offset (in square units) placing a piece at `from` when rendered inside `to`,
+ * matching the current board `orientation`.
+ */
+export function squareDelta(from: Square, to: Square, orientation: Color): { dx: number; dy: number } {
+  const fromPos = squareGridPos(from, orientation);
+  const toPos = squareGridPos(to, orientation);
+  return {
+    dx: fromPos.col - toPos.col,
+    dy: fromPos.row - toPos.row
+  };
+}
+
+/**
+ * Returns the animated piece movements for `move`. Castling moves include both the king and rook.
+ */
+export function moveAnimationSteps(
+  move: { from: Square; to: Square },
+  movedPieceType: PieceSymbol | undefined,
+  orientation: Color
+): MoveAnimationStep[] {
+  const steps: MoveAnimationStep[] = [{ ...move, ...squareDelta(move.from, move.to, orientation) }];
+  if (movedPieceType === 'k') {
+    const rookMove = CASTLING_ROOK_MOVES[`${move.from}-${move.to}`];
+    if (rookMove) {
+      steps.push({ ...rookMove, ...squareDelta(rookMove.from, rookMove.to, orientation) });
+    }
+  }
+  return steps;
 }

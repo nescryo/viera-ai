@@ -152,7 +152,7 @@ describe('buildChessChatPrompt & move helpers', () => {
     expect(prompt).toContain('[Chess Player Message]');
     expect(prompt).toContain(`Position (FEN): ${base.fen}`);
     expect(prompt).toContain('Your position evaluation: clearly-winning');
-    expect(prompt).toContain('Legal moves available to the user:');
+    expect(prompt).toContain('Moves the user could play:');
     expect(prompt).toContain('e5');
     expect(prompt).toContain('nice weather');
     expect(prompt).not.toContain('400');
@@ -164,16 +164,16 @@ describe('buildChessChatPrompt & move helpers', () => {
     expect(formatLegalMoves(base.fen, 5)).toContain('Na6');
 
     const withHint = buildChessChatPrompt({ ...base, text: 'what should I play?', suggestedMove: 'g8f6' });
-    expect(withHint).toContain('Engine best move hint for current turn: Nf6');
+    expect(withHint).toContain('Move you privately consider strongest right now: Nf6');
 
     const withIllegalHint = buildChessChatPrompt({ ...base, text: 'what should I play?', suggestedMove: 'e2e4' });
-    expect(withIllegalHint).not.toContain('Engine best move hint');
+    expect(withIllegalHint).not.toContain('Move you privately consider strongest');
   });
 
   it('omits the hint and legal moves on DeepSeek-chan\'s turn', () => {
     const prompt = buildChessChatPrompt({ ...base, text: 'hi', suggestedMove: 'g8f6', userToMove: false });
-    expect(prompt).not.toContain('Engine best move hint');
-    expect(prompt).not.toContain('Legal moves available');
+    expect(prompt).not.toContain('Move you privately consider strongest');
+    expect(prompt).not.toContain('Moves the user could play');
   });
 
   it('caps the user text length', () => {
@@ -183,8 +183,12 @@ describe('buildChessChatPrompt & move helpers', () => {
   });
 
   it('addendum allows natural tactical discussion and move hints without raw engine numbers', () => {
-    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('share a move hint when asked');
-    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('never invent notation or illegal moves');
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('suggest a move when asked');
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('Never invent notation or illegal moves');
+  });
+
+  it('addendum forbids naming the hint, engine, or data sources', () => {
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('Never mention hints, engines, Stockfish');
   });
 });
 
