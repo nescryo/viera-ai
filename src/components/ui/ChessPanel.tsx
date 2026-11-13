@@ -207,6 +207,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
           selected={selected}
           targets={targets}
           lastMove={game.lastMove}
+          moveCount={game.entries.length}
           checkSquare={game.checkSquare}
           onSquareActivate={handleSquare}
         />
