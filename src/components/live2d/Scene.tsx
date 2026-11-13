@@ -31,6 +31,11 @@ const BREATH_HEAD_NOD = 1.5;
 const REPLY_SWAY_AMOUNT = 0.5;
 const REPLY_SACCADE_AMOUNT = 0.4;
 
+// Serialize Live2D model loads across mounts/remounts (including React StrictMode double-invoke)
+// so two .moc3 allocations never overlap in the shared Cubism Core WASM memory and detach cached
+// parameter Float32Array views.
+let modelLoadChain: Promise<void> = Promise.resolve();
+
 interface SceneProps {
   currentPersona: CharacterPackage | Persona;
   currentEmotion: string;
@@ -62,20 +67,36 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     let disposed = false;
     let cleanup: (() => void) | null = null;
 
-    const quality = resolveRenderQuality(window.devicePixelRatio);
-    const app = new PIXI.Application({
-      resizeTo: host,
-      backgroundAlpha: 0,
-      antialias: quality.antialias,
-      autoDensity: true,
-      resolution: quality.resolution
-    });
-    host.appendChild(app.view as HTMLCanvasElement);
+    modelLoadChain = modelLoadChain
+      .then(async () => {
+        if (disposed) return;
 
-    Live2DModel.from(config.modelUrl, { autoHitTest: false, autoFocus: false })
-      .then((model) => {
+        const quality = resolveRenderQuality(window.devicePixelRatio);
+        const app = new PIXI.Application({
+          resizeTo: host,
+          backgroundAlpha: 0,
+          antialias: quality.antialias,
+          autoDensity: true,
+          resolution: quality.resolution
+        });
+        host.appendChild(app.view as HTMLCanvasElement);
+
+        let model: Live2DModel;
+        try {
+          model = await Live2DModel.from(config.modelUrl, {
+            autoHitTest: false,
+            autoFocus: false,
+            ticker: app.ticker
+          });
+        } catch (err: unknown) {
+          app.destroy(true, { children: true, texture: true, baseTexture: true });
+          console.error('Failed to load Live2D model:', err);
+          return;
+        }
+
         if (disposed) {
-          model.destroy();
+          model.destroy({ children: true, texture: true, baseTexture: true });
+          app.destroy(true, { children: true, texture: true, baseTexture: true });
           return;
         }
 
@@ -115,20 +136,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         };
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
-
-        model.anchor.set(0.5, 0.5);
-        app.stage.addChild(model);
-
-        const layout = (): void => {
-          app.resize();
-          const { width, height } = app.screen;
-          const s = (height * config.scale) / internal.originalHeight;
-          model.scale.set(s);
-          model.position.set(width * config.anchor[0], height * config.anchor[1]);
-        };
-        layout();
-        const resizeObserver = new ResizeObserver(layout);
-        resizeObserver.observe(host);
 
         const pointer = { targetX: 0, targetY: 0, x: 0, y: 0 };
         const onPointerMove = (e: PointerEvent): void => {
@@ -270,11 +277,30 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         events.on('afterMotionUpdate', onAfterMotionUpdate);
         events.on('beforeModelUpdate', onBeforeModelUpdate);
 
+        model.anchor.set(0.5, 0.5);
+        if (!model.deltaTime) {
+          model.update(app.ticker.deltaMS);
+        }
+        app.stage.addChild(model);
+
+        const layout = (): void => {
+          const width = host.clientWidth;
+          const height = host.clientHeight;
+          const s = (height * config.scale) / internal.originalHeight;
+          model.scale.set(s);
+          model.position.set(width * config.anchor[0], height * config.anchor[1]);
+          app.resize();
+        };
+        layout();
+        const resizeObserver = new ResizeObserver(layout);
+        resizeObserver.observe(host);
+
         cleanup = () => {
           events.off('afterMotionUpdate', onAfterMotionUpdate);
           events.off('beforeModelUpdate', onBeforeModelUpdate);
           window.removeEventListener('pointermove', onPointerMove);
           resizeObserver.disconnect();
+          app.destroy(true, { children: true, texture: true, baseTexture: true });
         };
       })
       .catch((err: unknown) => {
@@ -284,7 +310,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
     return () => {
       disposed = true;
       cleanup?.();
-      app.destroy(true, { children: true, texture: true, baseTexture: true });
     };
   }, [personaId]);
 
