@@ -13,9 +13,9 @@
   --chess-piece-b-fill: #303438;
   --chess-piece-b-stroke: #17191b;
   --chess-piece-b-detail: #e8e6dc;
-  /* Move strip height (36px) + column gap (12px) */
-  --chess-moves-space: 48px;
-  --chess-board-size: min(464px, 92vw, calc(100dvh - 190px - var(--chess-moves-space)));
+  /* Move strip height (40px) + column gap (12px) */
+  --chess-moves-space: 52px;
+  --chess-board-size: min(580px, 44vw, calc(100dvh - 196px - var(--chess-moves-space)));
 }
 
 .chess-panel {
@@ -35,6 +35,8 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
+  width: min(100%, 640px);
+  justify-self: end;
   padding: 72px 16px 16px;
 }
 
@@ -365,27 +367,73 @@
   align-items: center;
   gap: 14px;
   box-sizing: border-box;
-  height: 36px;
+  height: 40px;
   margin: 0;
   padding: 0 12px;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  color-scheme: dark;
   list-style: none;
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   background: var(--glass-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
-  scrollbar-width: thin;
+}
+
+.chess-moves::-webkit-scrollbar {
+  height: 4px;
+}
+
+.chess-moves::-webkit-scrollbar-button {
+  display: none;
+}
+
+.chess-moves::-webkit-scrollbar-track {
+  margin: 0 10px;
+  background: transparent;
+}
+
+.chess-moves::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.chess-moves::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .chess-moves {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
 }
 
 .chess-moves li {
   display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
-  gap: 5px;
+  gap: 4px;
 }
 
-.chess-move-number { color: var(--text-subtle); }
+.chess-move-number {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.chess-move {
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+
+.chess-move.is-latest {
+  color: var(--text-normal);
+  background: rgba(0, 210, 255, 0.14);
+}
+
 .chess-moves-empty { color: var(--text-subtle); }
 
 /* Right column: bubble sits near the character */
@@ -395,6 +443,8 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  width: min(100%, 640px);
+  justify-self: start;
   padding: 16px 24px 40px;
 }
 
@@ -569,7 +619,7 @@
 /* Scene moves to the right half while chess is open; Scene's ResizeObserver re-centers the model */
 .app-container.chess-active .scene-container {
   left: 50%;
-  width: 50%;
+  width: min(50%, 640px);
 }
 
 .app-container.chess-active .chat-overlay-container { display: none; }
@@ -586,8 +636,8 @@
     direction: ltr;
   }
 
-  .chess-main { grid-row: 2; padding: 8px 8px 12px; gap: 8px; }
-  .chess-side { grid-row: 1; justify-content: flex-start; padding: 64px 12px 0; }
+  .chess-main { grid-row: 2; width: 100%; justify-self: stretch; padding: 8px 8px 12px; gap: 8px; }
+  .chess-side { grid-row: 1; width: 100%; justify-self: stretch; justify-content: flex-start; padding: 64px 12px 0; }
 
   .app-container.chess-active .scene-container {
     left: 0;

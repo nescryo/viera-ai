@@ -248,15 +248,32 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
         </div>
 
         {showMoves && (
-          <ol ref={movesRef} id="chess-moves" className="chess-moves" aria-label="Moves played">
+          <ol
+            ref={movesRef}
+            id="chess-moves"
+            className="chess-moves"
+            aria-label="Moves played"
+            onWheel={(event) => {
+              const strip = event.currentTarget;
+              if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && strip.scrollWidth > strip.clientWidth) {
+                strip.scrollLeft += event.deltaY;
+              }
+            }}
+          >
             {rows.length === 0 && <li className="chess-moves-empty">No moves yet</li>}
-            {rows.map((row) => (
-              <li key={row.number}>
-                <span className="chess-move-number">{row.number}.</span>
-                <span>{row.white}</span>
-                <span>{row.black}</span>
-              </li>
-            ))}
+            {rows.map((row, rowIndex) => {
+              const isLastRow = rowIndex === rows.length - 1;
+              const lastIsBlack = game.entries.length % 2 === 0 && game.entries.length > 0;
+              return (
+                <li key={row.number}>
+                  <span className="chess-move-number">{row.number}.</span>
+                  <span className={`chess-move${isLastRow && !lastIsBlack ? ' is-latest' : ''}`}>{row.white}</span>
+                  {row.black && (
+                    <span className={`chess-move${isLastRow && lastIsBlack ? ' is-latest' : ''}`}>{row.black}</span>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         )}
       </div>
