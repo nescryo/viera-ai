@@ -9,7 +9,7 @@ import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../servi
 import { DEFAULT_EMOTION_ID, parseExpressionSpec } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
 import { BreathingCycle } from '../../avatar/breathing';
-import { resolveRenderQuality } from '../../avatar/renderQuality';
+import { isMobileDevice, resolvePhysicsFps, resolveRenderQuality, setPhysicsFps } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
 import { ChestJiggle, RIBBON_JIGGLE, SKIRT_JIGGLE } from '../../avatar/chestJiggle';
 import { ArmMotion } from '../../avatar/armMotion';
@@ -17,7 +17,8 @@ import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
 import { createDeepSeekRig } from '../../avatar/rig/createDeepSeekRig';
-import type { Live2DModelLike } from '../../avatar/rig/types';
+import { createParamAccessors } from '../../avatar/rig/math';
+import type { CoreModelLike, Live2DModelLike } from '../../avatar/rig/types';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -73,7 +74,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       .then(async () => {
         if (disposed) return;
 
-        const quality = resolveRenderQuality(window.devicePixelRatio);
+        const isMobile = isMobileDevice();
+        const quality = resolveRenderQuality(window.devicePixelRatio, isMobile);
         const app = new PIXI.Application({
           resizeTo: host,
           backgroundAlpha: 0,
@@ -81,6 +83,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           autoDensity: true,
           resolution: quality.resolution
         });
+        // Cap deltaMS to 50ms so GC pauses or background resumes never trigger a physics catch-up spike.
+        app.ticker.minFPS = 20;
         host.appendChild(app.view as HTMLCanvasElement);
 
         let model: Live2DModel;
@@ -108,36 +112,21 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           on(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
           off(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
         };
-        const core = internal.coreModel as unknown as {
-          getParameterIndex(id: string): number;
-          getParameterMinimumValue(index: number): number;
-          getParameterMaximumValue(index: number): number;
-          getParameterValueById(id: string): number;
-          setParameterValueById(id: string, value: number): void;
-        };
+        const core = internal.coreModel as unknown as CoreModelLike;
+        const paramAccess = createParamAccessors(core);
 
-        // Parameter IDs that do not exist on this model are ignored.
-        const hasParam = new Map<string, boolean>();
         const setParam = (id: string | undefined, value: number): void => {
           if (!id) return;
-          let ok = hasParam.get(id);
-          if (ok === undefined) {
-            ok = core.getParameterIndex(id) >= 0;
-            hasParam.set(id, ok);
-          }
-          if (!ok) return;
-          const index = core.getParameterIndex(id);
-          const clamped = Math.max(core.getParameterMinimumValue(index), Math.min(core.getParameterMaximumValue(index), value));
-          core.setParameterValueById(id, clamped);
+          paramAccess.setParam(id, value);
         };
 
         // Adds `delta` to the value physics/motion already set this frame (clamped to the range).
         const addParam = (id: string, delta: number): void => {
-          if (core.getParameterIndex(id) < 0) return;
-          setParam(id, core.getParameterValueById(id) + delta);
+          paramAccess.addParam(id, delta);
         };
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
+        setPhysicsFps(internal, resolvePhysicsFps(isMobile));
 
         const rig = config.interactiveRig === 'deepseek-chan'
           ? createDeepSeekRig(model as unknown as Live2DModelLike, app)
@@ -205,7 +194,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           if (eyelid) {
             eyelidScale += (resolveEyelidScale(weights, eyelid.closeBy) - eyelidScale) * smoothFactor(7, delta);
             eyelid.paramIds.forEach((id) => {
-              if (core.getParameterIndex(id) >= 0) setParam(id, core.getParameterValueById(id) * eyelidScale);
+              if (paramAccess.hasParam(id)) setParam(id, paramAccess.getParam(id) * eyelidScale);
             });
           }
 
