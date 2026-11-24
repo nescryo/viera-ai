@@ -16,6 +16,8 @@ import { ArmMotion } from '../../avatar/armMotion';
 import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
+import { createDeepSeekRig } from '../../avatar/rig/createDeepSeekRig';
+import type { Live2DModelLike } from '../../avatar/rig/types';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -137,6 +139,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
 
+        const rig = config.interactiveRig === 'deepseek-chan'
+          ? createDeepSeekRig(model as unknown as Live2DModelLike, app)
+          : null;
+
         const pointer = { targetX: 0, targetY: 0, x: 0, y: 0 };
         const onPointerMove = (e: PointerEvent): void => {
           const rect = host.getBoundingClientRect();
@@ -145,7 +151,9 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           pointer.targetX = Math.max(-1, Math.min(1, (e.clientX - cx) / (rect.width / 2)));
           pointer.targetY = Math.max(-1, Math.min(1, -(e.clientY - cy) / (rect.height / 2)));
         };
-        window.addEventListener('pointermove', onPointerMove);
+        if (!rig) {
+          window.addEventListener('pointermove', onPointerMove);
+        }
 
         const blender = new ParamBlender();
         const breathing = new BreathingCycle();
@@ -159,40 +167,33 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         const lipSync = new LipSyncSolver();
         let elapsed = 0;
         let eyelidScale = 1;
+        let lastSpeechLevel = 0;
 
-        // Physics reads ParamBreath, and it runs before `beforeModelUpdate`. Set the value
-        // right after the motion update so hair, skirt, ribbons and ears react to the breath.
+        // Physics reads ParamBreath and PositionX/Y/Z, and runs before `beforeModelUpdate`.
+        // Update them right after motion update so hair, skirt, ribbons, ears, and tail react naturally.
         let breath = breathing.step(0, 0);
         const onAfterMotionUpdate = (): void => {
-          breath = breathing.step(Math.min(app.ticker.deltaMS / 1000, 0.1), elapsed);
+          const delta = Math.min(app.ticker.deltaMS / 1000, 0.1);
+          elapsed += delta;
+          breath = breathing.step(delta, elapsed);
           setParam(config.params.breath, breath.level);
+          if (rig) {
+            rig.stepPrePhysics(Math.min(delta, 1 / 30), {
+              spec: emotionRef.current,
+              isReplying: replyingRef.current,
+              speechLevel: lastSpeechLevel,
+              breath
+            });
+          }
         };
 
         // Runs right before the core model is updated, so these values win over motions.
         const onBeforeModelUpdate = (): void => {
           const delta = Math.min(app.ticker.deltaMS / 1000, 0.1);
-          elapsed += delta;
-
-          // Gaze: always follow the pointer, including while replying.
-          const follow = smoothFactor(4, delta);
-          pointer.x += (pointer.targetX - pointer.x) * follow;
-          pointer.y += (pointer.targetY - pointer.y) * follow;
-
           const p = config.params;
           const replying = replyingRef.current;
-          const swayFrame = sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
-          const eyeJitter = saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
-
-          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
-          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
-          setParam(p.angleZ, swayFrame.headRoll);
-          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX);
-          setParam(p.bodyAngleZ, swayFrame.bodyZ);
-          setParam(p.eyeBallX, pointer.x + eyeJitter.x);
-          setParam(p.eyeBallY, pointer.y + eyeJitter.y);
-          p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
-
           const spec = emotionRef.current;
+
           const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
           const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
           blender.step(targets, delta).forEach((value, id) => setParam(id, value));
@@ -213,6 +214,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
           const visemes = source === 'audio' ? ttsService.getVisemeWeights() : SILENT_VISEMES;
           const frame = lipSync.step(source, visemes, delta, elapsed);
+          lastSpeechLevel = frame.openness;
           setParam(p.mouthOpen, frame.openness);
           if (p.visemes) {
             setParam(p.visemes.a, frame.a);
@@ -221,6 +223,33 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             setParam(p.visemes.e, frame.e);
             setParam(p.visemes.o, frame.o);
           }
+
+          if (rig) {
+            rig.stepPostPhysics(Math.min(delta, 1 / 30), {
+              spec,
+              isReplying: replying,
+              speechLevel: frame.openness,
+              breath
+            });
+            return;
+          }
+
+          // Generic fallback for characters without a dedicated interactive rig.
+          const follow = smoothFactor(4, delta);
+          pointer.x += (pointer.targetX - pointer.x) * follow;
+          pointer.y += (pointer.targetY - pointer.y) * follow;
+
+          const swayFrame = sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
+          const eyeJitter = saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
+
+          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
+          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
+          setParam(p.angleZ, swayFrame.headRoll);
+          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX);
+          setParam(p.bodyAngleZ, swayFrame.bodyZ);
+          setParam(p.eyeBallX, pointer.x + eyeJitter.x);
+          setParam(p.eyeBallY, pointer.y + eyeJitter.y);
+          p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
           const jiggle = chestJiggle.step(
             delta,
@@ -298,7 +327,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         cleanup = () => {
           events.off('afterMotionUpdate', onAfterMotionUpdate);
           events.off('beforeModelUpdate', onBeforeModelUpdate);
-          window.removeEventListener('pointermove', onPointerMove);
+          rig?.dispose();
+          if (!rig) {
+            window.removeEventListener('pointermove', onPointerMove);
+          }
           resizeObserver.disconnect();
           app.destroy(true, { children: true, texture: true, baseTexture: true });
         };

@@ -10,6 +10,7 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
   scale: 1.80,
   anchor: [0.5, 0.79],
   maskRenderTextures: 2, // the model has 49 clipping masks (> 36)
+  interactiveRig: 'deepseek-chan',
   params: {
     angleX: 'ParamAngleX',
     angleY: 'ParamAngleY',
@@ -43,12 +44,11 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
       ...['ribbonX1', 'ribbonX2', 'ribbonX3', 'ribbonX4', 'ribbonX5', 'ribbonX6', 'ribbonX7'].map((id) => ({ id, amount: 0.25, axis: 'x' as const, relative: true })),
       ...['ribbonY1', 'ribbonY2', 'ribbonY3', 'ribbonY4', 'ribbonY5', 'ribbonY6', 'ribbonY7'].map((id) => ({ id, amount: 0.25, axis: 'y' as const, relative: true }))
     ],
-    // Soft skirt swing on top of physics. Amounts are fractions of each parameter's half-range;
-    // first pass, needs visual tuning.
+    // Verified short-skirt vertical chains (SkirtY6/7/9/8) + horizontal sway parameters.
     skirtTargets: [
       ...['SkirtX1', 'SkirtX2', 'SkirtX3', 'SkirtX4'].map((id) => ({ id, amount: 0.08, axis: 'x' as const, relative: true })),
       ...['SkirtLayerX1', 'SkirtLayerX2', 'SkirtLayerX3', 'SkirtLayerX4', 'SkirtLayerX5', 'SkirtLayerX6'].map((id) => ({ id, amount: 0.06, axis: 'x' as const, relative: true })),
-      ...['SkirtY', 'SkirtY2', 'SkirtY3', 'SkirtY4', 'SkirtY5'].map((id) => ({ id, amount: 0.05, axis: 'y' as const, relative: true }))
+      ...['SkirtY6', 'SkirtY7', 'SkirtY9', 'SkirtY8'].map((id) => ({ id, amount: 0.05, axis: 'y' as const, relative: true }))
     ],
     // Standing weight shift and breath coupling at the hips, on top of physics. Amounts are
     // fractions of each parameter's half-range. First pass: the ranges and the direction of
@@ -87,7 +87,7 @@ export const DEEPSEEK_CHAN_MODEL_CONFIG: CharacterModelConfig = {
     relaxed: {},
     happy: { EyeSmile: 1, ParamMouthForm: 1 },
     teasing: { EyeSmile: 0.6, ParamMouthForm: 0.6, key7: 0.3 },
-    pouting: { key7: 0.3, ParamMouthForm: -0.5 },
+    pouting: { key7: 0.3, ParamMouthForm: -0.5, CheeckPuff: 0.55, Mouthpucker: 0.35 },
     jealous: { ParamMouthForm: -0.5, ParamBrowLY: -0.5, ParamBrowRY: -0.5 },
     terrified: { key13: 1, BrowInnerUp: 1, ParamMouthForm: -0.6 },
     surprised: { ParamBrowLY: 1, ParamBrowRY: 1 },

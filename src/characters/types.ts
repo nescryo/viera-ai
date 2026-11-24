@@ -124,6 +124,12 @@ export interface CharacterModelConfig {
    * in one; each extra texture adds 32. Check the console for "not supported mask count".
    */
   maskRenderTextures?: number;
+  /**
+   * Optional model-specific interactive animation & touch rig.
+   * When set, `Scene` delegates gaze, idle posture, secondary physics, and touch interactions
+   * to the dedicated rig while keeping Viera's expressions, breathing, and lip-sync.
+   */
+  interactiveRig?: 'deepseek-chan';
   /** Attribution text required by the model license */
   credits?: string;
 }

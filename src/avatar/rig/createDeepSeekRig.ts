@@ -1,0 +1,427 @@
+import type * as PIXI from 'pixi.js';
+import type {
+  ArmSide,
+  ClothHit,
+  DeepSeekRigFrameState,
+  EarSide,
+  ExternalTouchState,
+  FaceTouchMode,
+  HairGroup,
+  Live2DModelLike,
+  SkirtSide,
+  TailZone,
+} from './types';
+import { EMPTY_EXTERNAL_TOUCH } from './types';
+import { computeEmotionMoodOffsets, createCoordConverter, createParamAccessors } from './math';
+import { createFaceTouchController } from './faceTouch';
+import { createBodyIdleController } from './bodyIdle';
+import { createHeadFollowController } from './headFollow';
+import { createHairPhysicsController } from './hairPhysics';
+import { createEarTouchController } from './earTouch';
+import { createArmTouchController } from './armTouch';
+import { createChestTouchController } from './chestTouch';
+import { createSkirtTouchController } from './skirtTouch';
+import { createClothTouchController } from './clothTouch';
+import { createTailTouchController } from './tailTouch';
+
+export interface DeepSeekRig {
+  /** Called in `afterMotionUpdate` (before `physics.evaluate()`). */
+  stepPrePhysics(dt: number, state: DeepSeekRigFrameState): void;
+  /** Called in `beforeModelUpdate` (after expressions & lip-sync, before `coreModel.update()`). */
+  stepPostPhysics(dt: number, state: DeepSeekRigFrameState): void;
+  /** Resets all springs and touch states. */
+  reset(): void;
+  /** Unbinds all DOM listeners and restores the original `coreModel.update`. */
+  dispose(): void;
+}
+
+/**
+ * Wires the complete DeepSeek-chan animation & interactive touch pipeline:
+ * - Two-stage physics (`PositionX/Y/Z` pre-physics + crisp grounded posture post-physics)
+ * - Nose-anchored cursor gaze follow + cascading maid headdress & head ribbons
+ * - 26-parameter multi-segment hair physics + heavy back-hair pendulum (`LateHairZ`)
+ * - Whale-ear idle twitches, emotion-coupled perk/droop, and interactive ear grab/squish
+ * - Face touch (cheek pull, eye poke, headpat), 2-bone arm IK + speaking gestures + billowing sleeves,
+ *   chest touch, short/long skirt pinch, cloth pinch, and 5-bone whale tail wag
+ */
+export function createDeepSeekRig(
+  model: Live2DModelLike,
+  app: PIXI.Application,
+): DeepSeekRig {
+  const internal = model.internalModel;
+  const core = internal.coreModel;
+  const view = app.view as HTMLCanvasElement;
+
+  // Disable plugin's built-in CubismBreath so Viera's BreathingCycle and BodyIdle are the
+  // single clean source of truth (avoids double-breathing and phantom head sway while replying).
+  internal.breath?.setParameters([]);
+
+  const params = createParamAccessors(core);
+  const coords = createCoordConverter(model, view, app.screen);
+
+  const faceTouch = createFaceTouchController(internal, params, coords);
+  const bodyIdle = createBodyIdleController(internal, params);
+  const headFollow = createHeadFollowController(internal, params, coords);
+  const hairPhysics = createHairPhysicsController(internal, params, coords);
+  const earTouch = createEarTouchController(internal, params, coords);
+  const armTouch = createArmTouchController(internal, params, coords);
+  const chestTouch = createChestTouchController(internal, params, coords);
+  const skirtTouch = createSkirtTouchController(internal, params, coords);
+  const clothTouch = createClothTouchController(internal, params, coords);
+  const tailTouch = createTailTouchController(internal, params, coords);
+
+  // Single clean coreModel.update() wrapper for all vertex deformations, restored on dispose().
+  const origCoreUpdate = core.update.bind(core);
+  core.update = (): void => {
+    origCoreUpdate();
+    faceTouch.applyVertexDeform();
+    earTouch.applyVertexDeform();
+    skirtTouch.applyVertexDeform();
+    clothTouch.applyVertexDeform();
+    tailTouch.applyVertexDeform();
+  };
+
+  let currentExt: ExternalTouchState = { ...EMPTY_EXTERNAL_TOUCH };
+  let activeChest: 'left' | 'right' | null = null;
+  let activeEar: EarSide | null = null;
+  let activeFace: FaceTouchMode | null = null;
+  let activeSkirt: SkirtSide | null = null;
+  let activeCloth: ClothHit | null = null;
+  let activeTail: TailZone | null = null;
+  let activeArm: ArmSide | null = null;
+  let activeHair: HairGroup | null = null;
+  let activePointerId: number | null = null;
+  let lastEmotionBase: string | null = null;
+
+  const isDragging = (): boolean => Boolean(
+    activeChest || activeEar || activeFace || activeSkirt ||
+    activeCloth || activeTail || activeArm || activeHair,
+  );
+
+  const setExt = (patch: Partial<ExternalTouchState>): void => {
+    currentExt = { ...EMPTY_EXTERNAL_TOUCH, ...patch };
+    faceTouch.setExternalTouch(currentExt);
+  };
+
+  const releaseDrag = (): void => {
+    if (activePointerId !== null) {
+      try {
+        if (view.hasPointerCapture(activePointerId)) {
+          view.releasePointerCapture(activePointerId);
+        }
+      } catch {
+        // Pointer capture may already be released by the browser.
+      }
+      activePointerId = null;
+    }
+    activeChest = null;
+    activeEar = null;
+    activeFace = null;
+    activeSkirt = null;
+    activeCloth = null;
+    activeTail = null;
+    activeArm = null;
+    activeHair = null;
+    view.style.cursor = '';
+    chestTouch.pointerUp();
+    earTouch.pointerUp();
+    armTouch.pointerUp();
+    hairPhysics.pointerUp();
+    faceTouch.pointerUp();
+    skirtTouch.pointerUp();
+    clothTouch.pointerUp();
+    tailTouch.pointerUp();
+    setExt({});
+  };
+
+  const onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    // 1. Front upper cloth accents (chest bow/collar & shoulder frills drawn over bodice).
+    const frontCloth = clothTouch.tryPointerDown(e.clientX, e.clientY, 'frontTop');
+    if (frontCloth) {
+      activeCloth = frontCloth;
+      setExt({ cloth: frontCloth });
+    } else {
+      // 2. Chest touch.
+      const chestSide = chestTouch.tryPointerDown(e.clientX, e.clientY);
+      if (chestSide) {
+        activeChest = chestSide;
+        setExt({ chest: chestSide });
+        bodyIdle.triggerStartle(chestSide === 'left' ? 1 : -1, 0.9);
+        earTouch.triggerTwitch('both', 0.7);
+        hairPhysics.triggerImpulse(chestSide === 'left' ? 1 : -1, 0.85);
+      } else {
+        // 3. Whale ears (visible fins outside face/eyes/front-hair occluders).
+        const earSide = earTouch.tryPointerDown(e.clientX, e.clientY);
+        if (earSide) {
+          activeEar = earSide;
+          setExt({ ear: earSide });
+          bodyIdle.triggerStartle(earSide === 'left' ? 1 : -1, 0.65);
+          hairPhysics.triggerImpulse(earSide === 'left' ? 1 : -1, 0.55);
+        } else {
+          // 4. Face (cheek pinch, eye poke, headpat).
+          const faceMode = faceTouch.tryPointerDown(e.clientX, e.clientY);
+          if (faceMode) {
+            activeFace = faceMode;
+            if (faceMode === 'eye') {
+              bodyIdle.triggerStartle(0, 0.6);
+              earTouch.triggerTwitch('both', 0.7);
+              hairPhysics.triggerImpulse(0, 0.6);
+            }
+          } else {
+            // 5. Mid/lower cloth (waist corset/belt & thigh garter bows).
+            const midCloth = clothTouch.tryPointerDown(e.clientX, e.clientY, 'midLower');
+            if (midCloth) {
+              activeCloth = midCloth;
+              setExt({ cloth: midCloth });
+            } else {
+              // 6. Articulated 2-bone IK arms.
+              const armSide = armTouch.tryPointerDown(e.clientX, e.clientY);
+              if (armSide) {
+                activeArm = armSide;
+                setExt({ arm: armSide });
+              } else {
+                // 7. Skirt (short & long).
+                const skirtSide = skirtTouch.tryPointerDown(e.clientX, e.clientY);
+                if (skirtSide) {
+                  activeSkirt = skirtSide;
+                  setExt({ skirt: skirtSide });
+                  bodyIdle.triggerStartle(skirtSide === 'left' ? 1 : skirtSide === 'right' ? -1 : 0, 0.8);
+                  earTouch.triggerTwitch('both', 0.8);
+                  hairPhysics.triggerImpulse(skirtSide === 'left' ? 1 : -1, 0.75);
+                } else {
+                  // 8. Back waist bow tails.
+                  const backCloth = clothTouch.tryPointerDown(e.clientX, e.clientY, 'back');
+                  if (backCloth) {
+                    activeCloth = backCloth;
+                    setExt({ cloth: backCloth });
+                  } else {
+                    // 9. Whale tail (5-bone skinning chain + fluke flip + plush squish).
+                    const tailZone = tailTouch.tryPointerDown(e.clientX, e.clientY);
+                    if (tailZone) {
+                      activeTail = tailZone;
+                      setExt({ tail: tailZone });
+                      bodyIdle.triggerStartle(tailZone === 'left' ? -1 : 1, 0.95);
+                      earTouch.triggerTwitch('both', 1.05);
+                      hairPhysics.triggerImpulse(tailZone === 'left' ? -1 : 1, 0.9);
+                    } else {
+                      // 10. Multi-segment hair drag fallback.
+                      const hairGroup = hairPhysics.tryPointerDown(e.clientX, e.clientY);
+                      if (hairGroup) {
+                        activeHair = hairGroup;
+                        setExt({ hair: hairGroup });
+                      } else {
+                        return;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    activePointerId = e.pointerId;
+    view.style.cursor = 'grabbing';
+    try {
+      view.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore synthetic events without active pointer capture support.
+    }
+  };
+
+  const onCanvasPointerMove = (e: PointerEvent): void => {
+    if (!isDragging()) return;
+    const dt = Math.max(app.ticker.deltaMS / 1000, 1 / 120);
+    if (activeEar) {
+      const { dragX, dragY } = earTouch.pointerMove(e.clientX, e.clientY);
+      setExt({ ear: activeEar, dragX, dragY });
+    } else if (activeFace) {
+      faceTouch.pointerMove(e.clientX, e.clientY);
+    } else if (activeCloth) {
+      const { dragX, dragY } = clothTouch.pointerMove(e.clientX, e.clientY);
+      setExt({ cloth: activeCloth, dragX, dragY });
+    } else if (activeSkirt) {
+      const { dragX, dragY } = skirtTouch.pointerMove(e.clientX, e.clientY);
+      setExt({ skirt: activeSkirt, dragX, dragY });
+    } else if (activeTail) {
+      const { dragX, dragY } = tailTouch.pointerMove(e.clientX, e.clientY);
+      setExt({ tail: activeTail, dragX, dragY });
+    } else if (activeChest) {
+      const { dragX, dragY } = chestTouch.pointerMove(e.clientX, e.clientY);
+      setExt({ chest: activeChest, dragX, dragY });
+    } else if (activeArm) {
+      const { dragX, dragY } = armTouch.pointerMove(e.clientX, e.clientY, dt);
+      setExt({ arm: activeArm, dragX, dragY });
+    } else if (activeHair) {
+      const { dragX, dragY } = hairPhysics.pointerMove(e.clientX, e.clientY, dt);
+      setExt({ hair: activeHair, dragX, dragY });
+    }
+  };
+
+  const onWindowPointerMove = (e: PointerEvent): void => {
+    if (isDragging()) return;
+    headFollow.setPointer(e.clientX, e.clientY);
+  };
+
+  const onPointerLeaveWindow = (): void => {
+    headFollow.clearPointer();
+  };
+
+  const onWindowBlur = (): void => {
+    headFollow.clearPointer();
+    if (isDragging()) releaseDrag();
+  };
+
+  view.addEventListener('pointerdown', onPointerDown);
+  view.addEventListener('pointermove', onCanvasPointerMove);
+  view.addEventListener('pointerup', releaseDrag);
+  view.addEventListener('pointercancel', releaseDrag);
+  window.addEventListener('pointermove', onWindowPointerMove);
+  document.addEventListener('mouseleave', onPointerLeaveWindow);
+  window.addEventListener('blur', onWindowBlur);
+
+  return {
+    stepPrePhysics(dt: number, state: DeepSeekRigFrameState): void {
+      const mood = computeEmotionMoodOffsets(
+        state.spec.base,
+        state.spec.baseWeight,
+        state.spec.modifiers,
+      );
+
+      // Subtle ear/hair accent when LLM emotion shifts into high-arousal or joyful states.
+      if (state.spec.base !== lastEmotionBase) {
+        if (lastEmotionBase !== null) {
+          if (state.spec.base === 'surprised' || state.spec.base === 'terrified') {
+            earTouch.triggerTwitch('both', 0.7);
+            hairPhysics.triggerImpulse(0, 0.4);
+          } else if (state.spec.base === 'happy') {
+            earTouch.triggerTwitch('right', 0.45);
+          }
+        }
+        lastEmotionBase = state.spec.base;
+      }
+
+      faceTouch.stepPrePhysics(dt);
+      const snap = faceTouch.getSnapshot();
+      const dragging = isDragging();
+
+      headFollow.setInput({
+        enabled: true,
+        suppressed: dragging,
+        patActive: snap.mode === 'headpat',
+        patHappy: snap.patHappy,
+        patDragX: snap.patDragX,
+        patDragY: snap.patDragY,
+      });
+      headFollow.stepPrePhysics(dt);
+
+      const fOff = headFollow.getFollowOffset();
+      bodyIdle.setInput({
+        faceMode: snap.mode,
+        cheekSide: snap.cheekSide,
+        eyeSide: snap.eyeSide,
+        patHappy: snap.patHappy,
+        patDragX: snap.patDragX,
+        patDragY: snap.patDragY,
+        cheekXNorm: snap.cheekXNorm,
+        cheekYNorm: snap.cheekYNorm,
+        external: currentExt,
+        followActive: headFollow.isPointerActive(),
+        followX: fOff.x,
+        followY: fOff.y,
+        isReplying: state.isReplying,
+        breath: state.breath,
+        mood,
+      });
+      bodyIdle.stepPrePhysics(dt);
+
+      hairPhysics.setInput({
+        patActive: snap.mode === 'headpat',
+        patDragX: snap.patDragX,
+        patDragY: snap.patDragY,
+        patHappy: snap.patHappy,
+      });
+      earTouch.setMoodInput({
+        faceMode: snap.mode,
+        cheekSide: snap.cheekSide,
+        eyeSide: snap.eyeSide,
+        patHappy: snap.patHappy,
+        patDragX: snap.patDragX,
+        headAngleY: snap.headAngleY,
+        headAngleZ: snap.headAngleZ,
+        external: currentExt,
+        mood,
+      });
+      armTouch.setMoodInput({
+        faceMode: snap.mode,
+        patHappy: snap.patHappy,
+        external: currentExt,
+        speechLevel: state.speechLevel,
+        bodyDriverX: fOff.x * 10,
+      });
+    },
+
+    stepPostPhysics(dt: number, state: DeepSeekRigFrameState): void {
+      faceTouch.stepPostPhysics(dt);
+      bodyIdle.stepPostPhysics(dt);
+      headFollow.stepPostPhysics(dt);
+      hairPhysics.stepPostPhysics(dt);
+
+      // Update ear head-angle coupling with live combined head pitch/roll before stepping ears.
+      const snap = faceTouch.getSnapshot();
+      const mood = computeEmotionMoodOffsets(
+        state.spec.base,
+        state.spec.baseWeight,
+        state.spec.modifiers,
+      );
+      earTouch.setMoodInput({
+        faceMode: snap.mode,
+        cheekSide: snap.cheekSide,
+        eyeSide: snap.eyeSide,
+        patHappy: snap.patHappy,
+        patDragX: snap.patDragX,
+        headAngleY: params.getParam('ParamAngleY'),
+        headAngleZ: params.getParam('ParamAngleZ'),
+        external: currentExt,
+        mood,
+      });
+      earTouch.stepPostPhysics(dt);
+
+      armTouch.stepPostPhysics(dt);
+      chestTouch.stepPostPhysics(dt, state.breath.level);
+      skirtTouch.stepPostPhysics(dt);
+      clothTouch.stepPostPhysics(dt);
+      tailTouch.stepPostPhysics(dt);
+    },
+
+    reset(): void {
+      releaseDrag();
+      bodyIdle.reset();
+      headFollow.reset();
+      hairPhysics.reset();
+      earTouch.reset();
+      armTouch.reset();
+      faceTouch.reset();
+      chestTouch.reset();
+      skirtTouch.reset();
+      clothTouch.reset();
+      tailTouch.reset();
+    },
+
+    dispose(): void {
+      releaseDrag();
+      core.update = origCoreUpdate;
+      view.removeEventListener('pointerdown', onPointerDown);
+      view.removeEventListener('pointermove', onCanvasPointerMove);
+      view.removeEventListener('pointerup', releaseDrag);
+      view.removeEventListener('pointercancel', releaseDrag);
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      document.removeEventListener('mouseleave', onPointerLeaveWindow);
+      window.removeEventListener('blur', onWindowBlur);
+    },
+  };
+}
