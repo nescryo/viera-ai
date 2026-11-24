@@ -4,7 +4,8 @@ import { DEFAULT_CHARACTER_PACKAGE } from './characters/registry';
 import { sendStreamingChatMessage, parseResponseText, generateEpisodicMemory } from './services/aiService';
 import { getProviderById, AI_PROVIDERS } from './data/aiProviders';
 import { getSavedView, saveView } from './services/viewStateService';
-import { subscribeToAuth, saveCurrentUser, logoutUser, getGuestSession, startGuestSession } from './services/authService';
+import { subscribeToAuth, saveCurrentUser, logoutUser, getGuestSession, startGuestSession, GUEST_USER_ID } from './services/authService';
+import { isCloudSyncAvailable, isCloudSyncEnabled, setCloudSyncEnabled } from './services/chatSyncService';
 import { soundService } from './services/soundService';
 
 import { useToasts } from './hooks/useToasts';
@@ -108,6 +109,23 @@ export function App() {
   // 5. Custom Hooks (Modularized Subsystems)
   const { toasts, addToast, removeToast } = useToasts();
   const { isSpeaking, activeSpeakingId, speakMessage, stopSpeaking } = useSpeechAudio();
+
+  // Cloud chat sync: opt-in per signed-in user, stored on this device
+  const canCloudSync = Boolean(userProfile && userProfile.id !== GUEST_USER_ID && isCloudSyncAvailable());
+  const [, setCloudSyncVersion] = useState(0);
+  const cloudSyncEnabled = canCloudSync && userProfile ? isCloudSyncEnabled(userProfile.id) : false;
+  const handleToggleCloudSync = (enabled: boolean) => {
+    if (!userProfile) return;
+    setCloudSyncEnabled(userProfile.id, enabled);
+    setCloudSyncVersion((v) => v + 1);
+  };
+  const lastSyncErrorAt = useRef(0);
+  const handleSyncError = useCallback(() => {
+    // One toast per minute at most, so a long outage does not flood the screen
+    if (Date.now() - lastSyncErrorAt.current < 60_000) return;
+    lastSyncErrorAt.current = Date.now();
+    addToast('error', 'Cloud sync failed', 'Chats are still saved on this device. Sync will retry on the next change.');
+  }, [addToast]);
   const {
     sessions,
     activeSessionId,
@@ -124,7 +142,7 @@ export function App() {
     clearAllSessions,
     updateSessionEmotion,
     updateSessionSummary
-  } = useChatSessions(userProfile?.id, currentPersona.id, apiConfig.provider);
+  } = useChatSessions(userProfile?.id, currentPersona.id, apiConfig.provider, cloudSyncEnabled, handleSyncError);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -473,6 +491,7 @@ export function App() {
             apiConfig={apiConfig}
             onSaveConfig={handleSaveConfig}
             onClose={() => setActiveModal(null)}
+            cloudSync={canCloudSync ? { enabled: cloudSyncEnabled, onChange: handleToggleCloudSync } : undefined}
           />
         )}
 

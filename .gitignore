@@ -28,3 +28,7 @@ dist-ssr
 *.sln
 *.sw?
 reference/
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp

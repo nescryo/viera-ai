@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js';
 
 const auth = vi.hoisted(() => ({
   signInWithOAuth: vi.fn(),
+  signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
   signOut: vi.fn(),
   onAuthStateChange: vi.fn(),
 }));
@@ -33,7 +35,7 @@ function githubUser(overrides: Partial<User> = {}): User {
   };
 }
 
-describe('Supabase OAuth authentication', () => {
+describe('Supabase authentication', () => {
   it('starts Google OAuth with the app URL as the redirect target', async () => {
     auth.signInWithOAuth.mockResolvedValue({ error: null });
     const { signInWithGoogle } = await import('../src/services/authService');
@@ -70,17 +72,119 @@ describe('Supabase OAuth authentication', () => {
     });
   });
 
-  it('fails clearly when configuration is missing', async () => {
-    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', '');
-    const { signInWithGitHub } = await import('../src/services/authService');
-    await expect(signInWithGitHub()).rejects.toThrow('not configured');
-    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+  it('signs in with trimmed email and password', async () => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+    const { signInWithEmail } = await import('../src/services/authService');
+    await signInWithEmail('  alice@example.com  ', 'secret123');
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'alice@example.com', password: 'secret123',
+    });
   });
 
-  it('propagates sign-in errors', async () => {
+  it('creates an email account and reports when immediate session is returned', async () => {
+    auth.signUp.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null });
+    const { signUpWithEmail } = await import('../src/services/authService');
+    const result = await signUpWithEmail('  alice@example.com ', 'secret123');
+    expect(result).toEqual({ needsEmailConfirmation: false });
+    expect(auth.signUp).toHaveBeenCalledWith({
+      email: 'alice@example.com',
+      password: 'secret123',
+      options: { emailRedirectTo: 'https://viera.example/' },
+    });
+  });
+
+  it('reports when email confirmation is required after sign-up', async () => {
+    auth.signUp.mockResolvedValue({ data: { session: null }, error: null });
+    const { signUpWithEmail } = await import('../src/services/authService');
+    await expect(signUpWithEmail('alice@example.com', 'secret123')).resolves.toEqual({
+      needsEmailConfirmation: true,
+    });
+  });
+
+  it('maps email identity into a profile using the email local part as fallback nickname', async () => {
+    const { profileFromAuthUser } = await import('../src/services/authService');
+    expect(profileFromAuthUser(githubUser({
+      email: 'alice@example.com',
+      app_metadata: { provider: 'email' },
+      user_metadata: {},
+    }))).toMatchObject({
+      id: 'supabase-user-id', email: 'alice@example.com', username: '',
+      nickname: 'alice', picture: '', isSetupComplete: false,
+    });
+  });
+
+  it('handles email users with missing or very long email addresses', async () => {
+    const { profileFromAuthUser } = await import('../src/services/authService');
+    expect(profileFromAuthUser(githubUser({
+      email: undefined, app_metadata: { provider: 'email' }, user_metadata: {},
+    }))?.nickname).toBe('User');
+    expect(profileFromAuthUser(githubUser({
+      email: 'averylongemailaddressprefix@example.com',
+      app_metadata: { provider: 'email' },
+      user_metadata: {},
+    }))?.nickname).toBe('averylongemailaddres');
+  });
+
+  it('fails clearly when configuration is missing', async () => {
+    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', '');
+    const { signInWithGitHub, signInWithEmail, signUpWithEmail } = await import('../src/services/authService');
+    await expect(signInWithGitHub()).rejects.toThrow('not configured');
+    await expect(signInWithEmail('a@b.com', '123456')).rejects.toThrow('not configured');
+    await expect(signUpWithEmail('a@b.com', '123456')).rejects.toThrow('not configured');
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+    expect(auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it('propagates sign-in and sign-up errors', async () => {
     auth.signInWithOAuth.mockResolvedValue({ error: new Error('OAuth unavailable') });
-    const { signInWithGitHub } = await import('../src/services/authService');
+    auth.signInWithPassword.mockResolvedValue({ error: new Error('Invalid login credentials') });
+    auth.signUp.mockResolvedValue({ data: { session: null }, error: new Error('User already registered') });
+    const { signInWithGitHub, signInWithEmail, signUpWithEmail } = await import('../src/services/authService');
     await expect(signInWithGitHub()).rejects.toThrow('OAuth unavailable');
+    await expect(signInWithEmail('a@b.com', 'wrong')).rejects.toThrow('Invalid login credentials');
+    await expect(signUpWithEmail('a@b.com', '123456')).rejects.toThrow('User already registered');
+  });
+
+  it('detects enabled auth providers from Supabase Auth settings', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'http://127.0.0.1:54321/');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ external: { email: true, github: false, google: true } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { getEnabledAuthProviders } = await import('../src/services/authService');
+    await expect(getEnabledAuthProviders()).resolves.toEqual({
+      email: true, github: false, google: true,
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:54321/auth/v1/settings', {
+      headers: { apikey: 'sb_publishable_example' },
+      signal: undefined,
+    });
+  });
+
+  it('returns null when auth settings cannot be fetched', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const { getEnabledAuthProviders } = await import('../src/services/authService');
+    await expect(getEnabledAuthProviders()).resolves.toBeNull();
+  });
+
+  it('formats common Supabase Auth errors into user-facing messages', async () => {
+    const { formatAuthError } = await import('../src/services/authService');
+    expect(formatAuthError(new Error('Unsupported provider: provider is not enabled'), 'oauth', 'GitHub'))
+      .toContain("GitHub sign-in isn't enabled");
+    expect(formatAuthError(new Error('Invalid login credentials'), 'email-signin'))
+      .toBe('Incorrect email or password.');
+    expect(formatAuthError(new Error('Email not confirmed'), 'email-signin'))
+      .toContain('confirm your email');
+    expect(formatAuthError(new Error('User already registered'), 'email-signup'))
+      .toContain('already exists');
+    expect(formatAuthError(new Error('Password should be at least 6 characters.'), 'email-signup'))
+      .toBe('Password must be at least 6 characters.');
+    expect(formatAuthError(new TypeError('Failed to fetch'), 'email-signin'))
+      .toContain('Could not reach the sign-in server');
+    expect(formatAuthError(new Error('Unknown'), 'email-signup'))
+      .toBe("Couldn't create your account. Please try again.");
   });
 
   it('maps a GitHub identity to a stable Supabase profile ID', async () => {
@@ -101,7 +205,7 @@ describe('Supabase OAuth authentication', () => {
 
   it('does not treat an unsupported identity as authenticated', async () => {
     const { profileFromAuthUser } = await import('../src/services/authService');
-    expect(profileFromAuthUser(githubUser({ app_metadata: { provider: 'email' } }))).toBeNull();
+    expect(profileFromAuthUser(githubUser({ app_metadata: { provider: 'phone' } }))).toBeNull();
   });
 
   it('handles private email and missing optional GitHub metadata', async () => {

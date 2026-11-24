@@ -7,6 +7,7 @@ import { ttsService } from '../../services/ttsService';
 import { DEFAULT_CHARACTER_PACKAGE } from '../../characters/registry';
 import { AiSection, type ValidationStatus } from './settings/AiSection';
 import { VoiceEngineFields } from './settings/VoiceEngineFields';
+import { CloudSyncToggle } from './settings/CloudSyncToggle';
 import './forms/forms.css';
 import './settings/settings.css';
 
@@ -14,6 +15,8 @@ interface SettingsModalProps {
   apiConfig: ApiConfig;
   onSaveConfig: (newConfig: ApiConfig) => void;
   onClose: () => void;
+  /** Cloud sync switch state. Omitted for guests or when Supabase is not configured. */
+  cloudSync?: { enabled: boolean; onChange: (enabled: boolean) => void };
 }
 
 type SettingsTab = 'chat' | 'voice';
@@ -26,7 +29,8 @@ const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   apiConfig,
   onSaveConfig,
-  onClose
+  onClose,
+  cloudSync
 }) => {
   // Determine initial provider from apiConfig
   const initialProvider = (() => {
@@ -364,6 +368,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onModelChange={setModel}
               availableModels={availableModels}
             />
+            )}
+
+            {activeTab === 'chat' && cloudSync && (
+              <CloudSyncToggle enabled={cloudSync.enabled} onChange={cloudSync.onChange} />
             )}
 
             {activeTab === 'voice' && (

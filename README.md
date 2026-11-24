@@ -16,7 +16,7 @@ Built with React 19, TypeScript, Vite, PixiJS, and the Live2D Cubism runtime.
 - **Japanese Dubbing Mode**: The character speaks in Japanese while the chat text stays in the language you are using.
 - **Voice Input (Microphone)**: Speak directly to the character using your microphone without needing to type.
 - **Chess Minigame**: Play chess against the character from the minigames button in the header. She reacts to the game in character, you can chat with her during play, and games are saved in the conversation so you can resume them later.
-- **User Profiles & Chat History**: Sign in with your GitHub or Google account through Supabase Auth, or continue as a guest. Chat sessions are saved locally on your device, and you can customize your display name and avatar. Guests never touch Supabase.
+- **User Profiles & Chat History**: Sign in with email & password (or optionally GitHub/Google OAuth) through Supabase Auth, or continue as a guest. Chat sessions are saved locally on your device by default, signed-in users can optionally sync their chat history across devices through Supabase, and you can customize your display name and avatar. Guests never touch Supabase.
 
 ---
 
@@ -35,13 +35,13 @@ Before you begin, make sure you have the following installed on your computer:
    ```
 
 2. **Set up configuration (optional)**:
-   Sign-in with GitHub or Google needs a Supabase project. You can skip this and use **Continue as guest** on the login screen, where chats stay on your device and nothing is sent to Supabase.
+   Account sign-in and optional cloud chat sync use Supabase. You can skip this completely and use **Continue as guest** on the sign-in screen, where chats stay on your device and nothing is sent to Supabase.
 
-   To enable sign-in, copy the example environment file:
+   To enable accounts, either run local Supabase with Docker (`npx supabase start`, which enables Email & Password sign-in and applies the chat sync migration automatically without needing OAuth secrets) or create a Supabase Cloud project, then copy the example environment file:
    ```bash
    cp .env.example .env
    ```
-   Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`. Use the **publishable key**, never a secret or `service_role` key. Then enable the GitHub and Google providers and allow your redirect URLs. See [docs/supabase-setup.md](docs/supabase-setup.md) for the full walkthrough.
+   Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`. Use the **publishable key**, never a secret or `service_role` key. GitHub and Google OAuth are optional. See [docs/supabase-setup.md](docs/supabase-setup.md) for the full local (Docker) and cloud walkthrough.
 
    AI chat and voice API keys are entered later in the in-app Settings, not in `.env`. Restart Vite after changing `.env`.
 
@@ -58,6 +58,7 @@ Before you begin, make sure you have the following installed on your computer:
 Open **Settings** inside the app to configure the AI and the voice. Your choices are saved in your browser (`localStorage`) and are not sent anywhere except the provider you configure.
 
 - **AI provider**: choose a provider, enter your API key, and pick a model. Keys are not read from `.env`.
+- **Sync chats to the cloud**: available in **Chat** settings when signed in with Supabase configured; optionally syncs chat sessions across devices (automatically set up by `npx supabase start`, or run [docs/supabase-chat-sync.sql](docs/supabase-chat-sync.sql) once in your Supabase Cloud SQL Editor).
 - **Voice mode**:
   - *Follow chat*: speaks in the same language as the reply.
   - *Japanese Dubbing*: always speaks with the Japanese voice.
