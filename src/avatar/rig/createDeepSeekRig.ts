@@ -4,6 +4,7 @@ import type {
   ClothHit,
   DeepSeekRigFrameState,
   EarSide,
+  EmotionMoodOffsets,
   ExternalTouchState,
   FaceTouchMode,
   HairGroup,
@@ -134,6 +135,15 @@ export function createDeepSeekRig(
   let activeHair: HairGroup | null = null;
   let activePointerId: number | null = null;
   let lastEmotionBase: string | null = null;
+  let lastMood: EmotionMoodOffsets = {
+    swayScale: 1,
+    earPerk: 0,
+    earFlare: 0,
+    postureY: 0,
+    shoulderY: 0,
+    headPitch: 0,
+    headTilt: 0,
+  };
 
   const isDragging = (): boolean => Boolean(
     activeChest || activeEar || activeFace || activeSkirt ||
@@ -180,6 +190,7 @@ export function createDeepSeekRig(
   };
 
   const onPointerDown = (e: PointerEvent): void => {
+    if (isDragging()) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (!canStartRigPointerDown(e.target, view, e.pointerType)) return;
 
@@ -343,7 +354,7 @@ export function createDeepSeekRig(
 
   return {
     stepPrePhysics(dt: number, state: DeepSeekRigFrameState): void {
-      const mood = computeEmotionMoodOffsets(
+      lastMood = computeEmotionMoodOffsets(
         state.spec.base,
         state.spec.baseWeight,
         state.spec.modifiers,
@@ -392,7 +403,7 @@ export function createDeepSeekRig(
         followY: fOff.y,
         isReplying: state.isReplying,
         breath: state.breath,
-        mood,
+        mood: lastMood,
       });
       bodyIdle.stepPrePhysics(dt);
 
@@ -402,24 +413,6 @@ export function createDeepSeekRig(
         patDragY: snap.patDragY,
         patHappy: snap.patHappy,
       });
-      earTouch.setMoodInput({
-        faceMode: snap.mode,
-        cheekSide: snap.cheekSide,
-        eyeSide: snap.eyeSide,
-        patHappy: snap.patHappy,
-        patDragX: snap.patDragX,
-        headAngleY: snap.headAngleY,
-        headAngleZ: snap.headAngleZ,
-        external: currentExt,
-        mood,
-      });
-      armTouch.setMoodInput({
-        faceMode: snap.mode,
-        patHappy: snap.patHappy,
-        external: currentExt,
-        speechLevel: state.speechLevel,
-        bodyDriverX: fOff.x * 10,
-      });
     },
 
     stepPostPhysics(dt: number, state: DeepSeekRigFrameState): void {
@@ -428,13 +421,10 @@ export function createDeepSeekRig(
       headFollow.stepPostPhysics(dt);
       hairPhysics.stepPostPhysics(dt);
 
-      // Update ear head-angle coupling with live combined head pitch/roll before stepping ears.
       const snap = faceTouch.getSnapshot();
-      const mood = computeEmotionMoodOffsets(
-        state.spec.base,
-        state.spec.baseWeight,
-        state.spec.modifiers,
-      );
+      const fOff = headFollow.getFollowOffset();
+
+      // Feed final combined head angles and cached emotion mood into whale ears.
       earTouch.setMoodInput({
         faceMode: snap.mode,
         cheekSide: snap.cheekSide,
@@ -444,11 +434,20 @@ export function createDeepSeekRig(
         headAngleY: params.getParam('ParamAngleY'),
         headAngleZ: params.getParam('ParamAngleZ'),
         external: currentExt,
-        mood,
+        mood: lastMood,
       });
       earTouch.stepPostPhysics(dt);
 
+      // Feed current-frame lip-sync openness so speaking arm gestures & sleeve billow stay in sync.
+      armTouch.setMoodInput({
+        faceMode: snap.mode,
+        patHappy: snap.patHappy,
+        external: currentExt,
+        speechLevel: state.speechLevel ?? 0,
+        bodyDriverX: fOff.x * 10,
+      });
       armTouch.stepPostPhysics(dt);
+
       chestTouch.stepPostPhysics(dt, state.breath.level);
       skirtTouch.stepPostPhysics(dt);
       clothTouch.stepPostPhysics(dt);

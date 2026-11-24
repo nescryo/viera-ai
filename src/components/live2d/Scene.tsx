@@ -157,17 +157,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         const blender = new ParamBlender();
         const breathing = new BreathingCycle();
-        const sway = new IdleSway();
-        const chestJiggle = new ChestJiggle();
-        const ribbonJiggle = new ChestJiggle(RIBBON_JIGGLE);
-        const skirtJiggle = new ChestJiggle(SKIRT_JIGGLE);
-        const hipMotion = new HipMotion();
-        const armMotion = new ArmMotion();
-        const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
+        // Generic procedural fallback controllers (allocated only for characters without an interactiveRig).
+        const fallback = rig ? null : {
+          sway: new IdleSway(),
+          chestJiggle: new ChestJiggle(),
+          ribbonJiggle: new ChestJiggle(RIBBON_JIGGLE),
+          skirtJiggle: new ChestJiggle(SKIRT_JIGGLE),
+          hipMotion: new HipMotion(),
+          armMotion: new ArmMotion(),
+          saccade: new SaccadeGenerator(),
+        };
         let elapsed = 0;
         let eyelidScale = 1;
-        let lastSpeechLevel = 0;
 
         // Physics reads ParamBreath and PositionX/Y/Z, and runs before `beforeModelUpdate`.
         // Update them right after motion update so hair, skirt, ribbons, ears, and tail react naturally.
@@ -181,7 +183,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             rig.stepPrePhysics(Math.min(delta, 1 / 30), {
               spec: emotionRef.current,
               isReplying: replyingRef.current,
-              speechLevel: lastSpeechLevel,
               breath
             });
           }
@@ -214,7 +215,6 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
           const visemes = source === 'audio' ? ttsService.getVisemeWeights() : SILENT_VISEMES;
           const frame = lipSync.step(source, visemes, delta, elapsed);
-          lastSpeechLevel = frame.openness;
           setParam(p.mouthOpen, frame.openness);
           if (p.visemes) {
             setParam(p.visemes.a, frame.a);
@@ -234,13 +234,15 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             return;
           }
 
+          if (!fallback) return;
+
           // Generic fallback for characters without a dedicated interactive rig.
           const follow = smoothFactor(4, delta);
           pointer.x += (pointer.targetX - pointer.x) * follow;
           pointer.y += (pointer.targetY - pointer.y) * follow;
 
-          const swayFrame = sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
-          const eyeJitter = saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
+          const swayFrame = fallback.sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
+          const eyeJitter = fallback.saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
 
           setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
           setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
@@ -251,7 +253,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           setParam(p.eyeBallY, pointer.y + eyeJitter.y);
           p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
 
-          const jiggle = chestJiggle.step(
+          const jiggle = fallback.chestJiggle.step(
             delta,
             pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX,
             breath.level
@@ -259,7 +261,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           p.jiggleTargets?.forEach((t) => addParam(t.id, t.amount * jiggle[t.axis]));
 
           // Ribbons trail the head and body, and lift slightly with the breath.
-          const ribbon = ribbonJiggle.step(
+          const ribbon = fallback.ribbonJiggle.step(
             delta,
             pointer.x * (MAX_HEAD_ANGLE + MAX_BODY_ANGLE) + swayFrame.headYaw + swayFrame.bodyX,
             pointer.y * MAX_HEAD_ANGLE + breath.level,
@@ -273,7 +275,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Skirt trails the body lean and sway, and lifts slightly with the breath.
-          const skirt = skirtJiggle.step(
+          const skirt = fallback.skirtJiggle.step(
             delta,
             pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX - swayFrame.bodyZ,
             breath.level
@@ -286,7 +288,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Hips shift weight slowly and rise a little with the breath.
-          const hips = hipMotion.step(delta, elapsed, breath.level, replying ? REPLY_SWAY_AMOUNT : 1);
+          const hips = fallback.hipMotion.step(delta, elapsed, breath.level, replying ? REPLY_SWAY_AMOUNT : 1);
           p.hipTargets?.forEach((t) => {
             const index = core.getParameterIndex(t.id);
             if (index < 0) return;
@@ -295,7 +297,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Arms sway on their own, gesture while speech is audible, and swing when the body follows the pointer.
-          const arms = armMotion.step(delta, elapsed, frame.openness, 1, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX, pointer.y);
+          const arms = fallback.armMotion.step(delta, elapsed, frame.openness, 1, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX, pointer.y);
           p.armTargets?.forEach((t) => {
             const index = core.getParameterIndex(t.id);
             if (index < 0) return;

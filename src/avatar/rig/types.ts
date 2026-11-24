@@ -159,7 +159,8 @@ export interface EmotionMoodOffsets {
 export interface DeepSeekRigFrameState {
   spec: ExpressionSpec;
   isReplying: boolean;
-  speechLevel: number;
+  /** Current lip-sync mouth openness in 0..1 (provided in `stepPostPhysics`). */
+  speechLevel?: number;
   breath: BreathSample;
 }
 

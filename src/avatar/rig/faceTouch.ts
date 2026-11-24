@@ -642,7 +642,24 @@ export function createFaceTouchController(
       react.blush = 0;
       react.blushHold = 0;
       react.patHappy = 0;
+      react.eyePokeL = 0;
+      react.eyePokeR = 0;
+      react.chestShy = 0;
+      react.skirtShy = 0;
+      react.clothReact = 0;
+      react.tailShy = 0;
       react.earReact = 0;
+      react.cheekReact = 0;
+      react.eyeX = 0;
+      react.eyeY = 0;
+      react.browL = 0;
+      react.browR = 0;
+      react.mouthForm = 0;
+      react.mouthX = 0;
+      react.mouthOpen = 0;
+      react.mouthPucker = 0;
+      react.squintL = 0;
+      react.squintR = 0;
       external = { ...EMPTY_EXTERNAL_TOUCH };
     },
   };
