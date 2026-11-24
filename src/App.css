@@ -65,6 +65,13 @@
   height: 100%;
 }
 
+.live2d-canvas-container canvas {
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 
 .expression-menu-container {
   position: relative;

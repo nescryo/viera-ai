@@ -436,7 +436,11 @@
 
 .chess-moves-empty { color: var(--text-subtle); }
 
-/* Right column: bubble sits near the character */
+/* Right column: bubble sits near the character; empty area stays click-through for Live2D touch */
+.chess-panel > .chess-side {
+  pointer-events: none;
+}
+
 .chess-side {
   display: flex;
   flex-direction: column;
@@ -446,6 +450,10 @@
   width: min(100%, 640px);
   justify-self: start;
   padding: 16px 24px 40px;
+}
+
+.chess-side > * {
+  pointer-events: auto;
 }
 
 .chess-bubble {

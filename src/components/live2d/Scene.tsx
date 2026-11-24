@@ -16,6 +16,8 @@ import { ArmMotion } from '../../avatar/armMotion';
 import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
+import { createDeepSeekRig } from '../../avatar/rig/createDeepSeekRig';
+import type { Live2DModelLike } from '../../avatar/rig/types';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -137,6 +139,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
 
+        const rig = config.interactiveRig === 'deepseek-chan'
+          ? createDeepSeekRig(model as unknown as Live2DModelLike, app)
+          : null;
+
         const pointer = { targetX: 0, targetY: 0, x: 0, y: 0 };
         const onPointerMove = (e: PointerEvent): void => {
           const rect = host.getBoundingClientRect();
@@ -145,54 +151,50 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           pointer.targetX = Math.max(-1, Math.min(1, (e.clientX - cx) / (rect.width / 2)));
           pointer.targetY = Math.max(-1, Math.min(1, -(e.clientY - cy) / (rect.height / 2)));
         };
-        window.addEventListener('pointermove', onPointerMove);
+        if (!rig) {
+          window.addEventListener('pointermove', onPointerMove);
+        }
 
         const blender = new ParamBlender();
         const breathing = new BreathingCycle();
-        const sway = new IdleSway();
-        const chestJiggle = new ChestJiggle();
-        const ribbonJiggle = new ChestJiggle(RIBBON_JIGGLE);
-        const skirtJiggle = new ChestJiggle(SKIRT_JIGGLE);
-        const hipMotion = new HipMotion();
-        const armMotion = new ArmMotion();
-        const saccade = new SaccadeGenerator();
         const lipSync = new LipSyncSolver();
+        // Generic procedural fallback controllers (allocated only for characters without an interactiveRig).
+        const fallback = rig ? null : {
+          sway: new IdleSway(),
+          chestJiggle: new ChestJiggle(),
+          ribbonJiggle: new ChestJiggle(RIBBON_JIGGLE),
+          skirtJiggle: new ChestJiggle(SKIRT_JIGGLE),
+          hipMotion: new HipMotion(),
+          armMotion: new ArmMotion(),
+          saccade: new SaccadeGenerator(),
+        };
         let elapsed = 0;
         let eyelidScale = 1;
 
-        // Physics reads ParamBreath, and it runs before `beforeModelUpdate`. Set the value
-        // right after the motion update so hair, skirt, ribbons and ears react to the breath.
+        // Physics reads ParamBreath and PositionX/Y/Z, and runs before `beforeModelUpdate`.
+        // Update them right after motion update so hair, skirt, ribbons, ears, and tail react naturally.
         let breath = breathing.step(0, 0);
         const onAfterMotionUpdate = (): void => {
-          breath = breathing.step(Math.min(app.ticker.deltaMS / 1000, 0.1), elapsed);
+          const delta = Math.min(app.ticker.deltaMS / 1000, 0.1);
+          elapsed += delta;
+          breath = breathing.step(delta, elapsed);
           setParam(config.params.breath, breath.level);
+          if (rig) {
+            rig.stepPrePhysics(Math.min(delta, 1 / 30), {
+              spec: emotionRef.current,
+              isReplying: replyingRef.current,
+              breath
+            });
+          }
         };
 
         // Runs right before the core model is updated, so these values win over motions.
         const onBeforeModelUpdate = (): void => {
           const delta = Math.min(app.ticker.deltaMS / 1000, 0.1);
-          elapsed += delta;
-
-          // Gaze: always follow the pointer, including while replying.
-          const follow = smoothFactor(4, delta);
-          pointer.x += (pointer.targetX - pointer.x) * follow;
-          pointer.y += (pointer.targetY - pointer.y) * follow;
-
           const p = config.params;
           const replying = replyingRef.current;
-          const swayFrame = sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
-          const eyeJitter = saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
-
-          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
-          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
-          setParam(p.angleZ, swayFrame.headRoll);
-          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX);
-          setParam(p.bodyAngleZ, swayFrame.bodyZ);
-          setParam(p.eyeBallX, pointer.x + eyeJitter.x);
-          setParam(p.eyeBallY, pointer.y + eyeJitter.y);
-          p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
-
           const spec = emotionRef.current;
+
           const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
           const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
           blender.step(targets, delta).forEach((value, id) => setParam(id, value));
@@ -222,7 +224,36 @@ export const Scene: React.FC<SceneProps> = React.memo(({
             setParam(p.visemes.o, frame.o);
           }
 
-          const jiggle = chestJiggle.step(
+          if (rig) {
+            rig.stepPostPhysics(Math.min(delta, 1 / 30), {
+              spec,
+              isReplying: replying,
+              speechLevel: frame.openness,
+              breath
+            });
+            return;
+          }
+
+          if (!fallback) return;
+
+          // Generic fallback for characters without a dedicated interactive rig.
+          const follow = smoothFactor(4, delta);
+          pointer.x += (pointer.targetX - pointer.x) * follow;
+          pointer.y += (pointer.targetY - pointer.y) * follow;
+
+          const swayFrame = fallback.sway.step(delta, elapsed, pointer.x, replying ? REPLY_SWAY_AMOUNT : 1);
+          const eyeJitter = fallback.saccade.step(delta, replying ? REPLY_SACCADE_AMOUNT : 1);
+
+          setParam(p.angleX, pointer.x * MAX_HEAD_ANGLE + swayFrame.headYaw);
+          setParam(p.angleY, pointer.y * MAX_HEAD_ANGLE + (breath.head - 0.5) * BREATH_HEAD_NOD);
+          setParam(p.angleZ, swayFrame.headRoll);
+          setParam(p.bodyAngleX, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX);
+          setParam(p.bodyAngleZ, swayFrame.bodyZ);
+          setParam(p.eyeBallX, pointer.x + eyeJitter.x);
+          setParam(p.eyeBallY, pointer.y + eyeJitter.y);
+          p.breathTargets?.forEach((t) => addParam(t.id, t.amount * breath[t.channel === 'chest' ? 'level' : t.channel]));
+
+          const jiggle = fallback.chestJiggle.step(
             delta,
             pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX,
             breath.level
@@ -230,7 +261,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           p.jiggleTargets?.forEach((t) => addParam(t.id, t.amount * jiggle[t.axis]));
 
           // Ribbons trail the head and body, and lift slightly with the breath.
-          const ribbon = ribbonJiggle.step(
+          const ribbon = fallback.ribbonJiggle.step(
             delta,
             pointer.x * (MAX_HEAD_ANGLE + MAX_BODY_ANGLE) + swayFrame.headYaw + swayFrame.bodyX,
             pointer.y * MAX_HEAD_ANGLE + breath.level,
@@ -244,7 +275,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Skirt trails the body lean and sway, and lifts slightly with the breath.
-          const skirt = skirtJiggle.step(
+          const skirt = fallback.skirtJiggle.step(
             delta,
             pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX - swayFrame.bodyZ,
             breath.level
@@ -257,7 +288,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Hips shift weight slowly and rise a little with the breath.
-          const hips = hipMotion.step(delta, elapsed, breath.level, replying ? REPLY_SWAY_AMOUNT : 1);
+          const hips = fallback.hipMotion.step(delta, elapsed, breath.level, replying ? REPLY_SWAY_AMOUNT : 1);
           p.hipTargets?.forEach((t) => {
             const index = core.getParameterIndex(t.id);
             if (index < 0) return;
@@ -266,7 +297,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           });
 
           // Arms sway on their own, gesture while speech is audible, and swing when the body follows the pointer.
-          const arms = armMotion.step(delta, elapsed, frame.openness, 1, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX, pointer.y);
+          const arms = fallback.armMotion.step(delta, elapsed, frame.openness, 1, pointer.x * MAX_BODY_ANGLE + swayFrame.bodyX, pointer.y);
           p.armTargets?.forEach((t) => {
             const index = core.getParameterIndex(t.id);
             if (index < 0) return;
@@ -298,7 +329,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         cleanup = () => {
           events.off('afterMotionUpdate', onAfterMotionUpdate);
           events.off('beforeModelUpdate', onBeforeModelUpdate);
-          window.removeEventListener('pointermove', onPointerMove);
+          rig?.dispose();
+          if (!rig) {
+            window.removeEventListener('pointermove', onPointerMove);
+          }
           resizeObserver.disconnect();
           app.destroy(true, { children: true, texture: true, baseTexture: true });
         };
