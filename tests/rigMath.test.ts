@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canStartRigPointerDown,
+  type PassThroughElementLike,
+  type PassThroughFeedLike,
+} from '../src/avatar/rig/createDeepSeekRig';
+import {
   ARM_REST_HAND_LOCAL_X,
   ARM_REST_HAND_LOCAL_Y,
   computeEmotionMoodOffsets,
@@ -187,3 +192,55 @@ describe('computeEmotionMoodOffsets', () => {
     expect(Math.abs(low.earPerk)).toBeLessThan(Math.abs(high.earPerk));
   });
 });
+
+describe('canStartRigPointerDown', () => {
+  const canvas = { id: 'canvas' };
+  const makeTarget = (opts: {
+    interactive?: boolean;
+    bubble?: boolean;
+    feed?: PassThroughFeedLike | null;
+  }): PassThroughElementLike => ({
+    closest(selector: string) {
+      if (selector.includes('button') && opts.interactive) return {} as PassThroughElementLike;
+      if (selector.includes('.chat-bubble') && opts.bubble) return {} as PassThroughElementLike;
+      if (selector === '.chat-messages-feed') return opts.feed ?? null;
+      return null;
+    },
+  });
+
+  it('always allows direct canvas clicks', () => {
+    expect(canStartRigPointerDown(canvas, canvas, 'mouse')).toBe(true);
+    expect(canStartRigPointerDown(canvas, canvas, 'touch')).toBe(true);
+  });
+
+  it('allows mouse pass-through on empty space inside .chat-messages-feed', () => {
+    const emptyGap = makeTarget({ feed: { scrollHeight: 500, clientHeight: 200 } });
+    expect(canStartRigPointerDown(emptyGap, canvas, 'mouse')).toBe(true);
+    expect(canStartRigPointerDown(emptyGap, canvas, 'pen')).toBe(true);
+  });
+
+  it('blocks clicks on .chat-bubble so message text remains selectable', () => {
+    const bubble = makeTarget({ bubble: true, feed: { scrollHeight: 500, clientHeight: 200 } });
+    expect(canStartRigPointerDown(bubble, canvas, 'mouse')).toBe(false);
+    expect(canStartRigPointerDown(bubble, canvas, 'touch')).toBe(false);
+  });
+
+  it('blocks clicks on interactive controls inside .chat-messages-feed', () => {
+    const btn = makeTarget({ interactive: true, feed: { scrollHeight: 200, clientHeight: 200 } });
+    expect(canStartRigPointerDown(btn, canvas, 'mouse')).toBe(false);
+  });
+
+  it('blocks elements outside both canvas and .chat-messages-feed', () => {
+    const modalOrInput = makeTarget({ feed: null });
+    expect(canStartRigPointerDown(modalOrInput, canvas, 'mouse')).toBe(false);
+    expect(canStartRigPointerDown(null, canvas, 'mouse')).toBe(false);
+  });
+
+  it('preserves native touch scrolling only when the feed overflows', () => {
+    const overflowingFeed = makeTarget({ feed: { scrollHeight: 500, clientHeight: 200 } });
+    const shortFeed = makeTarget({ feed: { scrollHeight: 180, clientHeight: 200 } });
+    expect(canStartRigPointerDown(overflowingFeed, canvas, 'touch')).toBe(false);
+    expect(canStartRigPointerDown(shortFeed, canvas, 'touch')).toBe(true);
+  });
+});
+

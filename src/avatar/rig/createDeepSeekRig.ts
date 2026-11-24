@@ -35,6 +35,48 @@ export interface DeepSeekRig {
   dispose(): void;
 }
 
+const INTERACTIVE_UI_SELECTOR =
+  'button, a, input, textarea, select, [role="button"], [contenteditable="true"], .chat-bubble';
+
+/** Minimal DOM element surface needed to decide whether a pointerdown may pass through to the Live2D rig. */
+export interface PassThroughElementLike {
+  closest(selector: string): PassThroughFeedLike | PassThroughElementLike | null;
+}
+
+/** Minimal scrollable feed container surface for touch-scroll preservation. */
+export interface PassThroughFeedLike {
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+/**
+ * Returns true if a `pointerdown` on `target` is allowed to hit-test the Live2D canvas:
+ * - Always true directly on `canvas`.
+ * - True on empty space inside `.chat-messages-feed` (excluding `.chat-bubble` text and
+ *   interactive controls like buttons/links), so users can freely select/copy message text
+ *   and scroll with the mouse wheel while still touching the character through feed gaps.
+ * - On touchscreens, preserves native vertical touch-scrolling when the chat feed overflows.
+ */
+export function canStartRigPointerDown(
+  target: unknown,
+  canvas: unknown,
+  pointerType: string,
+): boolean {
+  if (target === canvas) return true;
+  if (!target || typeof (target as PassThroughElementLike).closest !== 'function') return false;
+
+  const el = target as PassThroughElementLike;
+  if (el.closest(INTERACTIVE_UI_SELECTOR)) return false;
+
+  const feed = el.closest('.chat-messages-feed') as PassThroughFeedLike | null;
+  if (!feed) return false;
+
+  if (pointerType === 'touch' && feed.scrollHeight > feed.clientHeight + 2) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Wires the complete DeepSeek-chan animation & interactive touch pipeline:
  * - Two-stage physics (`PositionX/Y/Z` pre-physics + crisp grounded posture post-physics)
@@ -123,6 +165,9 @@ export function createDeepSeekRig(
     activeArm = null;
     activeHair = null;
     view.style.cursor = '';
+    if (document.body.style.cursor === 'grabbing') {
+      document.body.style.cursor = '';
+    }
     chestTouch.pointerUp();
     earTouch.pointerUp();
     armTouch.pointerUp();
@@ -136,6 +181,7 @@ export function createDeepSeekRig(
 
   const onPointerDown = (e: PointerEvent): void => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (!canStartRigPointerDown(e.target, view, e.pointerType)) return;
 
     // 1. Front upper cloth accents (chest bow/collar & shoulder frills drawn over bodice).
     const frontCloth = clothTouch.tryPointerDown(e.clientX, e.clientY, 'frontTop');
@@ -224,17 +270,28 @@ export function createDeepSeekRig(
       }
     }
 
+    // Prevent browser text selection when grabbing the character through the chat overlay.
+    if (e.target !== view && e.cancelable) {
+      e.preventDefault();
+    }
+
     activePointerId = e.pointerId;
     view.style.cursor = 'grabbing';
+    document.body.style.cursor = 'grabbing';
     try {
       view.setPointerCapture(e.pointerId);
     } catch {
-      // Ignore synthetic events without active pointer capture support.
+      // Window-level pointer listeners handle drag tracking even without capture.
     }
   };
 
-  const onCanvasPointerMove = (e: PointerEvent): void => {
-    if (!isDragging()) return;
+  const onWindowPointerMove = (e: PointerEvent): void => {
+    if (!isDragging()) {
+      headFollow.setPointer(e.clientX, e.clientY);
+      return;
+    }
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+
     const dt = Math.max(app.ticker.deltaMS / 1000, 1 / 120);
     if (activeEar) {
       const { dragX, dragY } = earTouch.pointerMove(e.clientX, e.clientY);
@@ -262,9 +319,10 @@ export function createDeepSeekRig(
     }
   };
 
-  const onWindowPointerMove = (e: PointerEvent): void => {
-    if (isDragging()) return;
-    headFollow.setPointer(e.clientX, e.clientY);
+  const onWindowPointerUp = (e: PointerEvent): void => {
+    if (!isDragging()) return;
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    releaseDrag();
   };
 
   const onPointerLeaveWindow = (): void => {
@@ -276,11 +334,10 @@ export function createDeepSeekRig(
     if (isDragging()) releaseDrag();
   };
 
-  view.addEventListener('pointerdown', onPointerDown);
-  view.addEventListener('pointermove', onCanvasPointerMove);
-  view.addEventListener('pointerup', releaseDrag);
-  view.addEventListener('pointercancel', releaseDrag);
+  window.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onWindowPointerMove);
+  window.addEventListener('pointerup', onWindowPointerUp);
+  window.addEventListener('pointercancel', onWindowPointerUp);
   document.addEventListener('mouseleave', onPointerLeaveWindow);
   window.addEventListener('blur', onWindowBlur);
 
@@ -415,11 +472,10 @@ export function createDeepSeekRig(
     dispose(): void {
       releaseDrag();
       core.update = origCoreUpdate;
-      view.removeEventListener('pointerdown', onPointerDown);
-      view.removeEventListener('pointermove', onCanvasPointerMove);
-      view.removeEventListener('pointerup', releaseDrag);
-      view.removeEventListener('pointercancel', releaseDrag);
+      window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerUp);
       document.removeEventListener('mouseleave', onPointerLeaveWindow);
       window.removeEventListener('blur', onWindowBlur);
     },
