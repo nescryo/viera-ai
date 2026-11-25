@@ -453,7 +453,28 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
         {game.reaction && (
           <p className="chess-bubble" role="status" aria-live="polite">{game.reaction.text}</p>
         )}
-        {game.chatEnabled && (
+        {game.status === 'finished' && game.result && !isReviewActive && (
+          <div className={`chess-result chess-result--${game.result.outcome}`}>
+            <strong className="chess-result-label">{RESULT_TEXT[game.result.outcome]}</strong>
+            <div className="chess-result-actions">
+              {game.canReview && (
+                <button
+                  type="button"
+                  className="btn btn--secondary chess-review-cta"
+                  onClick={handleStartReview}
+                >
+                  <ScanSearch size={16} aria-hidden="true" />
+                  <span>Review</span>
+                </button>
+              )}
+              <ChessNewGameMenu variant="primary" onStart={startNewGame} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {game.chatEnabled && (
+        <div className="chess-chat-dock">
           <form
             className={`chess-chat${isAnalyzingReview ? ' is-disabled' : ''}`}
             onSubmit={(event) => {
@@ -488,26 +509,8 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
               <Send size={18} />
             </button>
           </form>
-        )}
-        {game.status === 'finished' && game.result && !isReviewActive && (
-          <div className={`chess-result chess-result--${game.result.outcome}`}>
-            <strong className="chess-result-label">{RESULT_TEXT[game.result.outcome]}</strong>
-            <div className="chess-result-actions">
-              {game.canReview && (
-                <button
-                  type="button"
-                  className="btn btn--secondary chess-review-cta"
-                  onClick={handleStartReview}
-                >
-                  <ScanSearch size={16} aria-hidden="true" />
-                  <span>Review</span>
-                </button>
-              )}
-              <ChessNewGameMenu variant="primary" onStart={startNewGame} />
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {pendingPromotion && (
         <div className="chess-confirm-scrim">
