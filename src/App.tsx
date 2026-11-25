@@ -11,6 +11,7 @@ import { soundService } from './services/soundService';
 import { useToasts } from './hooks/useToasts';
 import { useSpeechAudio } from './hooks/useSpeechAudio';
 import { useChatSessions } from './hooks/useChatSessions';
+import { useMobileViewport } from './hooks/useMobileViewport';
 
 import { Header } from './components/ui/Header';
 import { ChatOverlay } from './components/ui/ChatOverlay';
@@ -33,6 +34,8 @@ import './App.css';
 type ActiveModal = 'settings' | 'history' | 'profile' | 'alternativeMemory' | 'minigames' | null;
 
 export function App() {
+  useMobileViewport();
+
   // 1. Active 3D Roleplay Character Package with persistent custom lore
   const [currentPersona, setCurrentPersona] = useState<Persona>(() => {
     const savedLore = localStorage.getItem(`viera_custom_lore_${DEFAULT_CHARACTER_PACKAGE.id}`);

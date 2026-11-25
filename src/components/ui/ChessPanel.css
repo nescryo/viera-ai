@@ -635,7 +635,7 @@
 @media (max-width: 768px) {
   .chess-confirm-scrim { padding: 16px; }
 
-  :root { --chess-board-size: min(92vw, calc(100dvh - 330px - var(--chess-moves-space))); }
+  :root { --chess-board-size: min(92vw, calc(var(--scene-height, 100dvh) - 330px - var(--chess-moves-space))); }
 
   .chess-panel {
     grid-template-columns: 1fr;
@@ -644,13 +644,13 @@
     direction: ltr;
   }
 
-  .chess-main { grid-row: 2; width: 100%; justify-self: stretch; padding: 8px 8px 12px; gap: 8px; }
-  .chess-side { grid-row: 1; width: 100%; justify-self: stretch; justify-content: flex-start; padding: 64px 12px 0; }
+  .chess-main { grid-row: 2; width: 100%; justify-self: stretch; padding: 8px 8px calc(12px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
+  .chess-side { grid-row: 1; width: 100%; justify-self: stretch; justify-content: flex-start; padding: calc(64px + env(safe-area-inset-top, 0px)) 12px 0; }
 
   .app-container.chess-active .scene-container {
     left: 0;
     width: 100%;
-    height: 42%;
+    height: calc(var(--scene-height, 100dvh) * 0.42);
   }
 }
 
@@ -661,6 +661,10 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: rgba(10, 14, 28, 0.8);
+  }
+
+  .chess-chat-input {
+    font-size: 16px;
   }
 }
 
