@@ -396,7 +396,6 @@ interface GpuResources {
   vertexRing: WebGLBuffer[];
   ringIndex: number;
   packedVertices: Float32Array;
-  hasUploadedVertices: boolean;
 }
 
 function compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
@@ -535,7 +534,6 @@ function initGpuResources(gl: WebGLRenderingContext, geom: PackedModelGeometry):
     vertexRing,
     ringIndex: 0,
     packedVertices: new Float32Array(geom.totalFloats),
-    hasUploadedVertices: false,
   };
 }
 
@@ -615,28 +613,26 @@ export function patchCubismRenderer(live2dModel: unknown): boolean {
     const packed = res.packedVertices;
     const offsets = geom.vertexFloatOffsets;
     const counts = geom.vertexFloatCounts;
-    const fullCopy = !res.hasUploadedVertices;
-    let anyChanged = fullCopy;
+    let anyCopied = false;
 
+    // Copy every drawable unconditionally: interactive rig controllers (face/ear/skirt/cloth/tail
+    // touch) deform `vertexPositions` directly after `core.update()`, without setting Cubism's
+    // `VertexPositionsDidChange` dynamic flag.
     for (let d = 0; d < geom.drawableCount; ++d) {
       const floatCount = counts[d];
       if (floatCount <= 0) continue;
-      if (!fullCopy && !model.getDrawableDynamicFlagVertexPositionsDidChange(d)) {
-        continue;
-      }
       const verts = model.getDrawableVertices(d);
       if (verts) {
         packed.set(verts.length === floatCount ? verts : verts.subarray(0, floatCount), offsets[d]);
-        anyChanged = true;
+        anyCopied = true;
       }
     }
 
-    if (anyChanged) {
+    if (anyCopied) {
       res.ringIndex = (res.ringIndex + 1) % VERTEX_RING_COUNT;
       activeVertexBuffer = res.vertexRing[res.ringIndex];
       gl.bindBuffer(gl.ARRAY_BUFFER, activeVertexBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, packed);
-      res.hasUploadedVertices = true;
     } else if (!activeVertexBuffer) {
       activeVertexBuffer = res.vertexRing[res.ringIndex];
     }
@@ -909,7 +905,7 @@ export function patchCubismRenderer(live2dModel: unknown): boolean {
         if (fbSys.current === null) {
           trackedFbo = null;
         } else if (fbSys.current && fbSys.current !== fbSys.unknownFramebuffer) {
-          trackedFbo = fbSys.current.glFramebuffers?.[pixiRenderer.CONTEXT_UID]?.framebuffer ?? null;
+          trackedFbo = fbSys.current.glFramebuffers?.[pixiRenderer.CONTEXT_UID]?.framebuffer;
         } else {
           trackedFbo = undefined;
         }
@@ -940,6 +936,8 @@ export function patchCubismRenderer(live2dModel: unknown): boolean {
         disposeGpuResources(gpu);
         gpu = null;
       }
+      activeVertexBuffer = null;
+      resetPassState();
       origStartUp(gl);
     };
   }
@@ -976,6 +974,7 @@ export function patchCubismRenderer(live2dModel: unknown): boolean {
   renderer.restoreProfile = function lightProfileRestore(this: CubismRendererRuntimeLike): void {
     const gl = this.gl;
     if (!gl) return;
+    gl.useProgram(null);
     gl.disableVertexAttribArray(0);
     gl.disableVertexAttribArray(1);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -1148,6 +1147,8 @@ export function patchCubismRenderer(live2dModel: unknown): boolean {
   renderer.release = function releaseWithPatchedGpu(): void {
     disposeGpuResources(gpu);
     gpu = null;
+    activeVertexBuffer = null;
+    resetPassState();
     origRelease();
   };
 

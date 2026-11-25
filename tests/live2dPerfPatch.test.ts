@@ -370,10 +370,32 @@ describe('live2dPhysicsPatch', () => {
     expect(patchCubismPhysics(null)).toBe(false);
     expect(patchCubismPhysics({})).toBe(false);
   });
+
+  it('safely ignores Cubism 4 out-of-range missing parameter indices during evaluate and interpolate', () => {
+    const fixture = makePhysicsFixture(60);
+    const paramCount = fixture.model.getParameterCount();
+    const modelWithOobMissing = {
+      ...fixture.model,
+      // Cubism 4 returns `>= paramCount` for unknown parameter IDs instead of -1.
+      getParameterIndex: (id: string) => {
+        const idx = fixture.model.getParameterIndex(id);
+        return idx >= 0 ? idx : paramCount;
+      },
+    };
+    fixture.physics._physicsRig!.inputs[0].source.id = 'MissingInputParam';
+    fixture.physics._physicsRig!.outputs[0].destination.id = 'MissingOutputParam';
+
+    expect(patchCubismPhysics({ physics: fixture.physics })).toBe(true);
+    expect(() => fixture.physics.evaluate(modelWithOobMissing, 0.02)).not.toThrow();
+    for (let i = 0; i < fixture.values.length; ++i) {
+      expect(Number.isFinite(fixture.values[i])).toBe(true);
+    }
+  });
 });
 
 function createMockWebGLContext() {
   let nextId = 1;
+  let lastSubData: Float32Array | null = null;
   const counts = {
     bufferData: 0,
     bufferSubData: 0,
@@ -445,8 +467,9 @@ function createMockWebGLContext() {
     bufferData: () => {
       counts.bufferData += 1;
     },
-    bufferSubData: () => {
+    bufferSubData: (_target: number, _offset: number, data: Float32Array) => {
       counts.bufferSubData += 1;
+      lastSubData = new Float32Array(data);
     },
     enableVertexAttribArray: () => {},
     disableVertexAttribArray: () => {},
@@ -475,7 +498,11 @@ function createMockWebGLContext() {
     },
   };
 
-  return { gl: gl as unknown as WebGLRenderingContext, counts };
+  return {
+    gl: gl as unknown as WebGLRenderingContext,
+    counts,
+    getLastSubData: () => lastSubData,
+  };
 }
 
 function createMockModel(): CubismModelForRenderer {
@@ -609,22 +636,73 @@ describe('live2dRendererPatch', () => {
     expect(counts.bufferSubData).toBe(1);
     expect(counts.blendFuncSeparate).toBe(1);
 
-    // Frame 2: ZERO additional bufferData calls, only 1 bufferSubData, 1 useProgram, 0 getParameter
+    // Frame 2: ZERO additional bufferData calls, 1 bufferSubData, 1 shader bind (2 drawables),
+    // 1 gl.useProgram(null) cleanup in restoreProfile() (never per-drawable), 0 getParameter.
     const useProgramBeforeFrame2 = counts.useProgram;
     const useProgramNullBeforeFrame2 = counts.useProgramNull;
     live2dModel._render(pixiRenderer as never);
     expect(counts.bufferData).toBe(bufferDataAfterInit);
     expect(counts.bufferSubData).toBe(2);
     expect(counts.drawElements).toBe(4);
-    expect(counts.useProgram - useProgramBeforeFrame2).toBe(1);
-    expect(counts.useProgramNull - useProgramNullBeforeFrame2).toBe(0);
+    expect(counts.useProgram - useProgramBeforeFrame2).toBe(2);
+    expect(counts.useProgramNull - useProgramNullBeforeFrame2).toBe(1);
     expect(counts.getParameter).toBe(0);
+
+    // Fallback to gl.getParameter when Pixi's current framebuffer has no GL entry for CONTEXT_UID.
+    live2dModel._render({
+      CONTEXT_UID: 1,
+      framebuffer: { current: { glFramebuffers: {} } },
+    } as never);
+    expect(counts.getParameter).toBe(1);
 
     // Release cleans up all 4 programs and all 5 GPU buffers
     renderer.release();
     expect(counts.deleteProgram).toBe(4);
     expect(counts.deleteBuffer).toBe(5);
     expect(origRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads direct vertex deformations even when Cubism VertexPositionsDidChange is false', () => {
+    const { gl, getLastSubData } = createMockWebGLContext();
+    const model = createMockModel();
+    model.getDrawableDynamicFlagVertexPositionsDidChange = () => false;
+    const mvp = new Float32Array(16);
+
+    const renderer: CubismRendererRuntimeLike = {
+      gl,
+      firstDraw: true,
+      _model: model,
+      _modelColor: { R: 1, G: 1, B: 1, A: 1 },
+      _textures: { 0: { tex: 0 } as unknown as WebGLTexture },
+      _sortedDrawableIndexList: [0, 0, 0],
+      _clippingManager: null,
+      getModel: () => model,
+      getMvpMatrix: () => ({ getArray: () => mvp }),
+      isPremultipliedAlpha: () => true,
+      isCulling: () => false,
+      setIsCulling: () => {},
+      isUsingHighPrecisionMask: () => false,
+      getClippingContextBufferForMask: () => null,
+      setClippingContextBufferForMask: () => {},
+      getClippingContextBufferForDraw: () => null,
+      setClippingContextBufferForDraw: () => {},
+      setRenderState: () => {},
+      saveProfile: () => {},
+      restoreProfile: () => {},
+      preDraw: () => {},
+      doDrawModel: () => {},
+      drawMesh: () => {},
+      release: () => {},
+    };
+
+    expect(patchCubismRenderer({ internalModel: { renderer } })).toBe(true);
+    renderer.doDrawModel();
+
+    // Simulate rig applyVertexDeform() mutating drawable #0 vertices directly after core.update().
+    model.getDrawableVertices(0)[0] = 0.42;
+    renderer.doDrawModel();
+
+    expect(getLastSubData()?.[0]).toBeCloseTo(0.42, 6);
   });
 
   it('still draws opacity-0 drawables during clipping mask generation', () => {

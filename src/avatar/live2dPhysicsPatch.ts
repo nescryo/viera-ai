@@ -313,6 +313,7 @@ export function patchCubismPhysics(internalModel: unknown): boolean {
 
     const params = model.getModel().parameters;
     const parameterValues = params.values;
+    const paramCount = parameterValues.length;
     const parameterMinimumValues = params.minimumValues;
     const parameterMaximumValues = params.maximumValues;
     const settings = activeRig.settings;
@@ -330,7 +331,7 @@ export function patchCubismPhysics(internalModel: unknown): boolean {
       for (let i = 0; i < outputCount; ++i) {
         const output = outputs[baseOutput + i];
         const destIdx = output.destinationParameterIndex;
-        if (destIdx < 0) continue;
+        if (destIdx < 0 || destIdx >= paramCount) continue;
 
         const blended = prevOuts[i] * oneMinusWeight + currOuts[i] * weight;
         applyOutputParameterValue(
@@ -430,7 +431,7 @@ export function patchCubismPhysics(internalModel: unknown): boolean {
             srcIdx = model.getParameterIndex(inp.source.id);
             inp.sourceParameterIndex = srcIdx;
           }
-          if (srcIdx < 0) continue;
+          if (srcIdx < 0 || srcIdx >= paramCount) continue;
 
           inp.getNormalizedParameterValue(
             totalTranslation,
@@ -507,7 +508,7 @@ export function patchCubismPhysics(internalModel: unknown): boolean {
           }
 
           currOuts[i] = outputValue;
-          if (destIdx >= 0) {
+          if (destIdx >= 0 && destIdx < paramCount) {
             applyOutputParameterValue(
               parameterCaches,
               destIdx,
