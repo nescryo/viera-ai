@@ -8,8 +8,10 @@ import { ttsService } from '../../services/ttsService';
 import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../services/tts/lipSyncSolver';
 import { DEFAULT_EMOTION_ID, parseExpressionSpec } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
+import { patchCubismPhysics } from '../../avatar/live2dPhysicsPatch';
+import { patchCubismRenderer } from '../../avatar/live2dRendererPatch';
 import { BreathingCycle } from '../../avatar/breathing';
-import { isMobileDevice, resolvePhysicsFps, resolveRenderQuality, setPhysicsFps } from '../../avatar/renderQuality';
+import { resolveRenderQuality } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
 import { ChestJiggle, RIBBON_JIGGLE, SKIRT_JIGGLE } from '../../avatar/chestJiggle';
 import { ArmMotion } from '../../avatar/armMotion';
@@ -74,8 +76,7 @@ export const Scene: React.FC<SceneProps> = React.memo(({
       .then(async () => {
         if (disposed) return;
 
-        const isMobile = isMobileDevice();
-        const quality = resolveRenderQuality(window.devicePixelRatio, isMobile);
+        const quality = resolveRenderQuality(window.devicePixelRatio);
         const app = new PIXI.Application({
           resizeTo: host,
           backgroundAlpha: 0,
@@ -126,7 +127,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         };
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
-        setPhysicsFps(internal, resolvePhysicsFps(isMobile));
+        patchCubismPhysics(internal);
+        patchCubismRenderer(model);
 
         const rig = config.interactiveRig === 'deepseek-chan'
           ? createDeepSeekRig(model as unknown as Live2DModelLike, app)
@@ -159,6 +161,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         };
         let elapsed = 0;
         let eyelidScale = 1;
+        const allModifiers = { ...config.modifiers, ...config.eyes };
+        let lastSpec: ReturnType<typeof parseExpressionSpec> | null = null;
+        let cachedTargets: Record<string, number> = {};
+        let cachedEyelidTarget = 1;
 
         // Physics reads ParamBreath and PositionX/Y/Z, and runs before `beforeModelUpdate`.
         // Update them right after motion update so hair, skirt, ribbons, ears, and tail react naturally.
@@ -184,15 +190,19 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const replying = replyingRef.current;
           const spec = emotionRef.current;
 
-          const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
-          const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
-          blender.step(targets, delta).forEach((value, id) => setParam(id, value));
+          if (spec !== lastSpec) {
+            lastSpec = spec;
+            const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
+            cachedTargets = resolveExpressionTargets(config.emotions, allModifiers, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
+            cachedEyelidTarget = config.eyelid ? resolveEyelidScale(weights, config.eyelid.closeBy) : 1;
+          }
+          blender.step(cachedTargets, delta).forEach((value, id) => setParam(id, value));
 
           // Lower the eyelids by multiplying the value the automatic blink already wrote this
           // frame, so blinking keeps working (the blender cannot do this, see CharacterModelConfig).
           const eyelid = config.eyelid;
           if (eyelid) {
-            eyelidScale += (resolveEyelidScale(weights, eyelid.closeBy) - eyelidScale) * smoothFactor(7, delta);
+            eyelidScale += (cachedEyelidTarget - eyelidScale) * smoothFactor(7, delta);
             eyelid.paramIds.forEach((id) => {
               if (paramAccess.hasParam(id)) setParam(id, paramAccess.getParam(id) * eyelidScale);
             });
