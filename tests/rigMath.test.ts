@@ -163,6 +163,39 @@ describe('createParamAccessors', () => {
     expect(params.getParam('Missing')).toBe(0);
     params.setParam('Missing', 1);
   });
+
+  it('uses O(1) setParameterValueByIndex when available and rejects Cubism out-of-range missing indices', () => {
+    const values = [0];
+    let byIdWrites = 0;
+    let byIndexWrites = 0;
+    const core: CoreModelLike = {
+      getParameterCount: () => 1,
+      getParameterIndex: (id: string) => (id === 'ParamX' ? 0 : 1), // Cubism 4 returns >= count for missing IDs
+      getParameterMinimumValue: (index: number) => (index === 0 ? -10 : Number.NaN),
+      getParameterMaximumValue: (index: number) => (index === 0 ? 10 : Number.NaN),
+      getParameterValueById: () => values[0],
+      getParameterValueByIndex: (index: number) => values[index] ?? 0,
+      setParameterValueById: () => { byIdWrites += 1; },
+      setParameterValueByIndex: (index: number, value: number) => {
+        byIndexWrites += 1;
+        values[index] = value;
+      },
+      addParameterValueById: () => {},
+      getDrawableIndex: () => -1,
+      update: () => {},
+    };
+    const params = createParamAccessors(core);
+
+    params.setParam('ParamX', 5);
+    params.addParam('ParamX', 3);
+    expect(values[0]).toBe(8);
+    expect(byIndexWrites).toBe(2);
+    expect(byIdWrites).toBe(0);
+
+    expect(params.hasParam('NonExistent')).toBe(false);
+    params.setParam('NonExistent', 1);
+    expect(byIndexWrites).toBe(2);
+  });
 });
 
 describe('computeEmotionMoodOffsets', () => {

@@ -8,6 +8,8 @@ import { ttsService } from '../../services/ttsService';
 import { LipSyncSolver, SILENT_VISEMES, resolveLipSyncSource } from '../../services/tts/lipSyncSolver';
 import { DEFAULT_EMOTION_ID, parseExpressionSpec } from '../../data/emotionRegistry';
 import { setMaskRenderTextureCount } from '../../avatar/live2dMasks';
+import { patchCubismPhysics } from '../../avatar/live2dPhysicsPatch';
+import { patchCubismRenderer } from '../../avatar/live2dRendererPatch';
 import { BreathingCycle } from '../../avatar/breathing';
 import { resolveRenderQuality } from '../../avatar/renderQuality';
 import { IdleSway } from '../../avatar/idleSway';
@@ -17,7 +19,8 @@ import { HipMotion } from '../../avatar/hipMotion';
 import { SaccadeGenerator } from '../../avatar/saccade';
 import { ParamBlender, resolveEyelidScale, resolveExpressionTargets, smoothFactor } from '../../avatar/paramBlender';
 import { createDeepSeekRig } from '../../avatar/rig/createDeepSeekRig';
-import type { Live2DModelLike } from '../../avatar/rig/types';
+import { createParamAccessors } from '../../avatar/rig/math';
+import type { CoreModelLike, Live2DModelLike } from '../../avatar/rig/types';
 
 // pixi-live2d-display reads window.PIXI.Ticker to auto-update models.
 (window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI;
@@ -81,6 +84,8 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           autoDensity: true,
           resolution: quality.resolution
         });
+        // Cap deltaMS to 50ms so GC pauses or background resumes never trigger a physics catch-up spike.
+        app.ticker.minFPS = 20;
         host.appendChild(app.view as HTMLCanvasElement);
 
         let model: Live2DModel;
@@ -108,36 +113,22 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           on(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
           off(event: 'beforeModelUpdate' | 'afterMotionUpdate', fn: () => void): void;
         };
-        const core = internal.coreModel as unknown as {
-          getParameterIndex(id: string): number;
-          getParameterMinimumValue(index: number): number;
-          getParameterMaximumValue(index: number): number;
-          getParameterValueById(id: string): number;
-          setParameterValueById(id: string, value: number): void;
-        };
+        const core = internal.coreModel as unknown as CoreModelLike;
+        const paramAccess = createParamAccessors(core);
 
-        // Parameter IDs that do not exist on this model are ignored.
-        const hasParam = new Map<string, boolean>();
         const setParam = (id: string | undefined, value: number): void => {
           if (!id) return;
-          let ok = hasParam.get(id);
-          if (ok === undefined) {
-            ok = core.getParameterIndex(id) >= 0;
-            hasParam.set(id, ok);
-          }
-          if (!ok) return;
-          const index = core.getParameterIndex(id);
-          const clamped = Math.max(core.getParameterMinimumValue(index), Math.min(core.getParameterMaximumValue(index), value));
-          core.setParameterValueById(id, clamped);
+          paramAccess.setParam(id, value);
         };
 
         // Adds `delta` to the value physics/motion already set this frame (clamped to the range).
         const addParam = (id: string, delta: number): void => {
-          if (core.getParameterIndex(id) < 0) return;
-          setParam(id, core.getParameterValueById(id) + delta);
+          paramAccess.addParam(id, delta);
         };
 
         setMaskRenderTextureCount(internal, config.maskRenderTextures ?? 1);
+        patchCubismPhysics(internal);
+        patchCubismRenderer(model);
 
         const rig = config.interactiveRig === 'deepseek-chan'
           ? createDeepSeekRig(model as unknown as Live2DModelLike, app)
@@ -170,6 +161,10 @@ export const Scene: React.FC<SceneProps> = React.memo(({
         };
         let elapsed = 0;
         let eyelidScale = 1;
+        const allModifiers = { ...config.modifiers, ...config.eyes };
+        let lastSpec: ReturnType<typeof parseExpressionSpec> | null = null;
+        let cachedTargets: Record<string, number> = {};
+        let cachedEyelidTarget = 1;
 
         // Physics reads ParamBreath and PositionX/Y/Z, and runs before `beforeModelUpdate`.
         // Update them right after motion update so hair, skirt, ribbons, ears, and tail react naturally.
@@ -195,17 +190,21 @@ export const Scene: React.FC<SceneProps> = React.memo(({
           const replying = replyingRef.current;
           const spec = emotionRef.current;
 
-          const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
-          const targets = resolveExpressionTargets(config.emotions, { ...config.modifiers, ...config.eyes }, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
-          blender.step(targets, delta).forEach((value, id) => setParam(id, value));
+          if (spec !== lastSpec) {
+            lastSpec = spec;
+            const weights = spec.eye ? { ...spec.modifiers, [spec.eye.id]: spec.eye.weight } : spec.modifiers;
+            cachedTargets = resolveExpressionTargets(config.emotions, allModifiers, spec.base ?? DEFAULT_EMOTION_ID, weights, DEFAULT_EMOTION_ID, spec.baseWeight);
+            cachedEyelidTarget = config.eyelid ? resolveEyelidScale(weights, config.eyelid.closeBy) : 1;
+          }
+          blender.step(cachedTargets, delta).forEach((value, id) => setParam(id, value));
 
           // Lower the eyelids by multiplying the value the automatic blink already wrote this
           // frame, so blinking keeps working (the blender cannot do this, see CharacterModelConfig).
           const eyelid = config.eyelid;
           if (eyelid) {
-            eyelidScale += (resolveEyelidScale(weights, eyelid.closeBy) - eyelidScale) * smoothFactor(7, delta);
+            eyelidScale += (cachedEyelidTarget - eyelidScale) * smoothFactor(7, delta);
             eyelid.paramIds.forEach((id) => {
-              if (core.getParameterIndex(id) >= 0) setParam(id, core.getParameterValueById(id) * eyelidScale);
+              if (paramAccess.hasParam(id)) setParam(id, paramAccess.getParam(id) * eyelidScale);
             });
           }
 

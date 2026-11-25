@@ -134,12 +134,19 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   const [isRecording, setIsRecording] = useState(false);
   const [isFeedHidden, setIsFeedHidden] = useState(false);
   const recognitionRef = useRef<any>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   const latestMessageText = messages[messages.length - 1]?.text || '';
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const feed = feedRef.current;
+    if (!feed || feed.scrollHeight <= feed.clientHeight) return;
+    // Scroll only the feed container itself (never scrollIntoView, which also scrolls the
+    // document/visual viewport on mobile and pushes the header behind browser chrome).
+    feed.scrollTo({
+      top: feed.scrollHeight,
+      behavior: isLoading ? 'auto' : 'smooth',
+    });
   }, [messages.length, isLoading, latestMessageText, isFeedHidden]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -217,7 +224,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
   return (
     <div className="chat-overlay-container fade-in">
       {!isFeedHidden && (
-        <div className="chat-messages-feed">
+        <div className="chat-messages-feed" ref={feedRef}>
           {currentPersona.greeting.trim() && (
             <div className="chat-message chat-message--ai chat-greeting">
               <div className="chat-bubble">
@@ -251,8 +258,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = React.memo(({
               </div>
             </div>
           )}
-
-          <div ref={messagesEndRef} />
         </div>
       )}
 

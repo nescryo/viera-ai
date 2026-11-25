@@ -11,7 +11,7 @@ describe('resolveRenderQuality', () => {
     expect(resolveRenderQuality(2)).toEqual({ resolution: 2, antialias: false });
   });
 
-  it('caps the resolution on very dense displays', () => {
+  it('caps the resolution on very dense displays (including high-DPR mobile screens)', () => {
     expect(resolveRenderQuality(3).resolution).toBe(MAX_RESOLUTION);
     expect(resolveRenderQuality(3).antialias).toBe(false);
   });

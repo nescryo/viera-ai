@@ -338,3 +338,9 @@ select.form-input option {
 .btn--danger:hover:not(:disabled) {
   background: #be123c;
 }
+
+@media (pointer: coarse) {
+  .form-input {
+    font-size: 16px;
+  }
+}

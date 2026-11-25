@@ -2,17 +2,17 @@
 export interface RenderQuality {
   /** Pixel ratio the canvas renders at. */
   resolution: number;
-  /** MSAA is redundant at high pixel ratios and costs fill rate. */
+  /** MSAA is redundant at high pixel ratios and costly on high-DPR tiled GPUs. */
   antialias: boolean;
 }
 
-/** Rendering above this pixel ratio costs a lot of fill rate for no visible gain. */
+/** Resolution cap (rendering above 2x costs fill rate for no visible gain). */
 export const MAX_RESOLUTION = 2;
 
 /**
- * Picks the canvas resolution and antialiasing for a display.
- * The resolution is capped at {@link MAX_RESOLUTION}; antialiasing is only
- * enabled below a pixel ratio of 2, where edges would otherwise look jagged.
+ * Picks the canvas resolution and antialiasing for a display without downgrading mobile visuals.
+ * Caps resolution at {@link MAX_RESOLUTION} and enables MSAA whenever the rendered resolution
+ * is below 2x so anime lineart stays crisp on both desktop and mobile screens.
  * @param devicePixelRatio The display's `window.devicePixelRatio` (invalid values fall back to 1).
  */
 export function resolveRenderQuality(devicePixelRatio: number): RenderQuality {

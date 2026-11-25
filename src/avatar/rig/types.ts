@@ -29,12 +29,14 @@ export interface RawCubismModel {
 
 /** Subset of the Cubism 4 CoreModel API used by the avatar rig. */
 export interface CoreModelLike {
+  getParameterCount?(): number;
   getParameterIndex(id: string): number;
   getParameterMinimumValue(index: number): number;
   getParameterMaximumValue(index: number): number;
   getParameterValueById(id: string): number;
   getParameterValueByIndex(index: number): number;
   setParameterValueById(id: string, value: number): void;
+  setParameterValueByIndex?(index: number, value: number, weight?: number): void;
   addParameterValueById(id: string, value: number, weight?: number): void;
   getDrawableIndex(id: string): number;
   update(): void;
@@ -49,6 +51,11 @@ export interface InternalModelLike {
   pixelsPerUnit: number;
   breath?: {
     setParameters(params: unknown[]): void;
+  };
+  physics?: {
+    _physicsRig?: {
+      fps?: number;
+    };
   };
   motionManager?: {
     isFinished(): boolean;

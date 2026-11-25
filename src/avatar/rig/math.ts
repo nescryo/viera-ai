@@ -18,7 +18,9 @@ export const ARM_REST_HAND_LOCAL_X = 0.190;
 export const ARM_REST_HAND_LOCAL_Y = -0.452;
 
 const RAD_TO_DEG = 180 / Math.PI;
-const MAX_SPRING_SUBSTEP = 1 / 120;
+// Semi-implicit Euler stays stable well below dt < 2/sqrt(K); even for the stiffest rig spring
+// (K=280 -> limit 0.119s), 1/60s gives >7x safety margin while halving sub-step work on mobile.
+const MAX_SPRING_SUBSTEP = 1 / 60;
 
 /** Clamps `v` into `[lo, hi]`. */
 export function clamp(v: number, lo: number, hi: number): number {
@@ -278,56 +280,73 @@ export function getBoundsModelSpace(
   return { minX, maxX, minY, maxY, valid: Number.isFinite(minX) };
 }
 
-/** Creates clamped parameter read/write helpers with cached parameter indices. */
-export function createParamAccessors(core: CoreModelLike): ParamAccessors {
-  const indexCache = new Map<string, number>();
+interface ParamSlot {
+  index: number;
+  min: number;
+  max: number;
+}
 
-  const getIndex = (id: string): number => {
-    let idx = indexCache.get(id);
-    if (idx === undefined) {
-      idx = core.getParameterIndex(id);
-      indexCache.set(id, idx);
+/**
+ * Creates clamped O(1) parameter read/write helpers with cached indices and bounds.
+ * Uses `setParameterValueByIndex` when available to avoid Cubism's per-call O(N) string scan
+ * over all 509 parameters, and rejects out-of-range missing-parameter indices safely.
+ */
+export function createParamAccessors(core: CoreModelLike): ParamAccessors {
+  const slotCache = new Map<string, ParamSlot | null>();
+  const paramCount = typeof core.getParameterCount === 'function'
+    ? core.getParameterCount()
+    : Infinity;
+  const writeByIndex = typeof core.setParameterValueByIndex === 'function'
+    ? (slot: ParamSlot, _id: string, value: number) => core.setParameterValueByIndex!(slot.index, value)
+    : (_slot: ParamSlot, id: string, value: number) => core.setParameterValueById(id, value);
+
+  const getSlot = (id: string): ParamSlot | null => {
+    let slot = slotCache.get(id);
+    if (slot === undefined) {
+      const index = core.getParameterIndex(id);
+      if (index < 0 || index >= paramCount) {
+        slot = null;
+      } else {
+        const min = core.getParameterMinimumValue(index);
+        const max = core.getParameterMaximumValue(index);
+        slot = Number.isFinite(min) && Number.isFinite(max) ? { index, min, max } : null;
+      }
+      slotCache.set(id, slot);
     }
-    return idx;
+    return slot;
   };
 
   return {
     hasParam(id: string): boolean {
-      return getIndex(id) >= 0;
+      return getSlot(id) !== null;
     },
 
     getParam(id: string): number {
-      const i = getIndex(id);
-      return i >= 0 ? core.getParameterValueByIndex(i) : 0;
+      const slot = getSlot(id);
+      return slot ? core.getParameterValueByIndex(slot.index) : 0;
     },
 
     setParam(id: string, value: number): void {
-      const i = getIndex(id);
-      if (i < 0) return;
-      const lo = core.getParameterMinimumValue(i);
-      const hi = core.getParameterMaximumValue(i);
-      core.setParameterValueById(id, clamp(value, lo, hi));
+      const slot = getSlot(id);
+      if (!slot) return;
+      writeByIndex(slot, id, clamp(value, slot.min, slot.max));
     },
 
     addParam(id: string, delta: number): void {
       if (Math.abs(delta) < 1e-4) return;
-      const i = getIndex(id);
-      if (i < 0) return;
-      const lo = core.getParameterMinimumValue(i);
-      const hi = core.getParameterMaximumValue(i);
-      const cur = core.getParameterValueByIndex(i);
-      core.setParameterValueById(id, clamp(cur + delta, lo, hi));
+      const slot = getSlot(id);
+      if (!slot) return;
+      const cur = core.getParameterValueByIndex(slot.index);
+      writeByIndex(slot, id, clamp(cur + delta, slot.min, slot.max));
     },
 
     addScaled(id: string, normalizedDelta: number): void {
       if (Math.abs(normalizedDelta) < 1e-4) return;
-      const i = getIndex(id);
-      if (i < 0) return;
-      const lo = core.getParameterMinimumValue(i);
-      const hi = core.getParameterMaximumValue(i);
-      const cur = core.getParameterValueByIndex(i);
-      const delta = normalizedDelta >= 0 ? normalizedDelta * hi : -normalizedDelta * lo;
-      core.setParameterValueById(id, clamp(cur + delta, lo, hi));
+      const slot = getSlot(id);
+      if (!slot) return;
+      const cur = core.getParameterValueByIndex(slot.index);
+      const delta = normalizedDelta >= 0 ? normalizedDelta * slot.max : -normalizedDelta * slot.min;
+      writeByIndex(slot, id, clamp(cur + delta, slot.min, slot.max));
     },
   };
 }

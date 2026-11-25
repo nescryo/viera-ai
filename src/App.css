@@ -1,8 +1,11 @@
 /* Layout Container */
 .app-container {
-  position: relative;
-  width: 100vw;
+  position: fixed;
+  top: var(--app-top, 0px);
+  left: 0;
+  width: 100%;
   height: 100vh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -56,7 +59,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: var(--scene-height, 100%);
   z-index: 1;
 }
 
@@ -93,7 +96,7 @@
   display: flex;
   flex-direction: column;
   /* Header sits ~76px from the top; keep the card inside the viewport and scroll the content. */
-  max-height: calc(100dvh - 100px);
+  max-height: calc(var(--app-height, 100dvh) - 100px - env(safe-area-inset-top, 0px));
   background: rgba(18, 24, 46, 0.82);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -240,14 +243,15 @@
 /* Header Container - Floating Minimal Layout */
 .header-container {
   position: absolute;
-  top: 20px;
-  left: 24px;
-  right: 24px;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  left: calc(24px + env(safe-area-inset-left, 0px));
+  right: calc(24px + env(safe-area-inset-right, 0px));
   height: 48px;
   z-index: 13; /* above the chat scrim and the chess panel (z-index 12) so header buttons stay clickable */
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0;
   background: transparent !important;
   border: none !important;
@@ -262,6 +266,14 @@
   align-items: center;
   gap: 12px;
   pointer-events: auto;
+}
+
+.header-left {
+  min-width: 0;
+}
+
+.header-right {
+  flex-shrink: 0;
 }
 
 .header-right .icon-btn {
@@ -485,7 +497,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 72px 16px 20px;
+  padding: 72px 16px calc(20px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to bottom, rgba(6, 8, 16, 0) 0%, rgba(6, 8, 16, 0.32) 45%, rgba(6, 8, 16, 0.5) 100%);
   /* The scrim itself must not swallow clicks meant for the scene */
   pointer-events: none;
@@ -503,7 +515,7 @@
 
 /* Chat Messages Feed (older messages fade out at the top) */
 .chat-messages-feed {
-  max-height: 34vh;
+  max-height: min(34vh, calc(var(--app-height, 100dvh) - 180px));
   overflow-y: auto;
   padding: 28px 4px 4px;
   display: flex;
@@ -759,10 +771,10 @@
 /* Modals */
 .modal-backdrop {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   z-index: 100;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(12px);
@@ -774,7 +786,7 @@
 .modal-container {
   width: 600px;
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: min(85%, calc(var(--app-height, 100dvh) - 24px));
   background: var(--glass-card);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -980,15 +992,15 @@
    ========================================================================== */
 .toast-viewport {
   position: fixed;
-  top: 24px;
-  right: 24px;
+  top: calc(var(--app-top, 0px) + 24px + env(safe-area-inset-top, 0px));
+  right: calc(24px + env(safe-area-inset-right, 0px));
   z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
   max-width: 420px;
-  width: calc(100vw - 48px);
+  width: calc(100% - 48px);
 }
 
 .toast-card {
@@ -1081,24 +1093,51 @@
 /* 1. Medium Tablets & Small Desktops (<= 1024px) */
 @media (max-width: 1024px) {
   .header-container {
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
   }
 }
 
 /* 2. Tablets & Smartphones (<= 768px) */
 @media (max-width: 768px) {
   .header-container {
-    top: 10px;
-    left: 12px;
-    right: 12px;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
     height: 44px;
+    gap: 8px;
     padding: 0;
   }
 
+  .header-left {
+    gap: 8px;
+  }
+
+  .header-right {
+    gap: 4px;
+  }
+
+  .header-right .icon-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .header-user-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .brand-logo-img {
+    width: 28px;
+    height: 28px;
+  }
+
   .brand-badge {
-    font-size: 1.1rem;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
     gap: 6px;
   }
 
@@ -1149,30 +1188,31 @@
   }
 
   /* Expression dropdown on Mobile */
-
-
   .expression-dropdown-card {
-    max-height: min(420px, calc(100dvh - 90px));
+    max-height: min(420px, calc(var(--app-height, 100dvh) - 80px - env(safe-area-inset-top, 0px)));
+    max-width: calc(100vw - 24px);
   }
 
   /* Mobile: same centered layout, a little more room for text */
   .chat-overlay-container {
-    padding: 48px 8px 10px;
+    padding: 48px 8px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .chat-messages-feed {
-    max-height: 40vh;
+    max-height: min(38vh, calc(var(--app-height, 100dvh) - 160px));
   }
 
-
-
-
+  .toast-viewport {
+    top: calc(var(--app-top, 0px) + 12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    width: calc(100% - 24px);
+  }
 
   /* Modals on Mobile */
   .modal-container {
     width: 95vw !important;
     max-width: 95vw !important;
-    max-height: 88vh !important;
+    max-height: calc(var(--app-height, 100dvh) - 24px) !important;
     border-radius: var(--radius-lg);
   }
 
@@ -1189,14 +1229,52 @@
 
 /* 3. Small Mobile Devices (<= 480px) */
 @media (max-width: 480px) {
+  .header-container {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    right: calc(10px + env(safe-area-inset-right, 0px));
+  }
+
+  .header-right {
+    gap: 2px;
+  }
+
+  .header-right .icon-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .header-right .icon-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .header-user-avatar {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand-logo-img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand-badge {
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
+    gap: 5px;
+  }
+
   .chat-overlay-container {
-    padding: 40px 6px 8px;
+    padding: 40px 6px calc(8px + env(safe-area-inset-bottom, 0px));
   }
+}
 
-  .chat-input {
-    font-size: 0.88rem;
+@media (max-width: 360px) {
+  .expression-dropdown-card {
+    right: -36px;
   }
-
 }
 
 /* 4. Touchscreen Interaction Ergonomics (No Hover Capability) */
@@ -1212,6 +1290,48 @@
   .card-action-btn {
     background: rgba(255, 255, 255, 0.08);
   }
+}
+
+/* 4b. Mobile & Touch GPU Optimization: avoid full-screen background repaints and per-frame
+   backdrop-filter readbacks over the active Live2D WebGL canvas. */
+@media (max-width: 768px), (pointer: coarse) {
+  .app-container::after {
+    animation: none;
+  }
+
+  .chat-bubble {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(10, 14, 28, 0.78);
+  }
+
+  .chat-message--user .chat-bubble {
+    background: rgba(79, 82, 204, 0.78);
+  }
+
+  .chat-input-form {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(10, 14, 28, 0.82);
+  }
+
+  /* 16px prevents mobile Safari from auto-zooming the viewport on focus. */
+  .chat-input {
+    font-size: 16px;
+  }
+}
+
+/* 4c. Mobile software keyboard open: keep header and character head visible while
+   pinning the chat input right above the keyboard without overflowing upward. */
+html.keyboard-open .chat-overlay-container {
+  padding: 16px 8px 8px;
+}
+
+html.keyboard-open .chat-messages-feed {
+  max-height: min(160px, max(56px, calc(var(--app-height, 100dvh) - 140px)));
+  padding-top: 12px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
 }
 
 /* 5. Accessibility Motion Safety (Prefers-Reduced-Motion) */
