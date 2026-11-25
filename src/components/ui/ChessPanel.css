@@ -24,12 +24,15 @@
   z-index: 12;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr auto;
   pointer-events: none;
 }
 
 .chess-panel > * { pointer-events: auto; }
 
 .chess-main {
+  grid-column: 1;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -42,6 +45,7 @@
 
 .chess-topbar,
 .chess-toolbar,
+.chess-review-bar,
 .chess-moves {
   width: var(--chess-board-size);
 }
@@ -210,6 +214,11 @@
   transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
+.chess-icon-btn--sm {
+  width: 34px;
+  height: 34px;
+}
+
 .chess-icon-btn:hover:not(:disabled) { background: var(--bg-hover); }
 .chess-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .chess-icon-btn:focus-visible,
@@ -222,6 +231,7 @@
 
 /* Board */
 .chess-board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
@@ -231,6 +241,30 @@
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.chess-board.is-readonly .chess-square {
+  cursor: default;
+}
+
+.chess-board-arrow-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.chess-best-arrow-shaft {
+  stroke: rgba(34, 197, 94, 0.86);
+  stroke-width: 0.17;
+  stroke-linecap: round;
+}
+
+.chess-best-arrow-head {
+  fill: rgba(34, 197, 94, 0.92);
 }
 
 .chess-square {
@@ -360,6 +394,139 @@
 .chess-coord--file { right: 3px; bottom: 2px; }
 .chess-coord--rank { left: 3px; top: 2px; }
 
+/* Move review bar (replaces toolbar while reviewing so board height stays steady) */
+.chess-review-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 5px 10px;
+  background: var(--glass-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+}
+
+.chess-review-progress-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.chess-review-status {
+  font-size: 0.82rem;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.chess-review-progress-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.chess-review-progress-fill {
+  height: 100%;
+  background: var(--accent-cyan);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.chess-review-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.chess-verdict {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 999px;
+}
+
+.chess-verdict--best {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.chess-verdict--good {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.chess-verdict--inaccuracy {
+  color: #fde047;
+  background: rgba(234, 179, 8, 0.2);
+}
+
+.chess-verdict--mistake {
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.22);
+}
+
+.chess-verdict--blunder {
+  color: #fda4af;
+  background: rgba(244, 63, 94, 0.24);
+}
+
+.chess-review-move {
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.chess-review-better {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #86efac;
+  font-variant-numeric: tabular-nums;
+}
+
+.chess-review-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chess-review-counter {
+  min-width: 30px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.chess-chat.is-disabled {
+  opacity: 0.6;
+}
+
+.chess-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chess-review-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Move list drawer */
 /* One horizontal strip; the board size reserves its height (--chess-moves-space) so the board never jumps */
 .chess-moves {
@@ -437,11 +604,14 @@
 .chess-moves-empty { color: var(--text-subtle); }
 
 /* Right column: bubble sits near the character; empty area stays click-through for Live2D touch */
-.chess-panel > .chess-side {
+.chess-panel > .chess-side,
+.chess-panel > .chess-chat-dock {
   pointer-events: none;
 }
 
 .chess-side {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -449,23 +619,63 @@
   gap: 12px;
   width: min(100%, 640px);
   justify-self: start;
-  padding: 16px 24px 40px;
+  padding: 16px 24px 0;
 }
 
-.chess-side > * {
+.chess-panel:not(:has(.chess-chat-dock)) .chess-side {
+  padding-bottom: 40px;
+}
+
+.chess-chat-dock {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  justify-content: center;
+  width: min(100%, 640px);
+  justify-self: start;
+  padding: 12px 24px 40px;
+}
+
+.chess-side > *,
+.chess-chat-dock > * {
   pointer-events: auto;
 }
 
 .chess-bubble {
   max-width: 420px;
+  max-height: min(32dvh, 220px);
   margin: 0;
   padding: 14px 18px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  color-scheme: dark;
   color: var(--text-normal);
   background: var(--glass-card);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
+}
+
+.chess-bubble::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chess-bubble::-webkit-scrollbar-track {
+  margin: 10px 0;
+  background: transparent;
+}
+
+.chess-bubble::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .chess-bubble {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
 }
 
 .chess-chat {
@@ -624,10 +834,11 @@
   color: var(--text-muted);
 }
 
-/* Scene moves to the right half while chess is open; Scene's ResizeObserver re-centers the model */
+/* Keep the scene full-width and shift it horizontally so the model (anchor x = 0.5) still centers
+   over .chess-side (50% + min(25%, 320px)) without clipping outstretched arms at the 640px edges. */
 .app-container.chess-active .scene-container {
-  left: 50%;
-  width: min(50%, 640px);
+  left: min(25%, 320px);
+  width: 100%;
 }
 
 .app-container.chess-active .chat-overlay-container { display: none; }
@@ -635,22 +846,84 @@
 @media (max-width: 768px) {
   .chess-confirm-scrim { padding: 16px; }
 
-  :root { --chess-board-size: min(92vw, calc(var(--scene-height, 100dvh) - 330px - var(--chess-moves-space))); }
+  :root {
+    --chess-moves-space: 46px;
+    --chess-board-size: min(92vw, calc(var(--scene-height, 100dvh) - 340px - var(--chess-moves-space)));
+  }
 
   .chess-panel {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-    /* character on top, board below */
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    /* character + bubble on top, board in the middle, chat input in the bottom thumb zone */
     direction: ltr;
   }
 
-  .chess-main { grid-row: 2; width: 100%; justify-self: stretch; padding: 8px 8px calc(12px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
-  .chess-side { grid-row: 1; width: 100%; justify-self: stretch; justify-content: flex-start; padding: calc(64px + env(safe-area-inset-top, 0px)) 12px 0; }
+  .chess-side {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    justify-self: stretch;
+    justify-content: flex-end;
+    padding: calc(56px + env(safe-area-inset-top, 0px)) 12px 6px;
+    gap: 8px;
+  }
+
+  .chess-panel:not(:has(.chess-chat-dock)) .chess-side {
+    padding-bottom: 6px;
+  }
+
+  .chess-main {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    justify-self: stretch;
+    padding: 4px 8px 6px;
+    gap: 6px;
+  }
+
+  .chess-panel:not(:has(.chess-chat-dock)) .chess-main {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chess-chat-dock {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+    justify-self: stretch;
+    padding: 4px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chess-chat-dock .chess-chat {
+    width: var(--chess-board-size);
+    max-width: 100%;
+    padding: 3px 5px 3px 14px;
+  }
+
+  .chess-bubble {
+    max-width: var(--chess-board-size);
+    max-height: min(20dvh, 140px);
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+
+  .chess-review-bar {
+    flex-wrap: wrap;
+    padding: 5px 8px;
+    gap: 6px 8px;
+  }
 
   .app-container.chess-active .scene-container {
+    top: calc(44px + env(safe-area-inset-top, 0px));
     left: 0;
     width: 100%;
     height: calc(var(--scene-height, 100dvh) * 0.42);
+    -webkit-mask-image: linear-gradient(to bottom, #000 76%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 76%, transparent 100%);
+  }
+
+  /* Keep the character, speech bubble, and chat input unobstructed when the mobile keyboard opens */
+  :root.keyboard-open .app-container.chess-active .chess-main {
+    display: none;
   }
 }
 
@@ -669,7 +942,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chess-icon-btn { transition: none; }
+  .chess-icon-btn,
+  .chess-review-progress-fill { transition: none; }
   .chess-piece-slot.is-animating-a,
   .chess-piece-slot.is-animating-b {
     will-change: auto;

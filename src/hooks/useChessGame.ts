@@ -18,6 +18,9 @@ import { createStockfishEngine } from '../services/chess/engine';
 import type { ChessEngine } from '../services/chess/engine';
 import { resolveChessMood } from '../services/chess/evalMood';
 import { detectGameEvent } from '../services/chess/gameEvents';
+import { buildReviewChatPrompt } from '../services/chess/moveReview';
+import { useChessReview } from './useChessReview';
+import type { ChessReviewState } from './useChessReview';
 
 export interface ChessReaction {
   text: string;
@@ -48,10 +51,18 @@ export interface UseChessGame extends ChessSnapshot {
   /** Latest notable spoken reaction from DeepSeek-chan, or null on ordinary quiet moves. */
   reaction: ChessReaction | null;
   canUndo: boolean;
+  /** True when at least one user move exists and the engine is not busy. */
+  canReview: boolean;
+  /** Active move review state (analyzing, stepping through moments, or idle). */
+  review: ChessReviewState;
   /** True when persona and API config allow free-form chat with the opponent. */
   chatEnabled: boolean;
-  /** Sends a free-form user message with board context. Returns false if empty or no LLM is configured. */
+  /** Sends a free-form user message with board or review context. Returns false if empty, analyzing, or no LLM is configured. */
   sendUserChat(text: string): boolean;
+  startReview(): void;
+  prevReviewMoment(): void;
+  nextReviewMoment(): void;
+  exitReview(): void;
   legalMovesFrom(square: Square): Square[];
   isPromotionMove(from: Square, to: Square): boolean;
   tryUserMove(from: Square, to: Square, promotion?: PromotionPiece): boolean;
@@ -86,6 +97,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   const chessMessagesRef = useRef<ChatMessage[]>([]);
   const lastCommentedPlyRef = useRef<number | null>(null);
   const evalCpRef = useRef<number | undefined>(undefined);
+  const liveMoodRef = useRef('relaxed');
   const moodRef = useRef('relaxed');
   useEffect(() => {
     moodRef.current = mood;
@@ -120,7 +132,9 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       fallbackMood: string,
       notifyError: boolean,
       preallocatedToken?: number,
-      persistUserText?: string
+      persistUserText?: string,
+      onComplete?: (reaction: ChessReaction) => void,
+      onError?: () => void
     ): boolean => {
       const {
         persona: activePersona,
@@ -177,7 +191,8 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
           const finalEmotion = emotions[0] ?? parsed.emotion ?? fallbackMood;
           setMood(finalEmotion);
           if (clean) {
-            setReaction({ text: clean, emotion: finalEmotion });
+            const finalReaction = { text: clean, emotion: finalEmotion };
+            setReaction(finalReaction);
             const aiMsg: ChatMessage = {
               id: `chess-ai-${idTag}-${Date.now()}`,
               characterId: activePersona.id,
@@ -191,11 +206,14 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
             chessMessagesRef.current = trimChessContext([...chessMessagesRef.current, aiMsg]);
             optionsRef.current.onChatMessages?.([{ ...aiMsg, gameId: gameIdRef.current }]);
             speakFn?.(aiMsg);
+            onComplete?.(finalReaction);
           }
         },
         () => {
+          if (requestToken !== llmTokenRef.current) return;
+          onError?.();
           // Commentary errors stay silent; a chat message the user typed gets visible feedback.
-          if (!notifyError || requestToken !== llmTokenRef.current) return;
+          if (!notifyError) return;
           setReaction({ text: 'Connection problem. Try sending that again.', emotion: fallbackMood });
         },
         activeUser,
@@ -206,6 +224,70 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     },
     []
   );
+
+  const cancelLlm = useCallback(() => {
+    llmTokenRef.current += 1;
+  }, []);
+
+  const applyReviewReaction = useCallback((nextReaction: ChessReaction | null, nextMood?: string) => {
+    setReaction(nextReaction);
+    if (nextMood) setMood(nextMood);
+  }, []);
+
+  const requestReviewReply = useCallback(
+    (
+      promptText: string,
+      idTag: string,
+      fallbackMood: string,
+      onComplete?: (finalReaction: ChessReaction) => void,
+      onError?: () => void
+    ) => requestReply(promptText, idTag, fallbackMood, false, undefined, undefined, onComplete, onError),
+    [requestReply]
+  );
+
+  const reviewHook = useChessReview({
+    engineRef,
+    requestReviewReply,
+    cancelLlm,
+    applyReaction: applyReviewReaction,
+    getLiveMood: () => liveMoodRef.current
+  });
+
+  const {
+    startReview: startReviewSession,
+    prevMoment: prevReviewMoment,
+    nextMoment: nextReviewMoment,
+    exitReview
+  } = reviewHook;
+
+  const reviewStateRef = useRef<ChessReviewState>({
+    phase: reviewHook.phase,
+    progress: reviewHook.progress,
+    moments: reviewHook.moments,
+    currentIndex: reviewHook.currentIndex,
+    currentMoment: reviewHook.currentMoment,
+    gameResult: reviewHook.gameResult,
+    errorMessage: reviewHook.errorMessage
+  });
+  useEffect(() => {
+    reviewStateRef.current = {
+      phase: reviewHook.phase,
+      progress: reviewHook.progress,
+      moments: reviewHook.moments,
+      currentIndex: reviewHook.currentIndex,
+      currentMoment: reviewHook.currentMoment,
+      gameResult: reviewHook.gameResult,
+      errorMessage: reviewHook.errorMessage
+    };
+  }, [
+    reviewHook.phase,
+    reviewHook.progress,
+    reviewHook.moments,
+    reviewHook.currentIndex,
+    reviewHook.currentMoment,
+    reviewHook.gameResult,
+    reviewHook.errorMessage
+  ]);
 
   const triggerLlmCommentary = useCallback(
     (
@@ -257,6 +339,21 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       const { persona: activePersona, apiConfig: activeConfig } = optionsRef.current;
       if (!activePersona || !activeConfig?.baseUrl?.trim() || !activeConfig?.model?.trim()) {
         return false;
+      }
+
+      const activeReview = reviewStateRef.current;
+      if (activeReview.phase === 'analyzing') {
+        return false;
+      }
+      if (activeReview.phase === 'ready' && activeReview.currentMoment) {
+        const promptText = buildReviewChatPrompt({
+          move: activeReview.currentMoment,
+          position: activeReview.currentIndex + 1,
+          total: activeReview.moments.length,
+          result: activeReview.gameResult,
+          text
+        });
+        return requestReply(promptText, 'review-chat', moodRef.current, true, undefined, text);
       }
 
       const next = session.snapshot();
@@ -344,6 +441,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         event,
         result: next.result
       });
+      liveMoodRef.current = resolvedMood;
       setMood(resolvedMood);
 
       // Trigger LLM commentary after DeepSeek-chan's reply or when the game ends
@@ -389,6 +487,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
 
   const tryUserMove = useCallback(
     (from: Square, to: Square, promotion?: PromotionPiece): boolean => {
+      if (reviewStateRef.current.phase !== 'idle') return false;
       const entry = session.userMove(from, to, promotion);
       if (!entry) return false;
       const next = afterMove(entry);
@@ -400,6 +499,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
 
   const newGame = useCallback(
     (userColor?: Color) => {
+      exitReview();
       cancelPending();
       llmTokenRef.current += 1;
       gameIdRef.current = `chess-${Date.now()}`;
@@ -407,6 +507,7 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       chessMessagesRef.current = [];
       lastCommentedPlyRef.current = null;
       evalCpRef.current = undefined;
+      liveMoodRef.current = 'relaxed';
       session.reset(userColor);
       setSnapshot(session.snapshot());
       setMood('relaxed');
@@ -414,10 +515,11 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
       // When the user plays black, DeepSeek-chan opens
       if (session.snapshot().turn === 'deepseek') void runEngine();
     },
-    [session, cancelPending, runEngine]
+    [session, cancelPending, runEngine, exitReview]
   );
 
   const resign = useCallback(() => {
+    exitReview();
     cancelPending();
     session.resign();
     const next = session.snapshot();
@@ -435,12 +537,14 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
         event,
         result: next.result
       });
+      liveMoodRef.current = resolvedMood;
       setMood(resolvedMood);
       triggerLlmCommentary(next, event, evalCpRef.current, resolvedMood);
     }
-  }, [session, cancelPending, triggerLlmCommentary]);
+  }, [session, cancelPending, triggerLlmCommentary, exitReview]);
 
   const undo = useCallback(() => {
+    if (reviewStateRef.current.phase !== 'idle') return;
     if (!session.undo()) return;
     llmTokenRef.current += 1;
     const next = session.snapshot();
@@ -450,6 +554,11 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     setSnapshot(next);
     setReaction(null);
   }, [session]);
+
+  const startReview = useCallback(() => {
+    if (thinking) return;
+    startReviewSession(session.snapshot());
+  }, [thinking, session, startReviewSession]);
 
   const setDifficulty = useCallback((id: DifficultyId) => {
     const nextPreset = getDifficultyPreset(id);
@@ -481,11 +590,23 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
   );
 
   const status: ChessStatus = snapshot.result ? 'finished' : thinking ? 'thinking' : 'playing';
+  const hasUserMoves = snapshot.entries.some((entry) => entry.by === 'user');
   const canUndo =
+    reviewHook.phase === 'idle' &&
     status === 'playing' &&
     snapshot.turn === 'user' &&
-    snapshot.entries.some((entry) => entry.by === 'user');
+    hasUserMoves;
+  const canReview = reviewHook.phase === 'idle' && status !== 'thinking' && hasUserMoves;
   const chatEnabled = Boolean(persona && apiConfig?.baseUrl?.trim() && apiConfig?.model?.trim());
+  const review: ChessReviewState = {
+    phase: reviewHook.phase,
+    progress: reviewHook.progress,
+    moments: reviewHook.moments,
+    currentIndex: reviewHook.currentIndex,
+    currentMoment: reviewHook.currentMoment,
+    gameResult: reviewHook.gameResult,
+    errorMessage: reviewHook.errorMessage
+  };
 
   return {
     ...snapshot,
@@ -494,8 +615,14 @@ export function useChessGame(options: UseChessGameOptions = {}): UseChessGame {
     mood,
     reaction,
     canUndo,
+    canReview,
+    review,
     chatEnabled,
     sendUserChat,
+    startReview,
+    prevReviewMoment,
+    nextReviewMoment,
+    exitReview,
     legalMovesFrom,
     isPromotionMove,
     tryUserMove,

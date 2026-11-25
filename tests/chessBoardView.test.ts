@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  boardArrowGeometry,
   isDarkSquare,
   moveAnimationSteps,
   orderedSquares,
+  squareCenter,
   squareDelta,
   squareLabel,
   stepSquare
@@ -71,5 +73,24 @@ describe('boardView', () => {
     expect(moveAnimationSteps({ from: 'e1', to: 'c1' }, 'r', 'w')).toEqual([
       { from: 'e1', to: 'c1', dx: 2, dy: 0 }
     ]);
+  });
+
+  it('computes square centers and arrow geometry for white and black orientations', () => {
+    expect(squareCenter('a8', 'w')).toEqual({ x: 0.5, y: 0.5 });
+    expect(squareCenter('h1', 'w')).toEqual({ x: 7.5, y: 7.5 });
+    expect(squareCenter('a8', 'b')).toEqual({ x: 7.5, y: 7.5 });
+    expect(squareCenter('h1', 'b')).toEqual({ x: 0.5, y: 0.5 });
+
+    const whiteArrow = boardArrowGeometry('e2', 'e4', 'w');
+    expect(whiteArrow).not.toBeNull();
+    expect(whiteArrow!.x1).toBeCloseTo(4.5);
+    expect(whiteArrow!.x2).toBeCloseTo(4.5);
+    expect(whiteArrow!.y1).toBeGreaterThan(whiteArrow!.y2);
+
+    const blackArrow = boardArrowGeometry('e2', 'e4', 'b');
+    expect(blackArrow).not.toBeNull();
+    expect(blackArrow!.y1).toBeLessThan(blackArrow!.y2);
+
+    expect(boardArrowGeometry('e4', 'e4', 'w')).toBeNull();
   });
 });

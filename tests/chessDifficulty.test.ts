@@ -120,6 +120,49 @@ describe('createStockfishEngine', () => {
     expect(hintMove).toBe('g1f3');
     expect(engine.getLastEvalCp?.()).toBe(18);
 
+    // analyzePosition runs at requested depth with full strength, returns bestMove + evalCp,
+    // and leaves DeepSeek-chan's live lastEvalCp untouched
+    fakePort.postMessage = (cmd: string) => {
+      if (cmd === 'go depth 12') {
+        sent.push(cmd);
+        queueMicrotask(() => {
+          emit('info depth 10 score cp 42 pv d7d5');
+          emit('info depth 12 score cp -95 pv c7c5');
+          emit('bestmove c7c5');
+        });
+        return;
+      }
+      originalPost(cmd);
+    };
+
+    const analysis = await engine.analyzePosition?.(startFen, 12);
+    expect(analysis).toEqual({ bestMove: 'c7c5', evalCp: -95 });
+    expect(engine.getLastEvalCp?.()).toBe(18);
+
+    // Aborting mid-search sends UCI `stop` and returns empty analysis cleanly
+    const controller = new AbortController();
+    fakePort.postMessage = (cmd: string) => {
+      if (cmd === 'go depth 12') {
+        sent.push(cmd);
+        queueMicrotask(() => controller.abort());
+        return;
+      }
+      if (cmd === 'stop') {
+        sent.push(cmd);
+        queueMicrotask(() => emit('bestmove e7e5'));
+        return;
+      }
+      originalPost(cmd);
+    };
+
+    const aborted = await engine.analyzePosition?.(startFen, 12, controller.signal);
+    expect(aborted).toEqual({ bestMove: null, evalCp: undefined });
+    expect(sent).toContain('stop');
+
+    // Malformed FEN returns empty analysis without marking the engine broken
+    const invalid = await engine.analyzePosition?.('not-a-valid-fen', 12);
+    expect(invalid).toEqual({ bestMove: null, evalCp: undefined });
+
     engine.dispose();
     expect(terminated).toBe(true);
   });

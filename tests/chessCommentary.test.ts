@@ -190,6 +190,11 @@ describe('buildChessChatPrompt & move helpers', () => {
   it('addendum forbids naming the hint, engine, or data sources', () => {
     expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('Never mention hints, engines, Stockfish');
   });
+
+  it('addendum covers move review moments and follow-up review questions', () => {
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('[Chess Move Review]');
+    expect(CHESS_SYSTEM_PROMPT_ADDENDUM).toContain('[Chess Review Question]');
+  });
 });
 
 describe('trimChessContext', () => {

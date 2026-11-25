@@ -1,11 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Color, Square } from 'chess.js';
-import { ArrowLeft, ChevronDown, Flag, ListOrdered, Send, Undo2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  ListOrdered,
+  ScanSearch,
+  Send,
+  Undo2,
+  X
+} from 'lucide-react';
 import type { ApiConfig, ChatMessage, Persona, UserProfile } from '../../types';
 import { useChessGame } from '../../hooks/useChessGame';
 import type { ChessGameRecord, PromotionPiece } from '../../services/chess/chessSession';
 import { MAX_CHESS_CHAT_CHARS } from '../../services/chess/commentary';
 import { DIFFICULTY_PRESETS } from '../../services/chess/difficulty';
+import {
+  findCheckedKingSquare,
+  formatReviewMove,
+  parseUciSquares
+} from '../../services/chess/moveReview';
+import type { MoveLabel } from '../../services/chess/moveReview';
 import { ChessBoard } from './ChessBoard';
 import { ChessNewGameMenu } from './ChessNewGameMenu';
 import { ChessPiece } from './ChessPiece';
@@ -32,6 +49,14 @@ const RESULT_TEXT = {
   'deepseek-win': 'You lose',
   draw: 'Draw'
 } as const;
+
+const VERDICT_LABEL: Record<MoveLabel, string> = {
+  best: 'Best',
+  good: 'Good',
+  inaccuracy: 'Inaccuracy',
+  mistake: 'Mistake',
+  blunder: 'Blunder'
+};
 
 const PROMOTION_OPTIONS: { piece: PromotionPiece; label: string }[] = [
   { piece: 'q', label: 'Queen' },
@@ -73,8 +98,26 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   const movesRef = useRef<HTMLOListElement>(null);
   const difficultyRef = useRef<HTMLDivElement>(null);
 
-  const targets = useMemo(() => (selected ? game.legalMovesFrom(selected) : []), [selected, game]);
+  const isReviewActive = game.review.phase !== 'idle';
+  const activeMoment = game.review.phase === 'ready' ? game.review.currentMoment : null;
+
+  const targets = useMemo(
+    () => (selected && !isReviewActive ? game.legalMovesFrom(selected) : []),
+    [selected, isReviewActive, game]
+  );
   const rows = useMemo(() => toMoveRows(game.entries.map((entry) => entry.san)), [game.entries]);
+  const boardFen = activeMoment ? activeMoment.ply.fenAfter : game.fen;
+  const boardLastMove = activeMoment
+    ? { from: activeMoment.ply.entry.from, to: activeMoment.ply.entry.to }
+    : game.lastMove;
+  const boardCheckSquare = useMemo(
+    () => (activeMoment ? findCheckedKingSquare(activeMoment.ply.fenAfter) : game.checkSquare),
+    [activeMoment, game.checkSquare]
+  );
+  const bestMoveArrow = useMemo(
+    () => (activeMoment && activeMoment.label !== 'best' ? parseUciSquares(activeMoment.bestMoveUci) : null),
+    [activeMoment]
+  );
 
   useEffect(() => {
     onEmotion(game.reaction?.emotion ?? game.mood);
@@ -109,7 +152,7 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
   }, [showDifficulty]);
 
   const handleSquare = (square: Square) => {
-    if (game.status !== 'playing' || game.turn !== 'user') return;
+    if (isReviewActive || game.status !== 'playing' || game.turn !== 'user') return;
     if (selected && targets.includes(square)) {
       if (game.isPromotionMove(selected, square)) {
         setPendingPromotion({ from: selected, to: square });
@@ -121,6 +164,12 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
     }
     setPendingPromotion(null);
     setSelected(game.legalMovesFrom(square).length > 0 && square !== selected ? square : null);
+  };
+
+  const handleStartReview = () => {
+    setSelected(null);
+    setPendingPromotion(null);
+    game.startReview();
   };
 
   const handlePromotionSelect = (piece: PromotionPiece) => {
@@ -136,13 +185,23 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
     setPendingPromotion(null);
   };
 
-  const isActiveGame =game.status !== 'finished' && game.entries.length > 0;
+  const isActiveGame = game.status !== 'finished' && game.entries.length > 0;
+  const isAnalyzingReview = game.review.phase === 'analyzing';
 
   const statusText =
-    game.result ? RESULT_TEXT[game.result.outcome]
-    : game.status === 'thinking' ? `${opponentName} is thinking...`
-    : game.checkSquare ? 'Your move, you are in check'
-    : 'Your move';
+    isAnalyzingReview
+      ? `Analyzing moves (${game.review.progress.completed}/${game.review.progress.total})...`
+      : activeMoment
+        ? `Review · Moment ${game.review.currentIndex + 1} of ${game.review.moments.length}`
+        : game.review.phase === 'error'
+          ? 'Move review unavailable'
+          : game.result
+            ? RESULT_TEXT[game.result.outcome]
+            : game.status === 'thinking'
+              ? `${opponentName} is thinking...`
+              : game.checkSquare
+                ? 'Your move, you are in check'
+                : 'Your move';
 
   return (
     <section className="chess-panel" aria-label="Chess game">
@@ -202,52 +261,164 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
         </header>
 
         <ChessBoard
-          fen={game.fen}
+          fen={boardFen}
           orientation={game.userColor}
-          selected={selected}
+          selected={isReviewActive ? null : selected}
           targets={targets}
-          lastMove={game.lastMove}
-          moveCount={game.entries.length}
-          checkSquare={game.checkSquare}
+          lastMove={boardLastMove}
+          bestMoveArrow={bestMoveArrow}
+          moveCount={isReviewActive ? -1 : game.entries.length}
+          checkSquare={boardCheckSquare}
+          readOnly={isReviewActive}
           onSquareActivate={handleSquare}
         />
 
-        <div className="chess-toolbar">
-          <button
-            type="button"
-            className="chess-icon-btn"
-            onClick={() => { game.undo(); setSelected(null); setPendingPromotion(null); }}
-            disabled={!game.canUndo}
-            aria-label="Undo your last move"
-            title="Undo"
-          >
-            <Undo2 size={20} />
-          </button>
-          <button
-            type="button"
-            className="chess-icon-btn"
-            onClick={() => { setPendingPromotion(null); setConfirm('resign'); }}
-            disabled={game.status === 'finished'}
-            aria-label="Resign"
-            title="Resign"
-          >
-            <Flag size={20} />
-          </button>
-          <ChessNewGameMenu onStart={startNewGame} />
-          <button
-            type="button"
-            className="chess-icon-btn"
-            onClick={() => setShowMoves((open) => !open)}
-            aria-expanded={showMoves}
-            aria-controls="chess-moves"
-            aria-label="Move list"
-            title="Moves"
-          >
-            <ListOrdered size={20} />
-          </button>
-        </div>
+        {isReviewActive ? (
+          <div className="chess-review-bar" role="region" aria-label="Move review controls">
+            {isAnalyzingReview && (
+              <>
+                <div className="chess-review-progress-wrap">
+                  <span className="chess-review-status">
+                    Analyzing {game.review.progress.completed}/{game.review.progress.total}
+                  </span>
+                  <div className="chess-review-progress-track" aria-hidden="true">
+                    <div
+                      className="chess-review-progress-fill"
+                      style={{
+                        width: `${
+                          game.review.progress.total > 0
+                            ? Math.round((game.review.progress.completed / game.review.progress.total) * 100)
+                            : 0
+                        }%`
+                      }}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="chess-icon-btn"
+                  onClick={game.exitReview}
+                  aria-label="Cancel review analysis"
+                  title="Cancel"
+                >
+                  <X size={18} />
+                </button>
+              </>
+            )}
 
-        {showMoves && (
+            {activeMoment && (
+              <>
+                <div className="chess-review-info">
+                  <span className={`chess-verdict chess-verdict--${activeMoment.label}`}>
+                    {VERDICT_LABEL[activeMoment.label]}
+                  </span>
+                  <span className="chess-review-move">{formatReviewMove(activeMoment)}</span>
+                  {activeMoment.label !== 'best' && activeMoment.bestMoveSan && (
+                    <span className="chess-review-better">Better: {activeMoment.bestMoveSan}</span>
+                  )}
+                </div>
+                <div className="chess-review-nav">
+                  <button
+                    type="button"
+                    className="chess-icon-btn chess-icon-btn--sm"
+                    onClick={game.prevReviewMoment}
+                    disabled={game.review.currentIndex === 0}
+                    aria-label="Previous moment"
+                    title="Previous"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="chess-review-counter" aria-live="polite">
+                    {game.review.currentIndex + 1}/{game.review.moments.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="chess-icon-btn chess-icon-btn--sm"
+                    onClick={game.nextReviewMoment}
+                    disabled={game.review.currentIndex >= game.review.moments.length - 1}
+                    aria-label="Next moment"
+                    title="Next"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="chess-icon-btn chess-icon-btn--sm"
+                    onClick={game.exitReview}
+                    aria-label="Exit review"
+                    title="Exit review"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </>
+            )}
+
+            {game.review.phase === 'error' && (
+              <>
+                <span className="chess-review-status">
+                  {game.review.errorMessage ?? 'Move review unavailable.'}
+                </span>
+                <button
+                  type="button"
+                  className="chess-icon-btn chess-icon-btn--sm"
+                  onClick={game.exitReview}
+                  aria-label="Close review message"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="chess-toolbar">
+            <button
+              type="button"
+              className="chess-icon-btn"
+              onClick={() => { game.undo(); setSelected(null); setPendingPromotion(null); }}
+              disabled={!game.canUndo}
+              aria-label="Undo your last move"
+              title="Undo"
+            >
+              <Undo2 size={20} />
+            </button>
+            <button
+              type="button"
+              className="chess-icon-btn"
+              onClick={() => { setPendingPromotion(null); setConfirm('resign'); }}
+              disabled={game.status === 'finished'}
+              aria-label="Resign"
+              title="Resign"
+            >
+              <Flag size={20} />
+            </button>
+            <ChessNewGameMenu onStart={startNewGame} />
+            <button
+              type="button"
+              className="chess-icon-btn"
+              onClick={() => setShowMoves((open) => !open)}
+              aria-expanded={showMoves}
+              aria-controls="chess-moves"
+              aria-label="Move list"
+              title="Moves"
+            >
+              <ListOrdered size={20} />
+            </button>
+            <button
+              type="button"
+              className="chess-icon-btn"
+              onClick={handleStartReview}
+              disabled={!game.canReview}
+              aria-label="Review your moves"
+              title="Review moves"
+            >
+              <ScanSearch size={20} />
+            </button>
+          </div>
+        )}
+
+        {!isReviewActive && showMoves && (
           <ol
             ref={movesRef}
             id="chess-moves"
@@ -282,12 +453,33 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
         {game.reaction && (
           <p className="chess-bubble" role="status" aria-live="polite">{game.reaction.text}</p>
         )}
-        {game.chatEnabled && (
+        {game.status === 'finished' && game.result && !isReviewActive && (
+          <div className={`chess-result chess-result--${game.result.outcome}`}>
+            <strong className="chess-result-label">{RESULT_TEXT[game.result.outcome]}</strong>
+            <div className="chess-result-actions">
+              {game.canReview && (
+                <button
+                  type="button"
+                  className="btn btn--secondary chess-review-cta"
+                  onClick={handleStartReview}
+                >
+                  <ScanSearch size={16} aria-hidden="true" />
+                  <span>Review</span>
+                </button>
+              )}
+              <ChessNewGameMenu variant="primary" onStart={startNewGame} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {game.chatEnabled && (
+        <div className="chess-chat-dock">
           <form
-            className="chess-chat"
+            className={`chess-chat${isAnalyzingReview ? ' is-disabled' : ''}`}
             onSubmit={(event) => {
               event.preventDefault();
-              if (game.sendUserChat(chatText)) setChatText('');
+              if (!isAnalyzingReview && game.sendUserChat(chatText)) setChatText('');
             }}
           >
             <input
@@ -295,29 +487,30 @@ export const ChessPanel: React.FC<ChessPanelProps> = ({
               className="chess-chat-input"
               value={chatText}
               maxLength={MAX_CHESS_CHAT_CHARS}
+              disabled={isAnalyzingReview}
               onChange={(event) => setChatText(event.target.value)}
-              placeholder={`Talk to ${opponentName}...`}
+              placeholder={
+                isAnalyzingReview
+                  ? 'Analyzing moves...'
+                  : activeMoment
+                    ? `Ask ${opponentName} about this move...`
+                    : `Talk to ${opponentName}...`
+              }
               aria-label={`Message ${opponentName}`}
               autoComplete="off"
             />
             <button
               type="submit"
               className="chess-icon-btn"
-              disabled={!chatText.trim()}
+              disabled={isAnalyzingReview || !chatText.trim()}
               aria-label="Send message"
               title="Send"
             >
               <Send size={18} />
             </button>
           </form>
-        )}
-        {game.status === 'finished' && game.result && (
-          <div className={`chess-result chess-result--${game.result.outcome}`}>
-            <strong className="chess-result-label">{RESULT_TEXT[game.result.outcome]}</strong>
-            <ChessNewGameMenu variant="primary" onStart={startNewGame} />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {pendingPromotion && (
         <div className="chess-confirm-scrim">
