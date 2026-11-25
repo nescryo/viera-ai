@@ -159,6 +159,10 @@ describe('createStockfishEngine', () => {
     expect(aborted).toEqual({ bestMove: null, evalCp: undefined });
     expect(sent).toContain('stop');
 
+    // Malformed FEN returns empty analysis without marking the engine broken
+    const invalid = await engine.analyzePosition?.('not-a-valid-fen', 12);
+    expect(invalid).toEqual({ bestMove: null, evalCp: undefined });
+
     engine.dispose();
     expect(terminated).toBe(true);
   });

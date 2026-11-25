@@ -132,7 +132,7 @@ export function useChessReview(options: UseChessReviewOptions): UseChessReview {
         narrationCacheRef.current.set(move.ply.index, finalReaction);
       },
       () => {
-        narrationCacheRef.current.set(move.ply.index, template);
+        // Show fallback template without caching so a transient LLM error can retry if revisited
         applyReaction(template, template.emotion);
       }
     );
@@ -176,6 +176,7 @@ export function useChessReview(options: UseChessReviewOptions): UseChessReview {
       const engine = optionsRef.current.engineRef.current;
 
       if (fens.length === 0 || !engine?.analyzePosition) {
+        phaseRef.current = 'error';
         setState({
           ...INITIAL_REVIEW_STATE,
           phase: 'error',
@@ -190,6 +191,7 @@ export function useChessReview(options: UseChessReviewOptions): UseChessReview {
       gameResultRef.current = snapshot.result;
       momentsRef.current = [];
       currentIndexRef.current = 0;
+      phaseRef.current = 'analyzing';
 
       setState({
         phase: 'analyzing',
@@ -222,6 +224,7 @@ export function useChessReview(options: UseChessReviewOptions): UseChessReview {
         const reviewed = reviewUserMoves(plies, analyses, snapshot.userColor);
         const moments = pickKeyMoments(reviewed);
         if (moments.length === 0) {
+          phaseRef.current = 'error';
           setState({
             ...INITIAL_REVIEW_STATE,
             phase: 'error',
@@ -233,6 +236,7 @@ export function useChessReview(options: UseChessReviewOptions): UseChessReview {
 
         momentsRef.current = moments;
         currentIndexRef.current = 0;
+        phaseRef.current = 'ready';
         setState({
           phase: 'ready',
           progress: { completed: fens.length, total: fens.length },

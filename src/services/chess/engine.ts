@@ -345,7 +345,12 @@ export function createStockfishEngine(options: StockfishEngineOptions = {}): Che
         return { bestMove: null, evalCp: undefined };
       }
 
-      const legalMoves = new Chess(fen).moves({ verbose: true });
+      let legalMoves;
+      try {
+        legalMoves = new Chess(fen).moves({ verbose: true });
+      } catch {
+        return { bestMove: null, evalCp: undefined };
+      }
       if (legalMoves.length === 0) {
         return { bestMove: null, evalCp: undefined };
       }

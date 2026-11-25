@@ -942,7 +942,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chess-icon-btn { transition: none; }
+  .chess-icon-btn,
+  .chess-review-progress-fill { transition: none; }
   .chess-piece-slot.is-animating-a,
   .chess-piece-slot.is-animating-b {
     will-change: auto;
