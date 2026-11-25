@@ -13,6 +13,19 @@ export interface MoveAnimationStep {
   dy: number;
 }
 
+export interface BoardArrowGeometry {
+  /** Shaft start X in 0..8 board SVG coordinates. */
+  x1: number;
+  /** Shaft start Y in 0..8 board SVG coordinates. */
+  y1: number;
+  /** Shaft end X (base of the arrowhead) in 0..8 board SVG coordinates. */
+  x2: number;
+  /** Shaft end Y (base of the arrowhead) in 0..8 board SVG coordinates. */
+  y2: number;
+  /** Space-separated polygon points `"tipX,tipY leftX,leftY rightX,rightY"` for the arrowhead. */
+  headPoints: string;
+}
+
 const CASTLING_ROOK_MOVES: Record<string, { from: Square; to: Square }> = {
   'e1-g1': { from: 'h1', to: 'f1' },
   'e1-c1': { from: 'a1', to: 'd1' },
@@ -106,4 +119,52 @@ export function moveAnimationSteps(
     }
   }
   return steps;
+}
+
+/** Center of `square` in 0..8 SVG board coordinates for the given `orientation`. */
+export function squareCenter(square: Square, orientation: Color): { x: number; y: number } {
+  const { col, row } = squareGridPos(square, orientation);
+  return { x: col + 0.5, y: row + 0.5 };
+}
+
+/**
+ * Computes shaft and arrowhead geometry in 0..8 board coordinates for an arrow from `from` to `to`.
+ * Returns null if `from` and `to` are the same square.
+ */
+export function boardArrowGeometry(
+  from: Square,
+  to: Square,
+  orientation: Color
+): BoardArrowGeometry | null {
+  const start = squareCenter(from, orientation);
+  const end = squareCenter(to, orientation);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return null;
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const startPad = 0.16;
+  const tipPad = 0.08;
+  const headLen = 0.34;
+  const headHalfWidth = 0.22;
+
+  const tipX = end.x - ux * tipPad;
+  const tipY = end.y - uy * tipPad;
+  const baseX = tipX - ux * headLen;
+  const baseY = tipY - uy * headLen;
+  const leftX = baseX - uy * headHalfWidth;
+  const leftY = baseY + ux * headHalfWidth;
+  const rightX = baseX + uy * headHalfWidth;
+  const rightY = baseY - ux * headHalfWidth;
+
+  const round = (n: number) => Number(n.toFixed(3));
+  return {
+    x1: round(start.x + ux * startPad),
+    y1: round(start.y + uy * startPad),
+    x2: round(baseX),
+    y2: round(baseY),
+    headPoints: `${round(tipX)},${round(tipY)} ${round(leftX)},${round(leftY)} ${round(rightX)},${round(rightY)}`
+  };
 }

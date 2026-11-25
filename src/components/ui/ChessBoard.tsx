@@ -1,7 +1,14 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import type { Color, Square } from 'chess.js';
-import { isDarkSquare, moveAnimationSteps, orderedSquares, squareLabel, stepSquare } from '../../services/chess/boardView';
+import {
+  boardArrowGeometry,
+  isDarkSquare,
+  moveAnimationSteps,
+  orderedSquares,
+  squareLabel,
+  stepSquare
+} from '../../services/chess/boardView';
 import type { Direction, MoveAnimationStep } from '../../services/chess/boardView';
 import { ChessPiece } from './ChessPiece';
 import './ChessPanel.css';
@@ -14,9 +21,13 @@ interface ChessBoardProps {
   /** Squares the selected piece can move to. */
   targets: readonly Square[];
   lastMove: { from: Square; to: Square } | null;
+  /** Optional arrow showing the engine's recommended alternative move during review. */
+  bestMoveArrow?: { from: Square; to: Square } | null;
   /** Total half-moves played; slide animation runs only when this advances by 1. */
   moveCount?: number;
   checkSquare: Square | null;
+  /** Disables interactive square cursor cues while reviewing past positions. */
+  readOnly?: boolean;
   onSquareActivate: (square: Square) => void;
 }
 
@@ -55,12 +66,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   selected,
   targets,
   lastMove,
+  bestMoveArrow = null,
   moveCount = 0,
   checkSquare,
+  readOnly = false,
   onSquareActivate
 }) => {
   const position = useMemo(() => new Chess(fen), [fen]);
   const squares = useMemo(() => orderedSquares(orientation), [orientation]);
+  const arrow = useMemo(
+    () => (bestMoveArrow ? boardArrowGeometry(bestMoveArrow.from, bestMoveArrow.to, orientation) : null),
+    [bestMoveArrow, orientation]
+  );
   const boardRef = useRef<HTMLDivElement>(null);
   const [focusSquare, setFocusSquare] = useState<Square>(orientation === 'w' ? 'e2' : 'e7');
   const [prevTrigger, setPrevTrigger] = useState({ moveCount, orientation });
@@ -104,7 +121,12 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
   };
 
   return (
-    <div ref={boardRef} className="chess-board" role="group" aria-label="Chess board">
+    <div
+      ref={boardRef}
+      className={`chess-board${readOnly ? ' is-readonly' : ''}`}
+      role="group"
+      aria-label="Chess board"
+    >
       {squares.map((square) => {
         const piece = position.get(square);
         const anim = piece ? animations[square] : undefined;
@@ -153,6 +175,18 @@ export const ChessBoard: React.FC<ChessBoardProps> = ({
           </button>
         );
       })}
+      {arrow && (
+        <svg className="chess-board-arrow-layer" viewBox="0 0 8 8" aria-hidden="true">
+          <line
+            className="chess-best-arrow-shaft"
+            x1={arrow.x1}
+            y1={arrow.y1}
+            x2={arrow.x2}
+            y2={arrow.y2}
+          />
+          <polygon className="chess-best-arrow-head" points={arrow.headPoints} />
+        </svg>
+      )}
     </div>
   );
 };
